@@ -6,3 +6,6 @@ pubspec.lock
 
 # Generated bindings outputs
 binding_tests/generated/*.dart
+binding_tests/native/*.so
+binding_tests/native/*.dylib
+binding_tests/native/*.dll

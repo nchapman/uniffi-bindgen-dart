@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:test/test.dart';
+import '../generated/simple_fns.dart';
 
 void main() {
   test('binding test scaffold is wired', () {
@@ -19,5 +20,19 @@ void main() {
     expect(contents, contains('class SimpleFnsBindings {'));
     expect(contents, contains("libraryName = 'uniffi_simple_fns';"));
     expect(contents, contains('int add(int left, int right) {'));
+    expect(contents, contains('late final int Function(int left, int right) _add ='));
+  });
+
+  test('runtime ffi binding can call native add', () {
+    final libPath = Platform.environment['UBDG_SIMPLE_FNS_LIB'];
+    expect(
+      libPath,
+      isNotNull,
+      reason:
+          'UBDG_SIMPLE_FNS_LIB must point to the compiled simple-fns fixture library',
+    );
+
+    final bindings = SimpleFnsBindings(libraryPath: libPath);
+    expect(bindings.add(20, 22), 42);
   });
 }
