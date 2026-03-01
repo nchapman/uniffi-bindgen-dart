@@ -30,7 +30,9 @@ class SimpleFnsBindings {
   }
 }
 
+final SimpleFnsBindings _defaultBindings = SimpleFnsBindings();
+
 int add(int left, int right) {
-  throw UnimplementedError('TODO: bind to Rust FFI');
+  return _defaultBindings.add(left, right);
 }
 

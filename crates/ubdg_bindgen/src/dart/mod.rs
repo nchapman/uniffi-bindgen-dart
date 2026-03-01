@@ -179,7 +179,7 @@ fn render_dart_scaffold(
     out.push_str("  late final ffi.DynamicLibrary _lib = open();\n");
     out.push_str(&render_bound_methods(functions));
     out.push_str("}\n");
-    out.push_str(&render_function_stubs(functions));
+    out.push_str(&render_function_stubs(functions, ffi_class_name));
     out
 }
 
@@ -259,13 +259,19 @@ fn render_bound_methods(functions: &[UdlFunction]) -> String {
     out
 }
 
-fn render_function_stubs(functions: &[UdlFunction]) -> String {
+fn render_function_stubs(functions: &[UdlFunction], ffi_class_name: &str) -> String {
     if functions.is_empty() {
         return String::new();
     }
 
     let mut out = String::new();
+    let has_runtime_functions = functions.iter().any(is_runtime_ffi_compatible_function);
     out.push('\n');
+    if has_runtime_functions {
+        out.push_str(&format!(
+            "final {ffi_class_name} _defaultBindings = {ffi_class_name}();\n\n"
+        ));
+    }
     for f in functions {
         let fn_name = safe_dart_identifier(&to_lower_camel(&f.name));
         let return_type = f
@@ -285,9 +291,23 @@ fn render_function_stubs(functions: &[UdlFunction]) -> String {
             })
             .collect::<Vec<_>>()
             .join(", ");
+        let arg_names = f
+            .args
+            .iter()
+            .map(|a| safe_dart_identifier(&to_lower_camel(&a.name)))
+            .collect::<Vec<_>>()
+            .join(", ");
 
         out.push_str(&format!("{return_type} {fn_name}({args}) {{\n"));
-        out.push_str("  throw UnimplementedError('TODO: bind to Rust FFI');\n");
+        if is_runtime_ffi_compatible_function(f) {
+            if f.return_type.is_some() {
+                out.push_str(&format!("  return _defaultBindings.{fn_name}({arg_names});\n"));
+            } else {
+                out.push_str(&format!("  _defaultBindings.{fn_name}({arg_names});\n"));
+            }
+        } else {
+            out.push_str("  throw UnimplementedError('TODO: bind to Rust FFI');\n");
+        }
         out.push_str("}\n\n");
     }
     out
@@ -727,5 +747,37 @@ namespace keywords {
         generate_bindings(&args).expect("generate");
         let content = fs::read_to_string(out_dir.join("keywords.dart")).expect("read generated");
         assert!(content.contains("int class_(int switch_) {"));
+    }
+
+    #[test]
+    fn delegates_supported_top_level_functions_to_default_bindings() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = temp.path().join("simple.udl");
+        let out_dir = temp.path().join("out");
+        fs::write(
+            &source,
+            r#"
+namespace simple {
+  u32 add(u32 left, u32 right);
+  string greeting(string name);
+};
+"#,
+        )
+        .expect("write source");
+
+        let args = GenerateArgs {
+            source,
+            out_dir: out_dir.clone(),
+            library: false,
+            config: None,
+            crate_name: None,
+            no_format: false,
+        };
+
+        generate_bindings(&args).expect("generate");
+        let content = fs::read_to_string(out_dir.join("simple.dart")).expect("read generated");
+        assert!(content.contains("final SimpleFfi _defaultBindings = SimpleFfi();"));
+        assert!(content.contains("return _defaultBindings.add(left, right);"));
+        assert!(content.contains("throw UnimplementedError('TODO: bind to Rust FFI');"));
     }
 }
