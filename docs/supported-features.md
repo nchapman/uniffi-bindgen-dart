@@ -20,8 +20,8 @@ Legend:
 | Builtins | Implemented | int/float/bool/string/bytes/timestamp/duration |
 | Async futures | Partial | `[Async]` maps to idiomatic `Future<...>` APIs with rust-future poll/cancel/complete/free runtime flow for string, `void`, integer, bytes, optional-bytes, bytes-sequence, and string-keyed-map return families; builtin-backed custom typedefs in those families are supported; dedicated async golden coverage exists (`fixtures/futures-stress`) and runtime smoke includes failure + timeout/non-completion checks; external/custom parity is still incomplete |
 | Callback interfaces | Partial | sync/async/throws callback argument paths for top-level + object methods are implemented, including callback-interface method-level async/throws generation for primitive + string/optional string/record/enum return families with runtime fixture coverage |
-| Custom types | Partial | builtin-backed typedef unwrapping is implemented for runtime-compatible paths and validated for string, integer, and bytes/optional-bytes aliases across sync/async top-level + object calls; broader custom lift/lower coverage is pending |
-| External/remote types | Planned | pending |
+| Custom types | Partial | builtin-backed typedef unwrapping is implemented for runtime-compatible paths and validated for string, integer, bytes/optional-bytes, and string-keyed custom-map aliases across sync/async top-level + object calls; dedicated `custom-types-demo` golden fixture is in place; broader custom lift/lower coverage is pending |
+| External/remote types | Planned | pending; current UniFFI type surface in this integration path does not yet expose a standalone external-type variant for direct mapping, so ext-type support needs library/component metadata wiring first |
 | Rename/exclude/docstrings | Planned | pending |
 
 ## Notes

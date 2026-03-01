@@ -48,6 +48,9 @@ namespace simple_fns {
   Blob? blob_maybe_echo(Blob? input);
   [Async]
   Blob? async_blob_maybe_echo(Blob? input);
+  record<string, Count> count_map_echo(record<string, Count> items);
+  [Async]
+  record<string, Count> async_count_map_echo(record<string, Count> items);
   [Async]
   string async_fail_string();
   [Async]
@@ -167,6 +170,9 @@ interface Counter {
   Blob? blob_maybe_echo(Blob? input);
   [Async]
   Blob? async_blob_maybe_echo(Blob? input);
+  record<string, Count> count_map_echo(record<string, Count> items);
+  [Async]
+  record<string, Count> async_count_map_echo(record<string, Count> items);
   [Throws=MathError]
   i32 divide_by(i32 divisor);
   [Throws=MathError]

@@ -1,0 +1,40 @@
+[Custom]
+typedef string Label;
+[Custom]
+typedef u32 Count;
+[Custom]
+typedef bytes Blob;
+
+namespace custom_types_demo {
+  Label label_echo(Label input);
+  Count count_add(Count left, Count right);
+  Blob blob_echo(Blob input);
+  Blob? blob_maybe_echo(Blob? input);
+  record<string, Count> count_map_echo(record<string, Count> items);
+  [Async]
+  Label async_label_echo(Label input);
+  [Async]
+  Count async_count_add(Count left, Count right);
+  [Async]
+  Blob async_blob_echo(Blob input);
+  [Async]
+  Blob? async_blob_maybe_echo(Blob? input);
+  [Async]
+  record<string, Count> async_count_map_echo(record<string, Count> items);
+};
+
+interface CustomCounter {
+  constructor(Count initial);
+  Count count_plus(Count amount);
+  Blob blob_echo(Blob input);
+  Blob? blob_maybe_echo(Blob? input);
+  record<string, Count> count_map_echo(record<string, Count> items);
+  [Async]
+  Count async_count_plus(Count amount);
+  [Async]
+  Blob async_blob_echo(Blob input);
+  [Async]
+  Blob? async_blob_maybe_echo(Blob? input);
+  [Async]
+  record<string, Count> async_count_map_echo(record<string, Count> items);
+};

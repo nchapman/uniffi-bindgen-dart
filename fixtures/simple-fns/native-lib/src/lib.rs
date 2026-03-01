@@ -889,6 +889,38 @@ pub extern "C" fn async_blob_maybe_echo(input: RustBufferOpt) -> u64 {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn count_map_echo(items: *const c_char) -> *mut c_char {
+    let mut counts = if items.is_null() {
+        HashMap::<String, u32>::new()
+    } else {
+        let payload = unsafe { CStr::from_ptr(items) }
+            .to_string_lossy()
+            .into_owned();
+        serde_json::from_str::<HashMap<String, u32>>(&payload).unwrap_or_default()
+    };
+    let total = counts.values().copied().sum::<u32>();
+    counts.insert("total".to_string(), total);
+    CString::new(serde_json::to_string(&counts).unwrap_or_else(|_| "{}".to_string()))
+        .expect("valid CString")
+        .into_raw()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn async_count_map_echo(items: *const c_char) -> u64 {
+    let mut counts = if items.is_null() {
+        HashMap::<String, u32>::new()
+    } else {
+        let payload = unsafe { CStr::from_ptr(items) }
+            .to_string_lossy()
+            .into_owned();
+        serde_json::from_str::<HashMap<String, u32>>(&payload).unwrap_or_default()
+    };
+    let total = counts.values().copied().sum::<u32>();
+    counts.insert("total".to_string(), total);
+    enqueue_string_future(serde_json::to_string(&counts).unwrap_or_else(|_| "{}".to_string()))
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn async_fail_string() -> u64 {
     enqueue_async_future(AsyncFutureResult::Failed(
         "forced async failure".to_string(),
@@ -1984,6 +2016,54 @@ pub extern "C" fn counter_async_blob_maybe_echo(_handle: u64, input: RustBufferO
     } else {
         enqueue_bytes_opt_future(Some(rust_buffer_to_vec(input.value)))
     }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_count_map_echo(handle: u64, items: *const c_char) -> *mut c_char {
+    let mut counts = if items.is_null() {
+        HashMap::<String, u32>::new()
+    } else {
+        let payload = unsafe { CStr::from_ptr(items) }
+            .to_string_lossy()
+            .into_owned();
+        serde_json::from_str::<HashMap<String, u32>>(&payload).unwrap_or_default()
+    };
+    let counter_value = COUNTERS
+        .lock()
+        .expect("counter map lock")
+        .get(&handle)
+        .copied()
+        .unwrap_or_default()
+        .max(0) as u32;
+    counts.insert("counter".to_string(), counter_value);
+    let total = counts.values().copied().sum::<u32>();
+    counts.insert("total".to_string(), total);
+    CString::new(serde_json::to_string(&counts).unwrap_or_else(|_| "{}".to_string()))
+        .expect("valid CString")
+        .into_raw()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_async_count_map_echo(handle: u64, items: *const c_char) -> u64 {
+    let mut counts = if items.is_null() {
+        HashMap::<String, u32>::new()
+    } else {
+        let payload = unsafe { CStr::from_ptr(items) }
+            .to_string_lossy()
+            .into_owned();
+        serde_json::from_str::<HashMap<String, u32>>(&payload).unwrap_or_default()
+    };
+    let counter_value = COUNTERS
+        .lock()
+        .expect("counter map lock")
+        .get(&handle)
+        .copied()
+        .unwrap_or_default()
+        .max(0) as u32;
+    counts.insert("counter".to_string(), counter_value);
+    let total = counts.values().copied().sum::<u32>();
+    counts.insert("total".to_string(), total);
+    enqueue_string_future(serde_json::to_string(&counts).unwrap_or_else(|_| "{}".to_string()))
 }
 
 #[unsafe(no_mangle)]

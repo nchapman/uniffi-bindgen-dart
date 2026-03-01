@@ -147,6 +147,8 @@ void main() {
     expect(contents, contains('Future<Uint8List> asyncBlobEcho(Uint8List input) {'));
     expect(contents, contains('Uint8List? blobMaybeEcho(Uint8List? input) {'));
     expect(contents, contains('Future<Uint8List?> asyncBlobMaybeEcho(Uint8List? input) {'));
+    expect(contents, contains('Map<String, int> countMapEcho(Map<String, int> items) {'));
+    expect(contents, contains('Future<Map<String, int>> asyncCountMapEcho(Map<String, int> items) {'));
     expect(contents, contains('Future<String> asyncFailString() {'));
     expect(contents, contains('Future<String> asyncNeverString() {'));
     expect(contents, contains('int asyncCancelCount() {'));
@@ -287,6 +289,8 @@ void main() {
     expect(contents, contains('Future<Uint8List> asyncBlobEcho(Uint8List input) {'));
     expect(contents, contains('Uint8List? blobMaybeEcho(Uint8List? input) {'));
     expect(contents, contains('Future<Uint8List?> asyncBlobMaybeEcho(Uint8List? input) {'));
+    expect(contents, contains('Map<String, int> countMapEcho(Map<String, int> items) {'));
+    expect(contents, contains('Future<Map<String, int>> asyncCountMapEcho(Map<String, int> items) {'));
     expect(contents, contains('Person snapshotPerson() {'));
     expect(contents, contains('Outcome snapshotOutcome() {'));
     expect(contents, contains('Uint8List snapshotBytes() {'));
@@ -494,6 +498,14 @@ void main() {
     expect(await bindings.asyncBlobMaybeEcho(Uint8List.fromList([2])), Uint8List.fromList([2]));
     expect(await bindings.asyncBlobMaybeEcho(null), isNull);
     expect(bindings.bytesFreeCount(), customBlobBytesBefore + 4);
+    final bindingsCountMapEcho = bindings.countMapEcho({'a': 2, 'b': 4});
+    expect(bindingsCountMapEcho['a'], 2);
+    expect(bindingsCountMapEcho['b'], 4);
+    expect(bindingsCountMapEcho['total'], 6);
+    final bindingsAsyncCountMapEcho = await bindings.asyncCountMapEcho({'c': 1, 'd': 2});
+    expect(bindingsAsyncCountMapEcho['c'], 1);
+    expect(bindingsAsyncCountMapEcho['d'], 2);
+    expect(bindingsAsyncCountMapEcho['total'], 3);
     final cancelBeforeFail = bindings.asyncCancelCount();
     final freeBeforeFail = bindings.asyncFreeCount();
     await expectLater(bindings.asyncFailString(), throwsA(isA<StateError>()));
@@ -507,7 +519,7 @@ void main() {
     );
     expect(bindings.asyncCancelCount(), cancelBeforeTimeout);
     expect(bindings.asyncFreeCount(), freeBeforeTimeout);
-    expect(bindings.freeCount(), 10);
+    expect(bindings.freeCount(), 12);
     expect(bindings.checkedDivide(12, 3), 4);
     expect(
       () => bindings.checkedDivide(10, 0),
@@ -523,7 +535,7 @@ void main() {
         ),
       ),
     );
-    expect(bindings.freeCount(), 13);
+    expect(bindings.freeCount(), 15);
     final counter = bindings.counterCreateNew(10);
     expect(counter.currentValue(), 10);
     counter.addValue(5);
@@ -573,6 +585,14 @@ void main() {
     expect(await counter.asyncBlobMaybeEcho(Uint8List.fromList([7])), Uint8List.fromList([7]));
     expect(await counter.asyncBlobMaybeEcho(null), isNull);
     expect(bindings.bytesFreeCount(), counterBlobBytesBefore + 4);
+    final counterCountMap = counter.countMapEcho({'x': 2});
+    expect(counterCountMap['x'], 2);
+    expect(counterCountMap['counter'], 5);
+    expect(counterCountMap['total'], 7);
+    final counterAsyncCountMap = await counter.asyncCountMapEcho({'y': 3});
+    expect(counterAsyncCountMap['y'], 3);
+    expect(counterAsyncCountMap['counter'], 5);
+    expect(counterAsyncCountMap['total'], 8);
     expect(counter.maybeLabel('tail'), 'counter:5:tail');
     expect(counter.maybeLabel(null), 'counter:5:none');
     counter.ingestPerson(const Person(name: 'Eve', age: 9));
@@ -797,6 +817,13 @@ void main() {
     expect(await asyncBlobMaybeEcho(Uint8List.fromList([5])), Uint8List.fromList([5]));
     expect(await asyncBlobMaybeEcho(null), isNull);
     expect(bytesFreeCount(), topBlobBytesBefore + 4);
+    final topCountMapEcho = countMapEcho({'m': 9});
+    expect(topCountMapEcho['m'], 9);
+    expect(topCountMapEcho['total'], 9);
+    final topAsyncCountMapEcho = await asyncCountMapEcho({'n': 4, 'o': 1});
+    expect(topAsyncCountMapEcho['n'], 4);
+    expect(topAsyncCountMapEcho['o'], 1);
+    expect(topAsyncCountMapEcho['total'], 5);
     final topCancelBeforeFail = asyncCancelCount();
     final topFreeBeforeFail = asyncFreeCount();
     await expectLater(asyncFailString(), throwsA(isA<StateError>()));
@@ -810,7 +837,7 @@ void main() {
     );
     expect(asyncCancelCount(), topCancelBeforeTimeout);
     expect(asyncFreeCount(), topFreeBeforeTimeout);
-    expect(freeCount(), 10);
+    expect(freeCount(), 12);
     expect(checkedDivide(20, 4), 5);
     expect(
       () => checkedDivide(7, 0),
@@ -826,13 +853,13 @@ void main() {
         ),
       ),
     );
-    expect(freeCount(), 13);
+    expect(freeCount(), 15);
     expect(maybeGreet('ffi'), 'maybe, ffi');
-    expect(freeCount(), 14);
+    expect(freeCount(), 16);
     expect(maybeGreet(null), isNull);
-    expect(freeCount(), 14);
+    expect(freeCount(), 16);
     expect(() => brokenGreet(), throwsA(isA<StateError>()));
-    expect(freeCount(), 14);
+    expect(freeCount(), 16);
     expect(isEven(10), isTrue);
     expect(cycleColor(Color.red), Color.green);
     final freeBeforeTopOutcome = freeCount();
@@ -868,6 +895,14 @@ void main() {
     expect(await topCounter.asyncBlobMaybeEcho(Uint8List.fromList([8])), Uint8List.fromList([8]));
     expect(await topCounter.asyncBlobMaybeEcho(null), isNull);
     expect(bytesFreeCount(), topCounterBlobBytesBefore + 4);
+    final topCounterCountMap = topCounter.countMapEcho({'k': 2});
+    expect(topCounterCountMap['k'], 2);
+    expect(topCounterCountMap['counter'], 3);
+    expect(topCounterCountMap['total'], 5);
+    final topCounterAsyncCountMap = await topCounter.asyncCountMapEcho({'w': 5});
+    expect(topCounterAsyncCountMap['w'], 5);
+    expect(topCounterAsyncCountMap['counter'], 3);
+    expect(topCounterAsyncCountMap['total'], 8);
     expect(
       () => topCounter.checkedApplyAdderWith(const _TestAdder(2), 2, 0),
       throwsA(isA<MathErrorExceptionDivisionByZero>()),

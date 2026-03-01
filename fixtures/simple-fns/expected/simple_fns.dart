@@ -1743,6 +1743,78 @@ class SimpleFnsBindings {
     }
   }
 
+  late final int Function(ffi.Pointer<Utf8> items) _asyncCountMapEcho = _lib.lookupFunction<ffi.Uint64 Function(ffi.Pointer<Utf8> items), int Function(ffi.Pointer<Utf8> items)>('async_count_map_echo');
+  late final void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData) _asyncCountMapEchoRustFuturePoll = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, ffi.Uint64 callbackData), void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData)>('rust_future_poll_string');
+  late final void Function(int handle) _asyncCountMapEchoRustFutureCancel = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_cancel_string');
+  late final ffi.Pointer<Utf8> Function(int handle, ffi.Pointer<_RustCallStatus> outStatus) _asyncCountMapEchoRustFutureComplete = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle, ffi.Pointer<_RustCallStatus> outStatus), ffi.Pointer<Utf8> Function(int handle, ffi.Pointer<_RustCallStatus> outStatus)>('rust_future_complete_string');
+  late final void Function(int handle) _asyncCountMapEchoRustFutureFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_free_string');
+
+  Future<Map<String, int>> asyncCountMapEcho(Map<String, int> items) async {
+    final String itemsNativeJson = jsonEncode(items.map((key, value) => MapEntry(key, value)));
+    final ffi.Pointer<Utf8> itemsNative = itemsNativeJson.toNativeUtf8();
+    final int futureHandle;
+    try {
+      futureHandle = _asyncCountMapEcho(itemsNative);
+    } finally {
+    calloc.free(itemsNative);
+    }
+    final StreamController<int> pollEvents = StreamController<int>.broadcast();
+    final callback = ffi.NativeCallable<ffi.Void Function(ffi.Uint64, ffi.Int8)>.listener((int _, int pollResult) {
+      pollEvents.add(pollResult);
+    });
+    try {
+      _asyncCountMapEchoRustFuturePoll(futureHandle, callback.nativeFunction, 0);
+      while (true) {
+        final int pollResult = await pollEvents.stream.first;
+        if (pollResult == _rustFuturePollReady) {
+          break;
+        }
+        if (pollResult == _rustFuturePollWake) {
+          _asyncCountMapEchoRustFuturePoll(futureHandle, callback.nativeFunction, 0);
+          continue;
+        }
+        throw StateError('Rust future poll returned invalid status for async_count_map_echo: $pollResult');
+      }
+      final ffi.Pointer<_RustCallStatus> outStatusPtr = calloc<_RustCallStatus>();
+      try {
+        final ffi.Pointer<Utf8> resultPtr = _asyncCountMapEchoRustFutureComplete(futureHandle, outStatusPtr);
+        final int statusCode = outStatusPtr.ref.code;
+        if (statusCode == _rustCallStatusSuccess) {
+          if (resultPtr == ffi.nullptr) {
+            throw StateError('Rust returned null for async_count_map_echo');
+          }
+          try {
+            final String payload = resultPtr.toDartString();
+            return (jsonDecode(payload) as Map<String, dynamic>).map((key, value) => MapEntry(key, (value as num).toInt()));
+          } finally {
+            _rustStringFree(resultPtr);
+          }
+        }
+        if (statusCode == _rustCallStatusCancelled) {
+          throw StateError('Rust future was cancelled for async_count_map_echo');
+        }
+        final ffi.Pointer<Utf8> errorPtr = outStatusPtr.ref.errorBuf;
+        if (errorPtr != ffi.nullptr) {
+          try {
+            throw StateError(errorPtr.toDartString());
+          } finally {
+            _rustStringFree(errorPtr);
+          }
+        }
+        throw StateError('Rust future failed for async_count_map_echo with status code: $statusCode');
+      } finally {
+        calloc.free(outStatusPtr);
+      }
+    } catch (_) {
+      _asyncCountMapEchoRustFutureCancel(futureHandle);
+      rethrow;
+    } finally {
+      await pollEvents.close();
+      callback.close();
+      _asyncCountMapEchoRustFutureFree(futureHandle);
+    }
+  }
+
   late final int Function(ffi.Pointer<Utf8> items) _asyncCounts = _lib.lookupFunction<ffi.Uint64 Function(ffi.Pointer<Utf8> items), int Function(ffi.Pointer<Utf8> items)>('async_counts');
   late final void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData) _asyncCountsRustFuturePoll = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, ffi.Uint64 callbackData), void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData)>('rust_future_poll_string');
   late final void Function(int handle) _asyncCountsRustFutureCancel = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_cancel_string');
@@ -2456,6 +2528,27 @@ class SimpleFnsBindings {
       return _countAdd(left, right);
   }
 
+  late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> items) _countMapEcho = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> items), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> items)>('count_map_echo');
+
+  Map<String, int> countMapEcho(Map<String, int> items) {
+    final String itemsNativeJson = jsonEncode(items.map((key, value) => MapEntry(key, value)));
+    final ffi.Pointer<Utf8> itemsNative = itemsNativeJson.toNativeUtf8();
+    try {
+      final ffi.Pointer<Utf8> resultPtr = _countMapEcho(itemsNative);
+      if (resultPtr == ffi.nullptr) {
+        throw StateError('Rust returned null for count_map_echo');
+      }
+      try {
+        final String payload = resultPtr.toDartString();
+        return (jsonDecode(payload) as Map<String, dynamic>).map((key, value) => MapEntry(key, (value as num).toInt()));
+      } finally {
+        _rustStringFree(resultPtr);
+      }
+    } finally {
+    calloc.free(itemsNative);
+    }
+  }
+
   late final int Function() _currentTick = _lib.lookupFunction<ffi.Uint32 Function(), int Function()>('current_tick');
 
   int currentTick() {
@@ -2917,6 +3010,78 @@ class SimpleFnsBindings {
       await pollEvents.close();
       callback.close();
       _counterAsyncBlobMaybeEchoRustFutureFree(futureHandle);
+    }
+  }
+
+  late final int Function(int handle, ffi.Pointer<Utf8> items) _counterAsyncCountMapEcho = _lib.lookupFunction<ffi.Uint64 Function(ffi.Uint64 handle, ffi.Pointer<Utf8> items), int Function(int handle, ffi.Pointer<Utf8> items)>('counter_async_count_map_echo');
+  late final void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData) _counterAsyncCountMapEchoRustFuturePoll = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, ffi.Uint64 callbackData), void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData)>('rust_future_poll_string');
+  late final void Function(int handle) _counterAsyncCountMapEchoRustFutureCancel = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_cancel_string');
+  late final ffi.Pointer<Utf8> Function(int handle, ffi.Pointer<_RustCallStatus> outStatus) _counterAsyncCountMapEchoRustFutureComplete = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle, ffi.Pointer<_RustCallStatus> outStatus), ffi.Pointer<Utf8> Function(int handle, ffi.Pointer<_RustCallStatus> outStatus)>('rust_future_complete_string');
+  late final void Function(int handle) _counterAsyncCountMapEchoRustFutureFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_free_string');
+
+  Future<Map<String, int>> counterInvokeAsyncCountMapEcho(int handle, Map<String, int> items) async {
+    final String itemsNativeJson = jsonEncode(items.map((key, value) => MapEntry(key, value)));
+    final ffi.Pointer<Utf8> itemsNative = itemsNativeJson.toNativeUtf8();
+    final int futureHandle;
+    try {
+      futureHandle = _counterAsyncCountMapEcho(handle, itemsNative);
+    } finally {
+    calloc.free(itemsNative);
+    }
+    final StreamController<int> pollEvents = StreamController<int>.broadcast();
+    final callback = ffi.NativeCallable<ffi.Void Function(ffi.Uint64, ffi.Int8)>.listener((int _, int pollResult) {
+      pollEvents.add(pollResult);
+    });
+    try {
+      _counterAsyncCountMapEchoRustFuturePoll(futureHandle, callback.nativeFunction, 0);
+      while (true) {
+        final int pollResult = await pollEvents.stream.first;
+        if (pollResult == _rustFuturePollReady) {
+          break;
+        }
+        if (pollResult == _rustFuturePollWake) {
+          _counterAsyncCountMapEchoRustFuturePoll(futureHandle, callback.nativeFunction, 0);
+          continue;
+        }
+        throw StateError('Rust future poll returned invalid status for counter_async_count_map_echo: $pollResult');
+      }
+      final ffi.Pointer<_RustCallStatus> outStatusPtr = calloc<_RustCallStatus>();
+      try {
+        final ffi.Pointer<Utf8> resultPtr = _counterAsyncCountMapEchoRustFutureComplete(futureHandle, outStatusPtr);
+        final int statusCode = outStatusPtr.ref.code;
+        if (statusCode == _rustCallStatusSuccess) {
+          if (resultPtr == ffi.nullptr) {
+            throw StateError('Rust returned null for counter_async_count_map_echo');
+          }
+          try {
+            final String payload = resultPtr.toDartString();
+            return (jsonDecode(payload) as Map<String, dynamic>).map((key, value) => MapEntry(key, (value as num).toInt()));
+          } finally {
+            _rustStringFree(resultPtr);
+          }
+        }
+        if (statusCode == _rustCallStatusCancelled) {
+          throw StateError('Rust future was cancelled for counter_async_count_map_echo');
+        }
+        final ffi.Pointer<Utf8> errorPtr = outStatusPtr.ref.errorBuf;
+        if (errorPtr != ffi.nullptr) {
+          try {
+            throw StateError(errorPtr.toDartString());
+          } finally {
+            _rustStringFree(errorPtr);
+          }
+        }
+        throw StateError('Rust future failed for counter_async_count_map_echo with status code: $statusCode');
+      } finally {
+        calloc.free(outStatusPtr);
+      }
+    } catch (_) {
+      _counterAsyncCountMapEchoRustFutureCancel(futureHandle);
+      rethrow;
+    } finally {
+      await pollEvents.close();
+      callback.close();
+      _counterAsyncCountMapEchoRustFutureFree(futureHandle);
     }
   }
 
@@ -3473,6 +3638,27 @@ class SimpleFnsBindings {
     }
   }
 
+  late final ffi.Pointer<Utf8> Function(int handle, ffi.Pointer<Utf8> items) _counterCountMapEcho = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle, ffi.Pointer<Utf8> items), ffi.Pointer<Utf8> Function(int handle, ffi.Pointer<Utf8> items)>('counter_count_map_echo');
+
+  Map<String, int> counterInvokeCountMapEcho(int handle, Map<String, int> items) {
+    final String itemsNativeJson = jsonEncode(items.map((key, value) => MapEntry(key, value)));
+    final ffi.Pointer<Utf8> itemsNative = itemsNativeJson.toNativeUtf8();
+    try {
+    final ffi.Pointer<Utf8> resultPtr = _counterCountMapEcho(handle, itemsNative);
+    if (resultPtr == ffi.nullptr) {
+      throw StateError('Rust returned null for counter_count_map_echo');
+    }
+    try {
+      final String payload = resultPtr.toDartString();
+      return (jsonDecode(payload) as Map<String, dynamic>).map((key, value) => MapEntry(key, (value as num).toInt()));
+    } finally {
+      _rustStringFree(resultPtr);
+    }
+    } finally {
+    calloc.free(itemsNative);
+    }
+  }
+
   late final int Function(int handle, int amount) _counterCountPlus = _lib.lookupFunction<ffi.Uint32 Function(ffi.Uint64 handle, ffi.Uint32 amount), int Function(int handle, int amount)>('counter_count_plus');
 
   int counterInvokeCountPlus(int handle, int amount) {
@@ -3783,6 +3969,11 @@ final class Counter {
     return _ffi.counterInvokeAsyncBlobMaybeEcho(_handle, input);
   }
 
+  Future<Map<String, int>> asyncCountMapEcho(Map<String, int> items) {
+    _ensureOpen();
+    return _ffi.counterInvokeAsyncCountMapEcho(_handle, items);
+  }
+
   Future<int> asyncCountPlus(int amount) {
     _ensureOpen();
     return _ffi.counterInvokeAsyncCountPlus(_handle, amount);
@@ -3836,6 +4027,11 @@ final class Counter {
   int chunksTotalLen(List<Uint8List> input) {
     _ensureOpen();
     return _ffi.counterInvokeChunksTotalLen(_handle, input);
+  }
+
+  Map<String, int> countMapEcho(Map<String, int> items) {
+    _ensureOpen();
+    return _ffi.counterInvokeCountMapEcho(_handle, items);
   }
 
   int countPlus(int amount) {
@@ -4017,6 +4213,10 @@ Future<int> asyncCountAdd(int left, int right) {
   return _bindings().asyncCountAdd(left, right);
 }
 
+Future<Map<String, int>> asyncCountMapEcho(Map<String, int> items) {
+  return _bindings().asyncCountMapEcho(items);
+}
+
 Future<Map<String, int>> asyncCounts(Map<String, int> items) {
   return _bindings().asyncCounts(items);
 }
@@ -4087,6 +4287,10 @@ int checkedDivide(int left, int right) {
 
 int countAdd(int left, int right) {
   return _bindings().countAdd(left, right);
+}
+
+Map<String, int> countMapEcho(Map<String, int> items) {
+  return _bindings().countMapEcho(items);
 }
 
 int currentTick() {
