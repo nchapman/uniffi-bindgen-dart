@@ -509,30 +509,35 @@ void main() {
         contents, contains('final class MethodErrorExceptionDivisionByZero'));
     expect(contents, contains('final class MethodErrorExceptionNegativeInput'));
     expect(
-        contents,
-        contains(
-            "'uniffi_uniffi_record_enum_methods_fn_method_methodpoint_async_label'"));
+      contents,
+      contains(
+          "throw UnsupportedError('runtime invocation for this UniFFI ABI (RustCallStatus out-arg) is not implemented yet (methodpoint_async_label)');"),
+    );
     expect(
-        contents,
-        contains(
-            "'uniffi_uniffi_record_enum_methods_fn_method_methodstate_checked_code'"));
+      contents,
+      contains(
+          "throw UnsupportedError('runtime invocation for this UniFFI ABI (RustCallStatus out-arg) is not implemented yet (methodstate_checked_code)');"),
+    );
     expect(
-        contents,
-        contains(
-            "'uniffi_uniffi_record_enum_methods_fn_method_methodoutcome_checked_value'"));
-    expect(contents, contains('_methodPointNew = _lib.lookupFunction<'));
+      contents,
+      contains(
+          "throw UnsupportedError('runtime invocation for this UniFFI ABI (RustCallStatus out-arg) is not implemented yet (methodoutcome_checked_value)');"),
+    );
     expect(
-        contents,
-        contains(
-            "'uniffi_uniffi_record_enum_methods_fn_func_method_point_new'"));
+      contents,
+      contains(
+          "throw UnsupportedError('runtime invocation for this UniFFI ABI (RustCallStatus out-arg) is not implemented yet (method_point_new)');"),
+    );
     expect(
-        contents,
-        contains(
-            "'uniffi_uniffi_record_enum_methods_fn_func_method_state_busy'"));
+      contents,
+      contains(
+          "throw UnsupportedError('runtime invocation for this UniFFI ABI (RustCallStatus out-arg) is not implemented yet (method_state_busy)');"),
+    );
     expect(
-        contents,
-        contains(
-            "'uniffi_uniffi_record_enum_methods_fn_func_method_outcome_ok'"));
+      contents,
+      contains(
+          "throw UnsupportedError('runtime invocation for this UniFFI ABI (RustCallStatus out-arg) is not implemented yet (method_outcome_ok)');"),
+    );
     expect(contents, contains('class RecordEnumMethodsFfi {'));
   });
 
@@ -557,6 +562,20 @@ void main() {
         rem.MethodOutcomeFfiCodec.encode(okOutcome));
     expect(decodedOk, isA<rem.MethodOutcomeOk>());
     expect((decodedOk as rem.MethodOutcomeOk).value, 7);
+  });
+
+  test('record/enum runtime methods fail fast with unsupported ABI error', () {
+    final point = rem.MethodPoint(x: 6, y: 3);
+    expect(
+      () => point.checksum(),
+      throwsA(
+        isA<UnsupportedError>().having(
+          (e) => e.message,
+          'message',
+          contains('RustCallStatus out-arg'),
+        ),
+      ),
+    );
   });
 
   test('runtime ffi binding can call native exports', () async {

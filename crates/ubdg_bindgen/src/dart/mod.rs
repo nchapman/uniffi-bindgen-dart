@@ -4,7 +4,9 @@ use std::path::Path;
 
 use anyhow::{bail, Context, Result};
 use camino::Utf8Path;
-use uniffi_bindgen::interface::{AsType, ComponentInterface, DefaultValue, Literal, Radix, Type};
+use uniffi_bindgen::interface::{
+    ffi::FfiType, AsType, ComponentInterface, DefaultValue, Literal, Radix, Type,
+};
 
 use crate::GenerateArgs;
 
@@ -115,6 +117,7 @@ fn extract_namespace_from_udl(source: &Path) -> Option<String> {
 struct UdlFunction {
     name: String,
     ffi_symbol: Option<String>,
+    runtime_unsupported: Option<String>,
     docstring: Option<String>,
     is_async: bool,
     return_type: Option<Type>,
@@ -143,6 +146,7 @@ struct UdlObject {
 struct UdlObjectConstructor {
     name: String,
     ffi_symbol: Option<String>,
+    runtime_unsupported: Option<String>,
     docstring: Option<String>,
     is_async: bool,
     args: Vec<UdlArg>,
@@ -153,6 +157,7 @@ struct UdlObjectConstructor {
 struct UdlObjectMethod {
     name: String,
     ffi_symbol: Option<String>,
+    runtime_unsupported: Option<String>,
     docstring: Option<String>,
     is_async: bool,
     return_type: Option<Type>,
@@ -327,6 +332,9 @@ fn component_interface_to_metadata(
         .map(|f| UdlFunction {
             name: f.name().to_string(),
             ffi_symbol: include_ffi_symbols.then(|| f.ffi_func().name().to_string()),
+            runtime_unsupported: include_ffi_symbols
+                .then(|| runtime_unsupported_reason_for_ffi_func(f.ffi_func()))
+                .flatten(),
             docstring: f.docstring().map(ToString::to_string),
             is_async: f.is_async(),
             return_type: f.return_type().cloned(),
@@ -372,6 +380,9 @@ fn component_interface_to_metadata(
                 .map(|m| UdlObjectMethod {
                     name: m.name().to_string(),
                     ffi_symbol: include_ffi_symbols.then(|| m.ffi_func().name().to_string()),
+                    runtime_unsupported: include_ffi_symbols
+                        .then(|| runtime_unsupported_reason_for_ffi_func(m.ffi_func()))
+                        .flatten(),
                     docstring: m.docstring().map(ToString::to_string),
                     is_async: m.is_async(),
                     return_type: m.return_type().cloned(),
@@ -421,6 +432,9 @@ fn component_interface_to_metadata(
                 .map(|m| UdlObjectMethod {
                     name: m.name().to_string(),
                     ffi_symbol: include_ffi_symbols.then(|| m.ffi_func().name().to_string()),
+                    runtime_unsupported: include_ffi_symbols
+                        .then(|| runtime_unsupported_reason_for_ffi_func(m.ffi_func()))
+                        .flatten(),
                     docstring: m.docstring().map(ToString::to_string),
                     is_async: m.is_async(),
                     return_type: m.return_type().cloned(),
@@ -449,6 +463,9 @@ fn component_interface_to_metadata(
                 .map(|m| UdlObjectMethod {
                     name: m.name().to_string(),
                     ffi_symbol: include_ffi_symbols.then(|| m.ffi_func().name().to_string()),
+                    runtime_unsupported: include_ffi_symbols
+                        .then(|| runtime_unsupported_reason_for_ffi_func(m.ffi_func()))
+                        .flatten(),
                     docstring: m.docstring().map(ToString::to_string),
                     is_async: m.is_async(),
                     return_type: m.return_type().cloned(),
@@ -486,6 +503,7 @@ fn component_interface_to_metadata(
                 methods.push(UdlObjectMethod {
                     name: "uniffi_trait_display".to_string(),
                     ffi_symbol: None,
+                    runtime_unsupported: None,
                     docstring: None,
                     is_async: false,
                     return_type: Some(Type::String),
@@ -498,6 +516,7 @@ fn component_interface_to_metadata(
                 methods.push(UdlObjectMethod {
                     name: "uniffi_trait_debug".to_string(),
                     ffi_symbol: None,
+                    runtime_unsupported: None,
                     docstring: None,
                     is_async: false,
                     return_type: Some(Type::String),
@@ -510,6 +529,7 @@ fn component_interface_to_metadata(
                 methods.push(UdlObjectMethod {
                     name: "uniffi_trait_hash".to_string(),
                     ffi_symbol: None,
+                    runtime_unsupported: None,
                     docstring: None,
                     is_async: false,
                     return_type: Some(Type::UInt64),
@@ -522,6 +542,7 @@ fn component_interface_to_metadata(
                 methods.push(UdlObjectMethod {
                     name: "uniffi_trait_eq".to_string(),
                     ffi_symbol: None,
+                    runtime_unsupported: None,
                     docstring: None,
                     is_async: false,
                     return_type: Some(Type::Boolean),
@@ -539,6 +560,7 @@ fn component_interface_to_metadata(
                 methods.push(UdlObjectMethod {
                     name: "uniffi_trait_ne".to_string(),
                     ffi_symbol: None,
+                    runtime_unsupported: None,
                     docstring: None,
                     is_async: false,
                     return_type: Some(Type::Boolean),
@@ -556,6 +578,7 @@ fn component_interface_to_metadata(
                 methods.push(UdlObjectMethod {
                     name: "uniffi_trait_ord_cmp".to_string(),
                     ffi_symbol: None,
+                    runtime_unsupported: None,
                     docstring: None,
                     is_async: false,
                     return_type: Some(Type::Int8),
@@ -580,6 +603,9 @@ fn component_interface_to_metadata(
                     .map(|ctor| UdlObjectConstructor {
                         name: ctor.name().to_string(),
                         ffi_symbol: include_ffi_symbols.then(|| ctor.ffi_func().name().to_string()),
+                        runtime_unsupported: include_ffi_symbols
+                            .then(|| runtime_unsupported_reason_for_ffi_func(ctor.ffi_func()))
+                            .flatten(),
                         docstring: ctor.docstring().map(ToString::to_string),
                         is_async: ctor.is_async(),
                         args: ctor
@@ -640,6 +666,44 @@ fn component_interface_to_metadata(
         records,
         enums,
     })
+}
+
+fn ffi_type_contains_rust_buffer(type_: &FfiType) -> bool {
+    match type_ {
+        FfiType::RustBuffer(_) => true,
+        FfiType::Reference(inner) | FfiType::MutReference(inner) => {
+            ffi_type_contains_rust_buffer(inner)
+        }
+        _ => false,
+    }
+}
+
+fn runtime_unsupported_reason_for_ffi_func(
+    ffi_func: &uniffi_bindgen::interface::FfiFunction,
+) -> Option<String> {
+    if ffi_func.has_rust_call_status_arg() {
+        return Some("runtime invocation for this UniFFI ABI (RustCallStatus out-arg) is not implemented yet".to_string());
+    }
+    if ffi_func
+        .arguments()
+        .iter()
+        .any(|arg| ffi_type_contains_rust_buffer(&arg.type_()))
+    {
+        return Some(
+            "runtime invocation for this UniFFI ABI (RustBuffer argument) is not implemented yet"
+                .to_string(),
+        );
+    }
+    if ffi_func
+        .return_type()
+        .is_some_and(ffi_type_contains_rust_buffer)
+    {
+        return Some(
+            "runtime invocation for this UniFFI ABI (RustBuffer return) is not implemented yet"
+                .to_string(),
+        );
+    }
+    None
 }
 
 fn parse_udl_interface_traits(udl: &str) -> std::collections::HashMap<String, Vec<String>> {
@@ -973,10 +1037,29 @@ fn render_dart_scaffold(
                     .any(|a| is_runtime_sequence_bytes_type(&a.type_))
         })
     });
+    let has_runtime_unsupported = functions.iter().any(|f| f.runtime_unsupported.is_some())
+        || objects.iter().any(|o| {
+            o.constructors
+                .iter()
+                .any(|c| c.runtime_unsupported.is_some())
+                || o.methods.iter().any(|m| m.runtime_unsupported.is_some())
+        })
+        || records
+            .iter()
+            .flat_map(|r| r.methods.iter())
+            .any(|m| m.runtime_unsupported.is_some())
+        || enums
+            .iter()
+            .flat_map(|e| e.methods.iter())
+            .any(|m| m.runtime_unsupported.is_some());
 
     let mut out = String::new();
     out.push_str("// Generated by uniffi-bindgen-dart. DO NOT EDIT.\n");
-    out.push_str("// ignore_for_file: unused_element\n");
+    if has_runtime_unsupported {
+        out.push_str("// ignore_for_file: unused_element, unused_import, unused_field\n");
+    } else {
+        out.push_str("// ignore_for_file: unused_element\n");
+    }
     out.push_str(&render_doc_comment(namespace_docstring, ""));
     out.push_str(&format!("library {module_name};\n\n"));
     if needs_async_rust_future {
@@ -2412,6 +2495,7 @@ fn render_bound_methods(
                     dart_identifier(&method.name)
                 ),
                 ffi_symbol: method.ffi_symbol.clone(),
+                runtime_unsupported: method.runtime_unsupported.clone(),
                 docstring: method.docstring.clone(),
                 is_async: method.is_async,
                 return_type: method.return_type.clone(),
@@ -2439,6 +2523,7 @@ fn render_bound_methods(
                     dart_identifier(&method.name)
                 ),
                 ffi_symbol: method.ffi_symbol.clone(),
+                runtime_unsupported: method.runtime_unsupported.clone(),
                 docstring: method.docstring.clone(),
                 is_async: method.is_async,
                 return_type: method.return_type.clone(),
@@ -2461,68 +2546,70 @@ fn render_bound_methods(
         records,
         enums,
     );
-    let needs_string_free = needs_async_rust_future
-        || functions.iter().any(|f| {
-            is_runtime_ffi_compatible_function(f, records, enums)
-                && (f.returns_runtime_string()
-                    || f.return_type
-                        .as_ref()
-                        .is_some_and(|t| is_runtime_utf8_pointer_marshaled_type(t, records, enums))
-                    || is_runtime_throwing_ffi_compatible_function(
-                        f,
-                        callback_interfaces,
-                        records,
-                        enums,
-                    )
-                    || f.return_type
-                        .as_ref()
-                        .is_some_and(|t| is_runtime_record_or_enum_string_type(t, enums)))
-        })
-        || objects.iter().any(|o| {
-            o.methods.iter().any(|m| {
-                m.return_type
-                    .as_ref()
-                    .is_some_and(|t| is_runtime_utf8_pointer_marshaled_type(t, records, enums))
-                    || (m.throws_type.is_some()
-                        && m.return_type
+    let needs_string_free =
+        needs_async_rust_future
+            || functions.iter().any(|f| {
+                f.runtime_unsupported.is_none()
+                    && is_runtime_ffi_compatible_function(f, records, enums)
+                    && (f.returns_runtime_string()
+                        || f.return_type.as_ref().is_some_and(|t| {
+                            is_runtime_utf8_pointer_marshaled_type(t, records, enums)
+                        })
+                        || is_runtime_throwing_ffi_compatible_function(
+                            f,
+                            callback_interfaces,
+                            records,
+                            enums,
+                        )
+                        || f.return_type
                             .as_ref()
-                            .map(|t| is_runtime_ffi_compatible_type(t, records, enums))
-                            .unwrap_or(true)
-                        && m.args
-                            .iter()
-                            .all(|a| is_runtime_ffi_compatible_type(&a.type_, records, enums)))
+                            .is_some_and(|t| is_runtime_record_or_enum_string_type(t, enums)))
             })
-        })
-        || records.iter().any(|r| {
-            r.methods.iter().any(|m| {
-                m.return_type
-                    .as_ref()
-                    .is_some_and(|t| is_runtime_utf8_pointer_marshaled_type(t, records, enums))
-                    || (m.throws_type.is_some()
-                        && m.return_type
-                            .as_ref()
-                            .map(|t| is_runtime_ffi_compatible_type(t, records, enums))
-                            .unwrap_or(true)
-                        && m.args
-                            .iter()
-                            .all(|a| is_runtime_ffi_compatible_type(&a.type_, records, enums)))
+            || objects.iter().any(|o| {
+                o.methods.iter().any(|m| {
+                    m.runtime_unsupported.is_none()
+                        && (m.return_type.as_ref().is_some_and(|t| {
+                            is_runtime_utf8_pointer_marshaled_type(t, records, enums)
+                        }) || (m.throws_type.is_some()
+                            && m.return_type
+                                .as_ref()
+                                .map(|t| is_runtime_ffi_compatible_type(t, records, enums))
+                                .unwrap_or(true)
+                            && m.args
+                                .iter()
+                                .all(|a| is_runtime_ffi_compatible_type(&a.type_, records, enums))))
+                })
             })
-        })
-        || enums.iter().any(|e| {
-            e.methods.iter().any(|m| {
-                m.return_type
-                    .as_ref()
-                    .is_some_and(|t| is_runtime_utf8_pointer_marshaled_type(t, records, enums))
-                    || (m.throws_type.is_some()
-                        && m.return_type
-                            .as_ref()
-                            .map(|t| is_runtime_ffi_compatible_type(t, records, enums))
-                            .unwrap_or(true)
-                        && m.args
-                            .iter()
-                            .all(|a| is_runtime_ffi_compatible_type(&a.type_, records, enums)))
+            || records.iter().any(|r| {
+                r.methods.iter().any(|m| {
+                    m.runtime_unsupported.is_none()
+                        && (m.return_type.as_ref().is_some_and(|t| {
+                            is_runtime_utf8_pointer_marshaled_type(t, records, enums)
+                        }) || (m.throws_type.is_some()
+                            && m.return_type
+                                .as_ref()
+                                .map(|t| is_runtime_ffi_compatible_type(t, records, enums))
+                                .unwrap_or(true)
+                            && m.args
+                                .iter()
+                                .all(|a| is_runtime_ffi_compatible_type(&a.type_, records, enums))))
+                })
             })
-        });
+            || enums.iter().any(|e| {
+                e.methods.iter().any(|m| {
+                    m.runtime_unsupported.is_none()
+                        && (m.return_type.as_ref().is_some_and(|t| {
+                            is_runtime_utf8_pointer_marshaled_type(t, records, enums)
+                        }) || (m.throws_type.is_some()
+                            && m.return_type
+                                .as_ref()
+                                .map(|t| is_runtime_ffi_compatible_type(t, records, enums))
+                                .unwrap_or(true)
+                            && m.args
+                                .iter()
+                                .all(|a| is_runtime_ffi_compatible_type(&a.type_, records, enums))))
+                })
+            });
     let needs_bytes_free = functions.iter().any(|f| {
         is_runtime_ffi_compatible_function(f, records, enums) && f.returns_runtime_bytes()
     }) || objects.iter().any(|o| {
@@ -2602,6 +2689,49 @@ fn render_bound_methods(
     }
 
     for function in &runtime_functions {
+        let method_name = safe_dart_identifier(&to_lower_camel(&function.name));
+        if let Some(reason) = function.runtime_unsupported.as_ref() {
+            let value_return_type = function
+                .return_type
+                .as_ref()
+                .map(map_uniffi_type_to_dart)
+                .unwrap_or_else(|| "void".to_string());
+            let signature_return_type = if function.is_async {
+                format!("Future<{value_return_type}>")
+            } else {
+                value_return_type
+            };
+            let dart_sig = function
+                .args
+                .iter()
+                .map(|a| {
+                    format!(
+                        "{} {}",
+                        map_uniffi_type_to_dart(&a.type_),
+                        safe_dart_identifier(&to_lower_camel(&a.name))
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            let escaped_reason = reason.replace('\'', "\\'");
+            out.push('\n');
+            if function.is_async {
+                out.push_str(&format!(
+                    "  {signature_return_type} {method_name}({dart_sig}) async {{\n"
+                ));
+            } else {
+                out.push_str(&format!(
+                    "  {signature_return_type} {method_name}({dart_sig}) {{\n"
+                ));
+            }
+            out.push_str(&format!(
+                "    throw UnsupportedError('{escaped_reason} ({})');\n",
+                function.name
+            ));
+            out.push_str("  }\n");
+            continue;
+        }
+
         let is_runtime_supported = is_runtime_ffi_compatible_function(function, records, enums);
         let is_sync_callback_supported =
             is_runtime_callback_compatible_function(function, callback_interfaces, records, enums);
@@ -2610,8 +2740,6 @@ fn render_bound_methods(
         if !is_runtime_supported && !is_sync_callback_supported && !has_callback_args {
             continue;
         }
-
-        let method_name = safe_dart_identifier(&to_lower_camel(&function.name));
         let field_name = format!("_{}", method_name);
         let function_symbol = function.ffi_symbol.as_deref().unwrap_or(&function.name);
         if is_sync_callback_supported {
@@ -3474,6 +3602,28 @@ fn render_bound_methods(
         ));
 
         for ctor in &object.constructors {
+            if let Some(reason) = ctor.runtime_unsupported.as_ref() {
+                let ctor_camel = to_upper_camel(&ctor.name);
+                let ctor_method = format!("{}Create{}", object_lower, ctor_camel);
+                let dart_args = ctor
+                    .args
+                    .iter()
+                    .map(|arg| {
+                        let arg_name = safe_dart_identifier(&to_lower_camel(&arg.name));
+                        format!("{} {arg_name}", map_uniffi_type_to_dart(&arg.type_))
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let escaped_reason = reason.replace('\'', "\\'");
+                out.push('\n');
+                out.push_str(&format!("  {object_name} {ctor_method}({dart_args}) {{\n"));
+                out.push_str(&format!(
+                    "    throw UnsupportedError('{escaped_reason} ({})');\n",
+                    ctor.name
+                ));
+                out.push_str("  }\n");
+                continue;
+            }
             if !ctor
                 .args
                 .iter()
@@ -3610,6 +3760,44 @@ fn render_bound_methods(
         }
 
         for method in &object.methods {
+            if let Some(reason) = method.runtime_unsupported.as_ref() {
+                let method_invoke =
+                    format!("{}Invoke{}", object_lower, to_upper_camel(&method.name));
+                let value_return_type = method
+                    .return_type
+                    .as_ref()
+                    .map(map_uniffi_type_to_dart)
+                    .unwrap_or_else(|| "void".to_string());
+                let signature_return_type = if method.is_async {
+                    format!("Future<{value_return_type}>")
+                } else {
+                    value_return_type
+                };
+                let mut dart_args = vec!["int handle".to_string()];
+                dart_args.extend(method.args.iter().map(|arg| {
+                    let arg_name = safe_dart_identifier(&to_lower_camel(&arg.name));
+                    format!("{} {arg_name}", map_uniffi_type_to_dart(&arg.type_))
+                }));
+                let escaped_reason = reason.replace('\'', "\\'");
+                out.push('\n');
+                if method.is_async {
+                    out.push_str(&format!(
+                        "  {signature_return_type} {method_invoke}({}) async {{\n",
+                        dart_args.join(", ")
+                    ));
+                } else {
+                    out.push_str(&format!(
+                        "  {signature_return_type} {method_invoke}({}) {{\n",
+                        dart_args.join(", ")
+                    ));
+                }
+                out.push_str(&format!(
+                    "    throw UnsupportedError('{escaped_reason} ({})');\n",
+                    method.name
+                ));
+                out.push_str("  }\n");
+                continue;
+            }
             let has_callback_args = has_runtime_callback_args_in_args(
                 &method.args,
                 callback_interfaces,
@@ -5262,18 +5450,42 @@ fn has_runtime_async_rust_future_support(
     enums: &[UdlEnum],
 ) -> bool {
     functions.iter().any(|f| {
-        is_runtime_async_rust_future_compatible_function(f, callback_interfaces, records, enums)
+        f.runtime_unsupported.is_none()
+            && is_runtime_async_rust_future_compatible_function(
+                f,
+                callback_interfaces,
+                records,
+                enums,
+            )
     }) || objects.iter().any(|o| {
         o.methods.iter().any(|m| {
-            is_runtime_async_rust_future_compatible_method(m, callback_interfaces, records, enums)
+            m.runtime_unsupported.is_none()
+                && is_runtime_async_rust_future_compatible_method(
+                    m,
+                    callback_interfaces,
+                    records,
+                    enums,
+                )
         })
     }) || records.iter().any(|r| {
         r.methods.iter().any(|m| {
-            is_runtime_async_rust_future_compatible_method(m, callback_interfaces, records, enums)
+            m.runtime_unsupported.is_none()
+                && is_runtime_async_rust_future_compatible_method(
+                    m,
+                    callback_interfaces,
+                    records,
+                    enums,
+                )
         })
     }) || enums.iter().any(|e| {
         e.methods.iter().any(|m| {
-            is_runtime_async_rust_future_compatible_method(m, callback_interfaces, records, enums)
+            m.runtime_unsupported.is_none()
+                && is_runtime_async_rust_future_compatible_method(
+                    m,
+                    callback_interfaces,
+                    records,
+                    enums,
+                )
         })
     })
 }
@@ -7025,6 +7237,7 @@ interface Outcome {
             methods: vec![UdlObjectMethod {
                 name: "checksum".to_string(),
                 ffi_symbol: None,
+                runtime_unsupported: None,
                 docstring: None,
                 is_async: false,
                 return_type: Some(Type::UInt32),
@@ -7051,6 +7264,7 @@ interface Outcome {
             methods: vec![UdlObjectMethod {
                 name: "rank".to_string(),
                 ffi_symbol: None,
+                runtime_unsupported: None,
                 docstring: None,
                 is_async: false,
                 return_type: Some(Type::UInt32),
