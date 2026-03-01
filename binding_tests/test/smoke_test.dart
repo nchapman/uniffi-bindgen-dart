@@ -38,6 +38,7 @@ void main() {
     expect(contents, contains('void resetFreeCount() {'));
     expect(contents, contains('String brokenGreet() {'));
     expect(contents, contains('String greet(String name) {'));
+    expect(contents, contains('Future<String> asyncGreet(String name) {'));
     expect(
       contents,
       contains('Duration multiplyDuration(Duration value, int factor) {'),
@@ -108,6 +109,7 @@ void main() {
     expect(contents, contains('int optionalBytesLen(Uint8List? input) {'));
     expect(contents, contains('int chunksTotalLen(List<Uint8List> input) {'));
     expect(contents, contains('String describe() {'));
+    expect(contents, contains('Future<String> asyncDescribe() {'));
     expect(contents, contains('Person snapshotPerson() {'));
     expect(contents, contains('Outcome snapshotOutcome() {'));
     expect(contents, contains('Uint8List snapshotBytes() {'));
@@ -122,7 +124,7 @@ void main() {
     expect(contents, contains('Outcome _decodeOutcome(String raw) {'));
   });
 
-  test('runtime ffi binding can call native exports', () {
+  test('runtime ffi binding can call native exports', () async {
     final libPath = Platform.environment['UBDG_SIMPLE_FNS_LIB'];
     expect(
       libPath,
@@ -187,7 +189,8 @@ void main() {
       const Duration(milliseconds: 1000),
     );
     expect(bindings.greet('dart'), 'hello, dart');
-    expect(bindings.freeCount(), 2);
+    expect(await bindings.asyncGreet('dart'), 'async, dart');
+    expect(bindings.freeCount(), 3);
     expect(bindings.checkedDivide(12, 3), 4);
     expect(
       () => bindings.checkedDivide(10, 0),
@@ -203,7 +206,7 @@ void main() {
         ),
       ),
     );
-    expect(bindings.freeCount(), 5);
+    expect(bindings.freeCount(), 6);
     final counter = bindings.counterCreateNew(10);
     expect(counter.currentValue(), 10);
     counter.addValue(5);
@@ -212,6 +215,7 @@ void main() {
     expect(counter.currentValue(), 5);
     counter.setLabel('alpha');
     expect(counter.describe(), 'counter:5:alpha');
+    expect(await counter.asyncDescribe(), 'async:counter:5:alpha');
     expect(counter.maybeLabel('tail'), 'counter:5:tail');
     expect(counter.maybeLabel(null), 'counter:5:none');
     counter.ingestPerson(const Person(name: 'Eve', age: 9));

@@ -14,6 +14,8 @@ namespace simple_fns {
   [Throws=MathError]
   i32 checked_divide(i32 left, i32 right);
   string greet(string name);
+  [Async]
+  string async_greet(string name);
   duration multiply_duration(duration value, u32 factor);
   i64 subtract_i64(i64 left, i64 right);
   string? maybe_greet(string? name);
@@ -66,6 +68,8 @@ interface Counter {
   u32 optional_bytes_len(bytes? input);
   u32 chunks_total_len(sequence<bytes> input);
   string describe();
+  [Async]
+  string async_describe();
   Person snapshot_person();
   Outcome snapshot_outcome();
   bytes snapshot_bytes();

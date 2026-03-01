@@ -265,6 +265,25 @@ class SimpleFnsBindings {
       return _addU64(left, right);
   }
 
+  late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> name) _asyncGreet = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> name), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> name)>('async_greet');
+
+  String asyncGreet(String name) {
+    final ffi.Pointer<Utf8> nameNative = name.toNativeUtf8();
+    try {
+      final ffi.Pointer<Utf8> resultPtr = _asyncGreet(nameNative);
+      if (resultPtr == ffi.nullptr) {
+        throw StateError('Rust returned null for async_greet');
+      }
+      try {
+        return resultPtr.toDartString();
+      } finally {
+        _rustStringFree(resultPtr);
+      }
+    } finally {
+    calloc.free(nameNative);
+    }
+  }
+
   late final ffi.Pointer<Utf8> Function() _brokenGreet = _lib.lookupFunction<ffi.Pointer<Utf8> Function(), ffi.Pointer<Utf8> Function()>('broken_greet');
 
   String brokenGreet() {
@@ -661,6 +680,20 @@ class SimpleFnsBindings {
     _counterAddValue(handle, amount);
   }
 
+  late final ffi.Pointer<Utf8> Function(int handle) _counterAsyncDescribe = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle), ffi.Pointer<Utf8> Function(int handle)>('counter_async_describe');
+
+  String counterInvokeAsyncDescribe(int handle) {
+    final ffi.Pointer<Utf8> resultPtr = _counterAsyncDescribe(handle);
+    if (resultPtr == ffi.nullptr) {
+      throw StateError('Rust returned null for counter_async_describe');
+    }
+    try {
+      return resultPtr.toDartString();
+    } finally {
+      _rustStringFree(resultPtr);
+    }
+  }
+
   late final int Function(int handle, _RustBuffer input) _counterBytesLen = _lib.lookupFunction<ffi.Uint32 Function(ffi.Uint64 handle, _RustBuffer input), int Function(int handle, _RustBuffer input)>('counter_bytes_len');
 
   int counterInvokeBytesLen(int handle, Uint8List input) {
@@ -967,6 +1000,11 @@ final class Counter {
     _ffi.counterInvokeAddValue(_handle, amount);
   }
 
+  Future<String> asyncDescribe() {
+    _ensureOpen();
+    return Future(() => _ffi.counterInvokeAsyncDescribe(_handle));
+  }
+
   int bytesLen(Uint8List input) {
     _ensureOpen();
     return _ffi.counterInvokeBytesLen(_handle, input);
@@ -1061,6 +1099,10 @@ DateTime addSeconds(DateTime when_, int seconds) {
 
 int addU64(int left, int right) {
   return _bindings().addU64(left, right);
+}
+
+Future<String> asyncGreet(String name) {
+  return Future(() => _bindings().asyncGreet(name));
 }
 
 String brokenGreet() {

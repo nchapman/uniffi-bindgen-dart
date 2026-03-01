@@ -11,14 +11,14 @@ Legend:
 | Area | Status | Notes |
 |---|---|---|
 | Top-level functions | Implemented | includes primitives, temporal, bytes, records/enums, and typed throws envelope paths |
-| Objects/interfaces | Partial | sync constructors/methods + lifecycle (`close`/finalizer) implemented; async/trait parity pending |
+| Objects/interfaces | Partial | sync constructors/methods + lifecycle (`close`/finalizer) implemented; async wrappers for `[Async]` methods now generated; trait parity pending |
 | Trait methods | Planned | pending full parity coverage |
 | Records | Implemented | model generation + JSON codecs + `copyWith` |
 | Enums | Implemented | flat + data-carrying codecs |
 | Errors (`[Error]` + `[Throws]`) | Partial | typed Dart exception mapping for supported runtime-compatible paths |
 | Optionals/sequences/maps | Partial | covered in top-level and selected object paths; broader nesting parity still pending |
 | Builtins | Implemented | int/float/bool/string/bytes/timestamp/duration |
-| Async futures | Planned | pending |
+| Async futures | Partial | `[Async]` now maps to idiomatic `Future<...>` APIs; full rust-future ABI parity (poll/cancel/complete/free semantics) still pending |
 | Callback interfaces | Planned | pending |
 | Custom types | Planned | pending |
 | External/remote types | Planned | pending |

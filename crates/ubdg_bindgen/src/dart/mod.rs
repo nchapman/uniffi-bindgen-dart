@@ -103,6 +103,7 @@ fn extract_namespace_from_udl(source: &Path) -> Option<String> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct UdlFunction {
     name: String,
+    is_async: bool,
     return_type: Option<Type>,
     throws_type: Option<Type>,
     args: Vec<UdlArg>,
@@ -124,6 +125,7 @@ struct UdlObject {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct UdlObjectConstructor {
     name: String,
+    is_async: bool,
     args: Vec<UdlArg>,
     throws_type: Option<Type>,
 }
@@ -131,6 +133,7 @@ struct UdlObjectConstructor {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct UdlObjectMethod {
     name: String,
+    is_async: bool,
     return_type: Option<Type>,
     throws_type: Option<Type>,
     args: Vec<UdlArg>,
@@ -220,6 +223,7 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
         .iter()
         .map(|f| UdlFunction {
             name: f.name().to_string(),
+            is_async: f.is_async(),
             return_type: f.return_type().cloned(),
             throws_type: f.throws_type().cloned(),
             args: f
@@ -278,6 +282,7 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
                 .into_iter()
                 .map(|ctor| UdlObjectConstructor {
                     name: ctor.name().to_string(),
+                    is_async: ctor.is_async(),
                     args: ctor
                         .arguments()
                         .into_iter()
@@ -294,6 +299,7 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
                 .into_iter()
                 .map(|m| UdlObjectMethod {
                     name: m.name().to_string(),
+                    is_async: m.is_async(),
                     return_type: m.return_type().cloned(),
                     throws_type: m.throws_type().cloned(),
                     args: m
@@ -1975,12 +1981,20 @@ fn render_object_classes(
                 .map(|a| safe_dart_identifier(&to_lower_camel(&a.name)))
                 .collect::<Vec<_>>()
                 .join(", ");
+            let invoke_expr = format!("_bindings().{ctor_invoker}({arg_names})");
+            let signature_return = if ctor.is_async {
+                format!("Future<{object_name}>")
+            } else {
+                object_name.clone()
+            };
             out.push_str(&format!(
-                "  static {object_name} {static_name}({args}) {{\n"
+                "  static {signature_return} {static_name}({args}) {{\n"
             ));
-            out.push_str(&format!(
-                "    return _bindings().{ctor_invoker}({arg_names});\n"
-            ));
+            if ctor.is_async {
+                out.push_str(&format!("    return Future(() => {invoke_expr});\n"));
+            } else {
+                out.push_str(&format!("    return {invoke_expr};\n"));
+            }
             out.push_str("  }\n\n");
         }
 
@@ -2006,6 +2020,11 @@ fn render_object_classes(
                 .as_ref()
                 .map(map_uniffi_type_to_dart)
                 .unwrap_or_else(|| "void".to_string());
+            let signature_return = if method.is_async {
+                format!("Future<{return_type}>")
+            } else {
+                return_type.clone()
+            };
             let args = method
                 .args
                 .iter()
@@ -2024,14 +2043,24 @@ fn render_object_classes(
                 .map(|a| safe_dart_identifier(&to_lower_camel(&a.name)))
                 .collect::<Vec<_>>()
                 .join(", ");
-            out.push_str(&format!("  {return_type} {method_name}({args}) {{\n"));
+            out.push_str(&format!("  {signature_return} {method_name}({args}) {{\n"));
             out.push_str("    _ensureOpen();\n");
             let invoke_args = if arg_names.is_empty() {
                 "_handle".to_string()
             } else {
                 format!("_handle, {arg_names}")
             };
-            if method.return_type.is_some() {
+            if method.is_async {
+                if method.return_type.is_some() {
+                    out.push_str(&format!(
+                        "    return Future(() => _ffi.{invoke_name}({invoke_args}));\n"
+                    ));
+                } else {
+                    out.push_str("    return Future<void>(() {\n");
+                    out.push_str(&format!("      _ffi.{invoke_name}({invoke_args});\n"));
+                    out.push_str("    });\n");
+                }
+            } else if method.return_type.is_some() {
                 out.push_str(&format!("    return _ffi.{invoke_name}({invoke_args});\n"));
             } else {
                 out.push_str(&format!("    _ffi.{invoke_name}({invoke_args});\n"));
@@ -2081,11 +2110,16 @@ fn render_function_stubs(
     }
     for f in functions {
         let fn_name = safe_dart_identifier(&to_lower_camel(&f.name));
-        let return_type = f
+        let value_return_type = f
             .return_type
             .as_ref()
             .map(map_uniffi_type_to_dart)
             .unwrap_or_else(|| "void".to_string());
+        let signature_return_type = if f.is_async {
+            format!("Future<{value_return_type}>")
+        } else {
+            value_return_type.clone()
+        };
         let args = f
             .args
             .iter()
@@ -2105,13 +2139,25 @@ fn render_function_stubs(
             .collect::<Vec<_>>()
             .join(", ");
 
-        out.push_str(&format!("{return_type} {fn_name}({args}) {{\n"));
+        out.push_str(&format!("{signature_return_type} {fn_name}({args}) {{\n"));
         if is_runtime_ffi_compatible_function(f, records, enums) {
-            if f.return_type.is_some() {
+            if f.is_async {
+                if f.return_type.is_some() {
+                    out.push_str(&format!(
+                        "  return Future(() => _bindings().{fn_name}({arg_names}));\n"
+                    ));
+                } else {
+                    out.push_str("  return Future<void>(() {\n");
+                    out.push_str(&format!("    _bindings().{fn_name}({arg_names});\n"));
+                    out.push_str("  });\n");
+                }
+            } else if f.return_type.is_some() {
                 out.push_str(&format!("  return _bindings().{fn_name}({arg_names});\n"));
             } else {
                 out.push_str(&format!("  _bindings().{fn_name}({arg_names});\n"));
             }
+        } else if f.is_async {
+            out.push_str("  return Future.error(UnimplementedError('TODO: bind to Rust FFI'));\n");
         } else {
             out.push_str("  throw UnimplementedError('TODO: bind to Rust FFI');\n");
         }
@@ -2621,6 +2667,45 @@ namespace demo {
         let content = fs::read_to_string(out_dir.join("demo.dart")).expect("read generated file");
         assert!(content.contains("int addNumbers(int leftValue, int rightValue) {"));
         assert!(content.contains("bool isEven(int inputValue) {"));
+    }
+
+    #[test]
+    fn renders_async_functions_and_methods_as_futures() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = temp.path().join("async_demo.udl");
+        let out_dir = temp.path().join("out");
+        fs::write(
+            &source,
+            r#"
+namespace async_demo {
+  [Async]
+  string greet_async(string name);
+};
+
+interface Counter {
+  constructor(u32 initial);
+  [Async]
+  string async_describe();
+};
+"#,
+        )
+        .expect("write source");
+
+        let args = GenerateArgs {
+            source,
+            out_dir: out_dir.clone(),
+            library: false,
+            config: None,
+            crate_name: None,
+            no_format: false,
+        };
+
+        generate_bindings(&args).expect("generate");
+        let content = fs::read_to_string(out_dir.join("async_demo.dart")).expect("read generated");
+        assert!(content.contains("Future<String> greetAsync(String name) {"));
+        assert!(content.contains("return Future(() => _bindings().greetAsync(name));"));
+        assert!(content.contains("Future<String> asyncDescribe() {"));
+        assert!(content.contains("return Future(() => _ffi.counterInvokeAsyncDescribe(_handle));"));
     }
 
     #[test]

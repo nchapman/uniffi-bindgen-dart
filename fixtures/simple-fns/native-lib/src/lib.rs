@@ -1,8 +1,8 @@
+use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
-use std::collections::HashMap;
-use std::sync::{LazyLock, Mutex};
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::{LazyLock, Mutex};
 
 use serde_json::Value;
 
@@ -85,7 +85,9 @@ pub extern "C" fn echo_person(input: *const c_char) -> *mut c_char {
     if input.is_null() {
         return std::ptr::null_mut();
     }
-    let payload = unsafe { CStr::from_ptr(input) }.to_string_lossy().into_owned();
+    let payload = unsafe { CStr::from_ptr(input) }
+        .to_string_lossy()
+        .into_owned();
     CString::new(payload).expect("valid CString").into_raw()
 }
 
@@ -202,7 +204,9 @@ pub extern "C" fn evolve_outcome(input: *const c_char) -> *mut c_char {
     if input.is_null() {
         return std::ptr::null_mut();
     }
-    let payload = unsafe { CStr::from_ptr(input) }.to_string_lossy().into_owned();
+    let payload = unsafe { CStr::from_ptr(input) }
+        .to_string_lossy()
+        .into_owned();
     let Ok(value) = serde_json::from_str::<Value>(&payload) else {
         return std::ptr::null_mut();
     };
@@ -224,7 +228,10 @@ pub extern "C" fn evolve_outcome(input: *const c_char) -> *mut c_char {
             })
         }
         "failure" => {
-            let code = value.get("code").and_then(Value::as_i64).unwrap_or_default();
+            let code = value
+                .get("code")
+                .and_then(Value::as_i64)
+                .unwrap_or_default();
             let reason = value
                 .get("reason")
                 .and_then(Value::as_str)
@@ -253,6 +260,20 @@ pub extern "C" fn greet(name: *const c_char) -> *mut c_char {
 
     let name = unsafe { CStr::from_ptr(name) }.to_string_lossy();
     CString::new(format!("hello, {name}"))
+        .expect("valid CString")
+        .into_raw()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn async_greet(name: *const c_char) -> *mut c_char {
+    if name.is_null() {
+        return CString::new("async, <null>")
+            .expect("valid CString")
+            .into_raw();
+    }
+
+    let name = unsafe { CStr::from_ptr(name) }.to_string_lossy();
+    CString::new(format!("async, {name}"))
         .expect("valid CString")
         .into_raw()
 }
@@ -340,7 +361,9 @@ pub extern "C" fn counter_with_person(seed: *const c_char) -> u64 {
     let initial = if seed.is_null() {
         0
     } else {
-        let payload = unsafe { CStr::from_ptr(seed) }.to_string_lossy().into_owned();
+        let payload = unsafe { CStr::from_ptr(seed) }
+            .to_string_lossy()
+            .into_owned();
         serde_json::from_str::<Value>(&payload)
             .ok()
             .and_then(|v| v.get("age").and_then(Value::as_u64))
@@ -380,7 +403,9 @@ pub extern "C" fn counter_set_label(handle: u64, label: *const c_char) {
     if label.is_null() {
         return;
     }
-    let label = unsafe { CStr::from_ptr(label) }.to_string_lossy().into_owned();
+    let label = unsafe { CStr::from_ptr(label) }
+        .to_string_lossy()
+        .into_owned();
     COUNTER_LABELS
         .lock()
         .expect("counter labels lock")
@@ -398,7 +423,9 @@ pub extern "C" fn counter_maybe_label(handle: u64, suffix: *const c_char) -> *mu
     let suffix = if suffix.is_null() {
         "none".to_string()
     } else {
-        unsafe { CStr::from_ptr(suffix) }.to_string_lossy().into_owned()
+        unsafe { CStr::from_ptr(suffix) }
+            .to_string_lossy()
+            .into_owned()
     };
     CString::new(format!("counter:{value}:{suffix}"))
         .expect("valid CString")
@@ -410,7 +437,9 @@ pub extern "C" fn counter_ingest_person(handle: u64, input: *const c_char) {
     if input.is_null() {
         return;
     }
-    let payload = unsafe { CStr::from_ptr(input) }.to_string_lossy().into_owned();
+    let payload = unsafe { CStr::from_ptr(input) }
+        .to_string_lossy()
+        .into_owned();
     let Ok(value) = serde_json::from_str::<Value>(&payload) else {
         return;
     };
@@ -425,7 +454,9 @@ pub extern "C" fn counter_flip_outcome(_handle: u64, input: *const c_char) -> *m
     if input.is_null() {
         return std::ptr::null_mut();
     }
-    let payload = unsafe { CStr::from_ptr(input) }.to_string_lossy().into_owned();
+    let payload = unsafe { CStr::from_ptr(input) }
+        .to_string_lossy()
+        .into_owned();
     let Ok(value) = serde_json::from_str::<Value>(&payload) else {
         return std::ptr::null_mut();
     };
@@ -446,7 +477,10 @@ pub extern "C" fn counter_flip_outcome(_handle: u64, input: *const c_char) -> *m
             })
         }
         "failure" => {
-            let code = value.get("code").and_then(Value::as_i64).unwrap_or_default();
+            let code = value
+                .get("code")
+                .and_then(Value::as_i64)
+                .unwrap_or_default();
             let reason = value
                 .get("reason")
                 .and_then(Value::as_str)
@@ -511,9 +545,29 @@ pub extern "C" fn counter_describe(handle: u64) -> *mut c_char {
     } else {
         format!("counter:{value}:{label}")
     };
-    CString::new(text)
-        .expect("valid CString")
-        .into_raw()
+    CString::new(text).expect("valid CString").into_raw()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_async_describe(handle: u64) -> *mut c_char {
+    let value = COUNTERS
+        .lock()
+        .expect("counter map lock")
+        .get(&handle)
+        .copied()
+        .unwrap_or_default();
+    let label = COUNTER_LABELS
+        .lock()
+        .expect("counter labels lock")
+        .get(&handle)
+        .cloned()
+        .unwrap_or_default();
+    let text = if label.is_empty() {
+        format!("async:counter:{value}")
+    } else {
+        format!("async:counter:{value}:{label}")
+    };
+    CString::new(text).expect("valid CString").into_raw()
 }
 
 #[unsafe(no_mangle)]
