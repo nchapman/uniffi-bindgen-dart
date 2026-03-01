@@ -283,6 +283,10 @@ fn render_bound_methods(functions: &[UdlFunction]) -> String {
                     "    if ({native_name} != ffi.nullptr) calloc.free({native_name});\n"
                 ));
                 call_args.push(native_name);
+            } else if is_runtime_timestamp_type(&arg.type_) {
+                call_args.push(format!("{arg_name}.toUtc().microsecondsSinceEpoch"));
+            } else if is_runtime_duration_type(&arg.type_) {
+                call_args.push(format!("{arg_name}.inMicroseconds"));
             } else {
                 call_args.push(arg_name);
             }
@@ -344,6 +348,20 @@ fn render_bound_methods(functions: &[UdlFunction]) -> String {
                 out.push_str("      } finally {\n");
                 out.push_str("        _rustStringFree(resultPtr);\n");
                 out.push_str("      }\n");
+            }
+            Some(type_) if is_runtime_timestamp_type(type_) => {
+                out.push_str(&format!(
+                    "      final int micros = {call_expr};\n"
+                ));
+                out.push_str(
+                    "      return DateTime.fromMicrosecondsSinceEpoch(micros, isUtc: true);\n",
+                );
+            }
+            Some(type_) if is_runtime_duration_type(type_) => {
+                out.push_str(&format!(
+                    "      final int micros = {call_expr};\n"
+                ));
+                out.push_str("      return Duration(microseconds: micros);\n");
             }
             Some(_) => {
                 out.push_str(&format!("      return {call_expr};\n"));
@@ -462,6 +480,8 @@ fn map_runtime_native_ffi_type(type_: &Type) -> Option<&'static str> {
         Type::Float64 => Some("ffi.Double"),
         Type::Boolean => Some("ffi.Bool"),
         Type::String => Some("ffi.Pointer<Utf8>"),
+        Type::Timestamp => Some("ffi.Int64"),
+        Type::Duration => Some("ffi.Int64"),
         Type::Optional { inner_type } if is_runtime_string_type(inner_type) => {
             Some("ffi.Pointer<Utf8>")
         }
@@ -482,6 +502,7 @@ fn map_runtime_dart_ffi_type(type_: &Type) -> Option<&'static str> {
         Type::Float32 | Type::Float64 => Some("double"),
         Type::Boolean => Some("bool"),
         Type::String => Some("ffi.Pointer<Utf8>"),
+        Type::Timestamp | Type::Duration => Some("int"),
         Type::Optional { inner_type } if is_runtime_string_type(inner_type) => {
             Some("ffi.Pointer<Utf8>")
         }
@@ -491,6 +512,14 @@ fn map_runtime_dart_ffi_type(type_: &Type) -> Option<&'static str> {
 
 fn is_runtime_string_type(type_: &Type) -> bool {
     matches!(type_, Type::String)
+}
+
+fn is_runtime_timestamp_type(type_: &Type) -> bool {
+    matches!(type_, Type::Timestamp)
+}
+
+fn is_runtime_duration_type(type_: &Type) -> bool {
+    matches!(type_, Type::Duration)
 }
 
 fn is_runtime_optional_string_type(type_: &Type) -> bool {
@@ -977,5 +1006,40 @@ namespace strings {
         assert!(content.contains("if (nameNative != ffi.nullptr) calloc.free(nameNative);"));
         assert!(content.contains("if (resultPtr == ffi.nullptr) {"));
         assert!(content.contains("return null;"));
+    }
+
+    #[test]
+    fn renders_timestamp_and_duration_runtime_conversions() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = temp.path().join("temporal.udl");
+        let out_dir = temp.path().join("out");
+        fs::write(
+            &source,
+            r#"
+namespace temporal {
+  timestamp add_seconds(timestamp when, i64 seconds);
+  duration multiply_duration(duration value, u32 factor);
+};
+"#,
+        )
+        .expect("write source");
+
+        let args = GenerateArgs {
+            source,
+            out_dir: out_dir.clone(),
+            library: false,
+            config: None,
+            crate_name: None,
+            no_format: false,
+        };
+
+        generate_bindings(&args).expect("generate");
+        let content = fs::read_to_string(out_dir.join("temporal.dart")).expect("read generated");
+        assert!(content.contains("DateTime addSeconds(DateTime when_, int seconds) {"));
+        assert!(content.contains("return DateTime.fromMicrosecondsSinceEpoch(micros, isUtc: true);"));
+        assert!(content.contains("when_.toUtc().microsecondsSinceEpoch"));
+        assert!(content.contains("Duration multiplyDuration(Duration value, int factor) {"));
+        assert!(content.contains("return Duration(microseconds: micros);"));
+        assert!(content.contains("value.inMicroseconds"));
     }
 }

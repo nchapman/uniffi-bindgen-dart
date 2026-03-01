@@ -32,6 +32,13 @@ class SimpleFnsBindings {
       return _add(left, right);
   }
 
+  late final int Function(int when_, int seconds) _addSeconds = _lib.lookupFunction<ffi.Int64 Function(ffi.Int64 when_, ffi.Int64 seconds), int Function(int when_, int seconds)>('add_seconds');
+
+  DateTime addSeconds(DateTime when_, int seconds) {
+      final int micros = _addSeconds(when_.toUtc().microsecondsSinceEpoch, seconds);
+      return DateTime.fromMicrosecondsSinceEpoch(micros, isUtc: true);
+  }
+
   late final int Function(int left, int right) _addU64 = _lib.lookupFunction<ffi.Uint64 Function(ffi.Uint64 left, ffi.Uint64 right), int Function(int left, int right)>('add_u64');
 
   int addU64(int left, int right) {
@@ -108,6 +115,13 @@ class SimpleFnsBindings {
     }
   }
 
+  late final int Function(int value, int factor) _multiplyDuration = _lib.lookupFunction<ffi.Int64 Function(ffi.Int64 value, ffi.Uint32 factor), int Function(int value, int factor)>('multiply_duration');
+
+  Duration multiplyDuration(Duration value, int factor) {
+      final int micros = _multiplyDuration(value.inMicroseconds, factor);
+      return Duration(microseconds: micros);
+  }
+
   late final int Function(int value) _negate = _lib.lookupFunction<ffi.Int32 Function(ffi.Int32 value), int Function(int value)>('negate');
 
   int negate(int value) {
@@ -161,6 +175,10 @@ int add(int left, int right) {
   return _bindings().add(left, right);
 }
 
+DateTime addSeconds(DateTime when_, int seconds) {
+  return _bindings().addSeconds(when_, seconds);
+}
+
 int addU64(int left, int right) {
   return _bindings().addU64(left, right);
 }
@@ -187,6 +205,10 @@ bool isEven(int value) {
 
 String? maybeGreet(String? name) {
   return _bindings().maybeGreet(name);
+}
+
+Duration multiplyDuration(Duration value, int factor) {
+  return _bindings().multiplyDuration(value, factor);
 }
 
 int negate(int value) {

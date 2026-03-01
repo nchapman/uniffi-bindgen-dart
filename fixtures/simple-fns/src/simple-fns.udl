@@ -1,9 +1,11 @@
 namespace simple_fns {
   u32 add(u32 left, u32 right);
+  timestamp add_seconds(timestamp when, i64 seconds);
   u64 add_u64(u64 left, u64 right);
   string broken_greet();
   u32 free_count();
   string greet(string name);
+  duration multiply_duration(duration value, u32 factor);
   i64 subtract_i64(i64 left, i64 right);
   string? maybe_greet(string? name);
   i32 negate(i32 value);
