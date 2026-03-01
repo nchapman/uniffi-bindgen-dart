@@ -1,0 +1,6 @@
+namespace compound_demo {
+  sequence<u32> listify(sequence<u32> values);
+  record<string, u64> counts(record<string, u64> items);
+  string? maybe_name(string? value);
+  sequence<bytes> chunk(sequence<bytes> input);
+};
