@@ -558,13 +558,34 @@ fn render_dart_scaffold(
                     || m.args.iter().any(|a| uniffi_type_uses_bytes(&a.type_))
             })
         });
-    let needs_json_convert = !records.is_empty() || !enums.is_empty();
+    let needs_json_convert = !records.is_empty()
+        || !enums.is_empty()
+        || functions.iter().any(|f| {
+            f.throws_type.is_some()
+                || f.return_type.as_ref().is_some_and(uniffi_type_uses_json)
+                || f.args.iter().any(|a| uniffi_type_uses_json(&a.type_))
+        })
+        || objects.iter().any(|o| {
+            o.constructors.iter().any(|c| {
+                c.throws_type.is_some() || c.args.iter().any(|a| uniffi_type_uses_json(&a.type_))
+            }) || o.methods.iter().any(|m| {
+                m.throws_type.is_some()
+                    || m.return_type.as_ref().is_some_and(uniffi_type_uses_json)
+                    || m.args.iter().any(|a| uniffi_type_uses_json(&a.type_))
+            })
+        });
     let needs_ffi_helpers = needs_async_rust_future
         || needs_callback_runtime
         || functions.iter().any(|f| {
             is_runtime_ffi_compatible_function(f, records, enums)
                 && (f.uses_runtime_string()
                     || f.uses_runtime_bytes()
+                    || f.return_type
+                        .as_ref()
+                        .is_some_and(|t| is_runtime_utf8_pointer_marshaled_type(t, records, enums))
+                    || f.args
+                        .iter()
+                        .any(|a| is_runtime_utf8_pointer_marshaled_type(&a.type_, records, enums))
                     || f.return_type
                         .as_ref()
                         .is_some_and(|t| is_runtime_record_or_enum_string_type(t, enums))
@@ -1022,6 +1043,7 @@ fn render_json_encode_expr(value_expr: &str, type_: &Type) -> String {
             let inner = render_json_encode_expr("value", value_type);
             format!("{value_expr}.map((key, value) => MapEntry(key, {inner}))")
         }
+        Type::Custom { builtin, .. } => render_json_encode_expr(value_expr, builtin),
         Type::Record { .. } => format!("{value_expr}.toJson()"),
         Type::Enum { name, .. } => format!("_encode{}({value_expr})", to_upper_camel(name)),
         _ => value_expr.to_string(),
@@ -1061,6 +1083,7 @@ fn render_json_decode_expr(value_expr: &str, type_: &Type) -> String {
             let inner = render_json_decode_expr("value", value_type);
             format!("({value_expr} as Map<String, dynamic>).map((key, value) => MapEntry(key, {inner}))")
         }
+        Type::Custom { builtin, .. } => render_json_decode_expr(value_expr, builtin),
         Type::Record { name, .. } => format!(
             "{}.fromJson({value_expr} as Map<String, dynamic>)",
             to_upper_camel(name)
@@ -1080,6 +1103,11 @@ fn append_runtime_arg_marshalling(
     post_call: &mut Vec<String>,
     call_args: &mut Vec<String>,
 ) {
+    if let Type::Custom { builtin, .. } = type_ {
+        append_runtime_arg_marshalling(arg_name, builtin, enums, pre_call, post_call, call_args);
+        return;
+    }
+
     if is_runtime_string_type(type_) {
         let native_name = format!("{arg_name}Native");
         pre_call.push(format!(
@@ -1095,6 +1123,18 @@ fn append_runtime_arg_marshalling(
         post_call.push(format!(
             "    if ({native_name} != ffi.nullptr) calloc.free({native_name});\n"
         ));
+        call_args.push(native_name);
+    } else if is_runtime_map_with_string_key_type(type_) {
+        let native_name = format!("{arg_name}Native");
+        let json_name = format!("{native_name}Json");
+        let payload_expr = render_json_encode_expr(arg_name, type_);
+        pre_call.push(format!(
+            "    final String {json_name} = jsonEncode({payload_expr});\n"
+        ));
+        pre_call.push(format!(
+            "    final ffi.Pointer<Utf8> {native_name} = {json_name}.toNativeUtf8();\n"
+        ));
+        post_call.push(format!("    calloc.free({native_name});\n"));
         call_args.push(native_name);
     } else if is_runtime_timestamp_type(type_) {
         call_args.push(format!("{arg_name}.toUtc().microsecondsSinceEpoch"));
@@ -1638,6 +1678,9 @@ fn render_bound_methods(
         || functions.iter().any(|f| {
             is_runtime_ffi_compatible_function(f, records, enums)
                 && (f.returns_runtime_string()
+                    || f.return_type
+                        .as_ref()
+                        .is_some_and(|t| is_runtime_utf8_pointer_marshaled_type(t, records, enums))
                     || is_runtime_throwing_ffi_compatible_function(
                         f,
                         callback_interfaces,
@@ -1647,6 +1690,21 @@ fn render_bound_methods(
                     || f.return_type
                         .as_ref()
                         .is_some_and(|t| is_runtime_record_or_enum_string_type(t, enums)))
+        })
+        || objects.iter().any(|o| {
+            o.methods.iter().any(|m| {
+                m.return_type
+                    .as_ref()
+                    .is_some_and(|t| is_runtime_utf8_pointer_marshaled_type(t, records, enums))
+                    || (m.throws_type.is_some()
+                        && m.return_type
+                            .as_ref()
+                            .map(|t| is_runtime_ffi_compatible_type(t, records, enums))
+                            .unwrap_or(true)
+                        && m.args
+                            .iter()
+                            .all(|a| is_runtime_ffi_compatible_type(&a.type_, records, enums)))
+            })
         });
     let needs_bytes_free = functions.iter().any(|f| {
         is_runtime_ffi_compatible_function(f, records, enums) && f.returns_runtime_bytes()
@@ -1907,143 +1965,14 @@ fn render_bound_methods(
             };
             native_args.push(format!("{native_type} {arg_name}"));
             dart_ffi_args.push(format!("{dart_ffi_type} {arg_name}"));
-            if is_runtime_string_type(&arg.type_) {
-                let native_name = format!("{arg_name}Native");
-                pre_call.push(format!(
-                    "    final ffi.Pointer<Utf8> {native_name} = {arg_name}.toNativeUtf8();\n"
-                ));
-                post_call.push(format!("    calloc.free({native_name});\n"));
-                call_args.push(native_name);
-            } else if is_runtime_optional_string_type(&arg.type_) {
-                let native_name = format!("{arg_name}Native");
-                pre_call.push(format!(
-                    "    final ffi.Pointer<Utf8> {native_name} = {arg_name} == null ? ffi.nullptr : {arg_name}.toNativeUtf8();\n"
-                ));
-                post_call.push(format!(
-                    "    if ({native_name} != ffi.nullptr) calloc.free({native_name});\n"
-                ));
-                call_args.push(native_name);
-            } else if is_runtime_timestamp_type(&arg.type_) {
-                call_args.push(format!("{arg_name}.toUtc().microsecondsSinceEpoch"));
-            } else if is_runtime_duration_type(&arg.type_) {
-                call_args.push(format!("{arg_name}.inMicroseconds"));
-            } else if is_runtime_bytes_type(&arg.type_) {
-                let data_name = format!("{arg_name}Data");
-                let buffer_ptr_name = format!("{arg_name}BufferPtr");
-                let native_name = format!("{arg_name}Native");
-                pre_call.push(format!(
-                    "    final ffi.Pointer<ffi.Uint8> {data_name} = {arg_name}.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>({arg_name}.length);\n"
-                ));
-                pre_call.push(format!(
-                    "    if ({data_name} != ffi.nullptr) {{\n      {data_name}.asTypedList({arg_name}.length).setAll(0, {arg_name});\n    }}\n"
-                ));
-                pre_call.push(format!(
-                    "    final ffi.Pointer<_RustBuffer> {buffer_ptr_name} = calloc<_RustBuffer>();\n"
-                ));
-                pre_call.push(format!("    {buffer_ptr_name}.ref.data = {data_name};\n"));
-                pre_call.push(format!(
-                    "    {buffer_ptr_name}.ref.len = {arg_name}.length;\n"
-                ));
-                pre_call.push(format!(
-                    "    final _RustBuffer {native_name} = {buffer_ptr_name}.ref;\n"
-                ));
-                post_call.push(format!(
-                    "    if ({data_name} != ffi.nullptr) calloc.free({data_name});\n"
-                ));
-                post_call.push(format!("    calloc.free({buffer_ptr_name});\n"));
-                call_args.push(native_name);
-            } else if is_runtime_optional_bytes_type(&arg.type_) {
-                let data_name = format!("{arg_name}Data");
-                let buffer_ptr_name = format!("{arg_name}BufferPtr");
-                let opt_ptr_name = format!("{arg_name}OptPtr");
-                let native_name = format!("{arg_name}Native");
-                let value_name = format!("{arg_name}Value");
-                pre_call.push(format!(
-                    "    final bool {arg_name}IsSome = {arg_name} != null;\n"
-                ));
-                pre_call.push(format!(
-                    "    final Uint8List {value_name} = {arg_name} ?? Uint8List(0);\n"
-                ));
-                pre_call.push(format!(
-                    "    final ffi.Pointer<ffi.Uint8> {data_name} = !{arg_name}IsSome || {value_name}.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>({value_name}.length);\n"
-                ));
-                pre_call.push(format!(
-                    "    if ({data_name} != ffi.nullptr) {{\n      {data_name}.asTypedList({value_name}.length).setAll(0, {value_name});\n    }}\n"
-                ));
-                pre_call.push(format!(
-                    "    final ffi.Pointer<_RustBuffer> {buffer_ptr_name} = calloc<_RustBuffer>();\n"
-                ));
-                pre_call.push(format!("    {buffer_ptr_name}.ref.data = {data_name};\n"));
-                pre_call.push(format!(
-                    "    {buffer_ptr_name}.ref.len = {arg_name}IsSome ? {value_name}.length : 0;\n"
-                ));
-                pre_call.push(format!(
-                    "    final ffi.Pointer<_RustBufferOpt> {opt_ptr_name} = calloc<_RustBufferOpt>();\n"
-                ));
-                pre_call.push(format!(
-                    "    {opt_ptr_name}.ref.isSome = {arg_name}IsSome ? 1 : 0;\n"
-                ));
-                pre_call.push(format!(
-                    "    {opt_ptr_name}.ref.value = {buffer_ptr_name}.ref;\n"
-                ));
-                pre_call.push(format!(
-                    "    final _RustBufferOpt {native_name} = {opt_ptr_name}.ref;\n"
-                ));
-                post_call.push(format!(
-                    "    if ({data_name} != ffi.nullptr) calloc.free({data_name});\n"
-                ));
-                post_call.push(format!("    calloc.free({buffer_ptr_name});\n"));
-                post_call.push(format!("    calloc.free({opt_ptr_name});\n"));
-                call_args.push(native_name);
-            } else if is_runtime_sequence_bytes_type(&arg.type_) {
-                let data_name = format!("{arg_name}Data");
-                let vec_ptr_name = format!("{arg_name}VecPtr");
-                let native_name = format!("{arg_name}Native");
-                pre_call.push(format!(
-                    "    final ffi.Pointer<_RustBuffer> {data_name} = {arg_name}.isEmpty ? ffi.nullptr : calloc<_RustBuffer>({arg_name}.length);\n"
-                ));
-                pre_call.push(format!(
-                    "    if ({data_name} != ffi.nullptr) {{\n      for (var i = 0; i < {arg_name}.length; i++) {{\n        final item = {arg_name}[i];\n        final ffi.Pointer<ffi.Uint8> itemData = item.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>(item.length);\n        if (itemData != ffi.nullptr) {{\n          itemData.asTypedList(item.length).setAll(0, item);\n        }}\n        ({data_name} + i).ref\n          ..data = itemData\n          ..len = item.length;\n      }}\n    }}\n"
-                ));
-                pre_call.push(format!(
-                    "    final ffi.Pointer<_RustBufferVec> {vec_ptr_name} = calloc<_RustBufferVec>();\n"
-                ));
-                pre_call.push(format!(
-                    "    {vec_ptr_name}.ref\n      ..data = {data_name}\n      ..len = {arg_name}.length;\n"
-                ));
-                pre_call.push(format!(
-                    "    final _RustBufferVec {native_name} = {vec_ptr_name}.ref;\n"
-                ));
-                post_call.push(format!(
-                    "    if ({data_name} != ffi.nullptr) {{\n      for (var i = 0; i < {arg_name}.length; i++) {{\n        final data = ({data_name} + i).ref.data;\n        if (data != ffi.nullptr) calloc.free(data);\n      }}\n      calloc.free({data_name});\n    }}\n"
-                ));
-                post_call.push(format!("    calloc.free({vec_ptr_name});\n"));
-                call_args.push(native_name);
-            } else if is_runtime_record_type(&arg.type_) {
-                let native_name = format!("{arg_name}Native");
-                pre_call.push(format!(
-                    "    final String {native_name}Json = jsonEncode({arg_name}.toJson());\n"
-                ));
-                pre_call.push(format!(
-                    "    final ffi.Pointer<Utf8> {native_name} = {native_name}Json.toNativeUtf8();\n"
-                ));
-                post_call.push(format!("    calloc.free({native_name});\n"));
-                call_args.push(native_name);
-            } else if is_runtime_enum_type(&arg.type_, enums) {
-                let native_name = format!("{arg_name}Native");
-                let enum_name = enum_name_from_type(&arg.type_).unwrap_or("Enum");
-                pre_call.push(format!(
-                    "    final String {native_name}Json = _encode{}({arg_name});\n",
-                    to_upper_camel(enum_name)
-                ));
-                pre_call.push(format!(
-                    "    final ffi.Pointer<Utf8> {native_name} = {native_name}Json.toNativeUtf8();\n"
-                ));
-                post_call.push(format!("    calloc.free({native_name});\n"));
-                call_args.push(native_name);
-            } else {
-                call_args.push(arg_name);
-            }
+            append_runtime_arg_marshalling(
+                &arg_name,
+                &arg.type_,
+                enums,
+                &mut pre_call,
+                &mut post_call,
+                &mut call_args,
+            );
         }
 
         if !signature_compatible {
@@ -2160,11 +2089,7 @@ fn render_bound_methods(
                     "        {complete_field}(futureHandle, outStatusPtr);\n"
                 ));
             } else if let Some(ret_type) = function.return_type.as_ref() {
-                if is_runtime_string_type(ret_type)
-                    || is_runtime_optional_string_type(ret_type)
-                    || is_runtime_record_type(ret_type)
-                    || is_runtime_enum_type(ret_type, enums)
-                {
+                if is_runtime_utf8_pointer_marshaled_type(ret_type, records, enums) {
                     out.push_str(&format!(
                         "        final ffi.Pointer<Utf8> resultPtr = {complete_field}(futureHandle, outStatusPtr);\n"
                     ));
@@ -2235,6 +2160,20 @@ fn render_bound_methods(
                         "            return _decode{}(payload);\n",
                         to_upper_camel(enum_name)
                     ));
+                    out.push_str("          } finally {\n");
+                    out.push_str("            _rustStringFree(resultPtr);\n");
+                    out.push_str("          }\n");
+                } else if is_runtime_map_with_string_key_type(ret_type) {
+                    let decode = render_json_decode_expr("jsonDecode(payload)", ret_type);
+                    out.push_str("          if (resultPtr == ffi.nullptr) {\n");
+                    out.push_str(&format!(
+                        "            throw StateError('Rust returned null for {}');\n",
+                        function.name
+                    ));
+                    out.push_str("          }\n");
+                    out.push_str("          try {\n");
+                    out.push_str("            final String payload = resultPtr.toDartString();\n");
+                    out.push_str(&format!("            return {decode};\n"));
                     out.push_str("          } finally {\n");
                     out.push_str("            _rustStringFree(resultPtr);\n");
                     out.push_str("          }\n");
@@ -2637,6 +2576,24 @@ fn render_bound_methods(
                     out.push_str("        _rustStringFree(resultPtr);\n");
                     out.push_str("      }\n");
                 }
+                Some(type_) if is_runtime_map_with_string_key_type(type_) => {
+                    let decode = render_json_decode_expr("jsonDecode(payload)", type_);
+                    out.push_str(&format!(
+                        "      final ffi.Pointer<Utf8> resultPtr = {call_expr};\n"
+                    ));
+                    out.push_str("      if (resultPtr == ffi.nullptr) {\n");
+                    out.push_str(&format!(
+                        "        throw StateError('Rust returned null for {}');\n",
+                        function.name
+                    ));
+                    out.push_str("      }\n");
+                    out.push_str("      try {\n");
+                    out.push_str("        final String payload = resultPtr.toDartString();\n");
+                    out.push_str(&format!("        return {decode};\n"));
+                    out.push_str("      } finally {\n");
+                    out.push_str("        _rustStringFree(resultPtr);\n");
+                    out.push_str("      }\n");
+                }
                 Some(_) => {
                     out.push_str(&format!("      return {call_expr};\n"));
                 }
@@ -3033,12 +2990,11 @@ fn render_bound_methods(
                     out.push_str(&format!(
                         "        {complete_field}(futureHandle, outStatusPtr);\n"
                     ));
-                } else if method.return_type.as_ref().is_some_and(|t| {
-                    is_runtime_string_type(t)
-                        || is_runtime_optional_string_type(t)
-                        || is_runtime_record_type(t)
-                        || is_runtime_enum_type(t, enums)
-                }) {
+                } else if method
+                    .return_type
+                    .as_ref()
+                    .is_some_and(|t| is_runtime_utf8_pointer_marshaled_type(t, records, enums))
+                {
                     out.push_str(&format!(
                         "        final ffi.Pointer<Utf8> resultPtr = {complete_field}(futureHandle, outStatusPtr);\n"
                     ));
@@ -3128,6 +3084,28 @@ fn render_bound_methods(
                         "            return _decode{}(payload);\n",
                         to_upper_camel(enum_name)
                     ));
+                    out.push_str("          } finally {\n");
+                    out.push_str("            _rustStringFree(resultPtr);\n");
+                    out.push_str("          }\n");
+                } else if method
+                    .return_type
+                    .as_ref()
+                    .is_some_and(is_runtime_map_with_string_key_type)
+                {
+                    let decode = method
+                        .return_type
+                        .as_ref()
+                        .map(|t| render_json_decode_expr("jsonDecode(payload)", t))
+                        .unwrap_or_else(|| "null".to_string());
+                    out.push_str("          if (resultPtr == ffi.nullptr) {\n");
+                    out.push_str(&format!(
+                        "            throw StateError('Rust returned null for {}');\n",
+                        method_symbol
+                    ));
+                    out.push_str("          }\n");
+                    out.push_str("          try {\n");
+                    out.push_str("            final String payload = resultPtr.toDartString();\n");
+                    out.push_str(&format!("            return {decode};\n"));
                     out.push_str("          } finally {\n");
                     out.push_str("            _rustStringFree(resultPtr);\n");
                     out.push_str("          }\n");
@@ -3419,6 +3397,23 @@ fn render_bound_methods(
                         "      return _decode{}(payload);\n",
                         to_upper_camel(enum_name)
                     ));
+                    out.push_str("    } finally {\n");
+                    out.push_str("      _rustStringFree(resultPtr);\n");
+                    out.push_str("    }\n");
+                } else if is_runtime_map_with_string_key_type(ret) {
+                    let decode = render_json_decode_expr("jsonDecode(payload)", ret);
+                    out.push_str(&format!(
+                        "    final ffi.Pointer<Utf8> resultPtr = {call_expr};\n"
+                    ));
+                    out.push_str("    if (resultPtr == ffi.nullptr) {\n");
+                    out.push_str(&format!(
+                        "      throw StateError('Rust returned null for {}');\n",
+                        method_symbol
+                    ));
+                    out.push_str("    }\n");
+                    out.push_str("    try {\n");
+                    out.push_str("      final String payload = resultPtr.toDartString();\n");
+                    out.push_str(&format!("      return {decode};\n"));
                     out.push_str("    } finally {\n");
                     out.push_str("      _rustStringFree(resultPtr);\n");
                     out.push_str("    }\n");
@@ -4181,7 +4176,7 @@ fn async_rust_future_spec(
     _records: &[UdlRecord],
     enums: &[UdlEnum],
 ) -> Option<AsyncRustFutureSpec> {
-    match return_type {
+    match return_type.map(runtime_unwrapped_type) {
         None => Some(AsyncRustFutureSpec {
             suffix: "void",
             complete_native_type: "ffi.Void",
@@ -4207,6 +4202,13 @@ fn async_rust_future_spec(
             complete_native_type: "ffi.Pointer<Utf8>",
             complete_dart_type: "ffi.Pointer<Utf8>",
         }),
+        Some(Type::Map { key_type, .. }) if is_runtime_string_type(key_type) => {
+            Some(AsyncRustFutureSpec {
+                suffix: "string",
+                complete_native_type: "ffi.Pointer<Utf8>",
+                complete_dart_type: "ffi.Pointer<Utf8>",
+            })
+        }
         Some(Type::Bytes) => Some(AsyncRustFutureSpec {
             suffix: "bytes",
             complete_native_type: "_RustBuffer",
@@ -4392,6 +4394,10 @@ fn map_runtime_native_ffi_type(
     records: &[UdlRecord],
     enums: &[UdlEnum],
 ) -> Option<&'static str> {
+    if let Type::Custom { builtin, .. } = type_ {
+        return map_runtime_native_ffi_type(builtin, records, enums);
+    }
+
     match type_ {
         Type::UInt8 => Some("ffi.Uint8"),
         Type::Int8 => Some("ffi.Int8"),
@@ -4414,6 +4420,7 @@ fn map_runtime_native_ffi_type(
         Type::Sequence { inner_type } if is_runtime_bytes_type(inner_type) => {
             Some("_RustBufferVec")
         }
+        Type::Map { key_type, .. } if is_runtime_string_type(key_type) => Some("ffi.Pointer<Utf8>"),
         Type::Optional { inner_type } if is_runtime_string_type(inner_type) => {
             Some("ffi.Pointer<Utf8>")
         }
@@ -4432,6 +4439,10 @@ fn map_runtime_dart_ffi_type(
     records: &[UdlRecord],
     enums: &[UdlEnum],
 ) -> Option<&'static str> {
+    if let Type::Custom { builtin, .. } = type_ {
+        return map_runtime_dart_ffi_type(builtin, records, enums);
+    }
+
     match type_ {
         Type::UInt8
         | Type::Int8
@@ -4452,6 +4463,7 @@ fn map_runtime_dart_ffi_type(
         Type::Sequence { inner_type } if is_runtime_bytes_type(inner_type) => {
             Some("_RustBufferVec")
         }
+        Type::Map { key_type, .. } if is_runtime_string_type(key_type) => Some("ffi.Pointer<Utf8>"),
         Type::Optional { inner_type } if is_runtime_string_type(inner_type) => {
             Some("ffi.Pointer<Utf8>")
         }
@@ -4466,23 +4478,23 @@ fn map_runtime_dart_ffi_type(
 }
 
 fn is_runtime_string_type(type_: &Type) -> bool {
-    matches!(type_, Type::String)
+    matches!(runtime_unwrapped_type(type_), Type::String)
 }
 
 fn is_runtime_timestamp_type(type_: &Type) -> bool {
-    matches!(type_, Type::Timestamp)
+    matches!(runtime_unwrapped_type(type_), Type::Timestamp)
 }
 
 fn is_runtime_duration_type(type_: &Type) -> bool {
-    matches!(type_, Type::Duration)
+    matches!(runtime_unwrapped_type(type_), Type::Duration)
 }
 
 fn is_runtime_bytes_type(type_: &Type) -> bool {
-    matches!(type_, Type::Bytes)
+    matches!(runtime_unwrapped_type(type_), Type::Bytes)
 }
 
 fn is_runtime_record_type(type_: &Type) -> bool {
-    matches!(type_, Type::Record { .. })
+    matches!(runtime_unwrapped_type(type_), Type::Record { .. })
 }
 
 fn is_runtime_enum_type(type_: &Type, enums: &[UdlEnum]) -> bool {
@@ -4504,25 +4516,25 @@ fn is_runtime_record_or_enum_string_type(type_: &Type, enums: &[UdlEnum]) -> boo
 }
 
 fn enum_name_from_type(type_: &Type) -> Option<&str> {
-    match type_ {
+    match runtime_unwrapped_type(type_) {
         Type::Enum { name, .. } => Some(name.as_str()),
         _ => None,
     }
 }
 
 fn record_name_from_type(type_: &Type) -> Option<&str> {
-    match type_ {
+    match runtime_unwrapped_type(type_) {
         Type::Record { name, .. } => Some(name.as_str()),
         _ => None,
     }
 }
 
 fn is_runtime_optional_bytes_type(type_: &Type) -> bool {
-    matches!(type_, Type::Optional { inner_type } if is_runtime_bytes_type(inner_type))
+    matches!(runtime_unwrapped_type(type_), Type::Optional { inner_type } if is_runtime_bytes_type(inner_type))
 }
 
 fn is_runtime_sequence_bytes_type(type_: &Type) -> bool {
-    matches!(type_, Type::Sequence { inner_type } if is_runtime_bytes_type(inner_type))
+    matches!(runtime_unwrapped_type(type_), Type::Sequence { inner_type } if is_runtime_bytes_type(inner_type))
 }
 
 fn is_runtime_bytes_like_type(type_: &Type) -> bool {
@@ -4532,7 +4544,7 @@ fn is_runtime_bytes_like_type(type_: &Type) -> bool {
 }
 
 fn is_runtime_optional_string_type(type_: &Type) -> bool {
-    matches!(type_, Type::Optional { inner_type } if is_runtime_string_type(inner_type))
+    matches!(runtime_unwrapped_type(type_), Type::Optional { inner_type } if is_runtime_string_type(inner_type))
 }
 
 fn is_runtime_string_like_type(type_: &Type) -> bool {
@@ -4540,7 +4552,7 @@ fn is_runtime_string_like_type(type_: &Type) -> bool {
 }
 
 fn render_plain_ffi_decode_expr(type_: &Type, call_expr: &str) -> String {
-    match type_ {
+    match runtime_unwrapped_type(type_) {
         Type::Timestamp => format!("DateTime.fromMicrosecondsSinceEpoch({call_expr}, isUtc: true)"),
         Type::Duration => format!("Duration(microseconds: {call_expr})"),
         _ => call_expr.to_string(),
@@ -4576,8 +4588,19 @@ fn map_uniffi_type_to_dart(type_: &Type) -> String {
         Type::Enum { name, .. }
         | Type::Object { name, .. }
         | Type::Record { name, .. }
-        | Type::Custom { name, .. }
         | Type::CallbackInterface { name, .. } => to_upper_camel(name),
+        Type::Custom { builtin, .. } => map_uniffi_type_to_dart(builtin),
+    }
+}
+
+fn uniffi_type_uses_json(type_: &Type) -> bool {
+    match type_ {
+        Type::Record { .. } | Type::Enum { .. } | Type::Map { .. } => true,
+        Type::Optional { inner_type } | Type::Sequence { inner_type } => {
+            uniffi_type_uses_json(inner_type)
+        }
+        Type::Custom { builtin, .. } => uniffi_type_uses_json(builtin),
+        _ => false,
     }
 }
 
@@ -4591,8 +4614,31 @@ fn uniffi_type_uses_bytes(type_: &Type) -> bool {
             key_type,
             value_type,
         } => uniffi_type_uses_bytes(key_type) || uniffi_type_uses_bytes(value_type),
+        Type::Custom { builtin, .. } => uniffi_type_uses_bytes(builtin),
         _ => false,
     }
+}
+
+fn runtime_unwrapped_type(type_: &Type) -> &Type {
+    match type_ {
+        Type::Custom { builtin, .. } => runtime_unwrapped_type(builtin),
+        _ => type_,
+    }
+}
+
+fn is_runtime_map_with_string_key_type(type_: &Type) -> bool {
+    match runtime_unwrapped_type(type_) {
+        Type::Map { key_type, .. } => is_runtime_string_type(key_type),
+        _ => false,
+    }
+}
+
+fn is_runtime_utf8_pointer_marshaled_type(
+    type_: &Type,
+    records: &[UdlRecord],
+    enums: &[UdlEnum],
+) -> bool {
+    map_runtime_native_ffi_type(type_, records, enums) == Some("ffi.Pointer<Utf8>")
 }
 
 fn to_upper_camel(input: &str) -> String {
@@ -4878,6 +4924,9 @@ namespace demo {
         fs::write(
             &source,
             r#"
+[Custom]
+typedef string Label;
+
 namespace async_demo {
   [Async]
   string greet_async(string name);
@@ -4891,6 +4940,10 @@ namespace async_demo {
   bytes? maybe_echo_bytes_async(bytes? input);
   [Async]
   sequence<bytes> chunks_echo_bytes_async(sequence<bytes> input);
+  [Async]
+  record<string, u32> summarize_async(record<string, u32> values);
+  [Async]
+  Label label_echo_async(Label input);
 };
 
 interface Counter {
@@ -4901,6 +4954,10 @@ interface Counter {
   u32 async_value();
   [Async]
   bytes async_snapshot_bytes();
+  [Async]
+  record<string, u32> async_counts(record<string, u32> items);
+  [Async]
+  Label async_label_echo(Label input);
 };
 "#,
         )
@@ -4925,6 +4982,10 @@ interface Counter {
         assert!(content.contains("Future<Uint8List?> maybeEchoBytesAsync(Uint8List? input) {"));
         assert!(content
             .contains("Future<List<Uint8List>> chunksEchoBytesAsync(List<Uint8List> input) {"));
+        assert!(
+            content.contains("Future<Map<String, int>> summarizeAsync(Map<String, int> values) {")
+        );
+        assert!(content.contains("Future<String> labelEchoAsync(String input) {"));
         assert!(content.contains("rust_future_poll_string"));
         assert!(content.contains("rust_future_complete_string"));
         assert!(content.contains("rust_future_poll_u32"));
@@ -4943,6 +5004,8 @@ interface Counter {
         assert!(content.contains("return _ffi.counterInvokeAsyncDescribe(_handle);"));
         assert!(content.contains("Future<int> asyncValue() {"));
         assert!(content.contains("Future<Uint8List> asyncSnapshotBytes() {"));
+        assert!(content.contains("Future<Map<String, int>> asyncCounts(Map<String, int> items) {"));
+        assert!(content.contains("Future<String> asyncLabelEcho(String input) {"));
         assert!(content.contains("return _ffi.counterInvokeAsyncSnapshotBytes(_handle);"));
     }
 

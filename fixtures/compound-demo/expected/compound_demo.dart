@@ -2,6 +2,7 @@
 // ignore_for_file: unused_element
 library compound_demo;
 
+import 'dart:convert';
 import 'dart:ffi' as ffi;
 import 'package:ffi/ffi.dart';
 import 'dart:typed_data';
@@ -113,6 +114,27 @@ class CompoundDemoFfi {
     }
   }
 
+  late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> items) _counts = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> items), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> items)>('counts');
+
+  Map<String, int> counts(Map<String, int> items) {
+    final String itemsNativeJson = jsonEncode(items.map((key, value) => MapEntry(key, value)));
+    final ffi.Pointer<Utf8> itemsNative = itemsNativeJson.toNativeUtf8();
+    try {
+      final ffi.Pointer<Utf8> resultPtr = _counts(itemsNative);
+      if (resultPtr == ffi.nullptr) {
+        throw StateError('Rust returned null for counts');
+      }
+      try {
+        final String payload = resultPtr.toDartString();
+        return (jsonDecode(payload) as Map<String, dynamic>).map((key, value) => MapEntry(key, (value as num).toInt()));
+      } finally {
+        _rustStringFree(resultPtr);
+      }
+    } finally {
+    calloc.free(itemsNative);
+    }
+  }
+
   late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> value) _maybeName = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> value), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> value)>('maybe_name');
 
   String? maybeName(String? value) {
@@ -150,7 +172,7 @@ List<Uint8List> chunk(List<Uint8List> input) {
 }
 
 Map<String, int> counts(Map<String, int> items) {
-  throw UnimplementedError('TODO: bind to Rust FFI');
+  return _bindings().counts(items);
 }
 
 List<int> listify(List<int> values) {

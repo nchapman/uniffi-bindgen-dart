@@ -815,6 +815,34 @@ pub extern "C" fn async_bytes_chunks_echo(input: RustBufferVec) -> u64 {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn async_counts(items: *const c_char) -> u64 {
+    let counts = if items.is_null() {
+        HashMap::<String, u32>::new()
+    } else {
+        let payload = unsafe { CStr::from_ptr(items) }
+            .to_string_lossy()
+            .into_owned();
+        serde_json::from_str::<HashMap<String, u32>>(&payload).unwrap_or_default()
+    };
+    let mut out = counts;
+    let total = out.values().copied().sum::<u32>();
+    out.insert("total".to_string(), total);
+    enqueue_string_future(serde_json::to_string(&out).unwrap_or_else(|_| "{}".to_string()))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn async_label_echo(input: *const c_char) -> u64 {
+    let label = if input.is_null() {
+        String::new()
+    } else {
+        unsafe { CStr::from_ptr(input) }
+            .to_string_lossy()
+            .into_owned()
+    };
+    enqueue_string_future(format!("label:{label}"))
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn rust_bytes_free(value: RustBuffer) {
     if value.data.is_null() {
         return;
@@ -1787,6 +1815,47 @@ pub extern "C" fn counter_async_snapshot_bytes(handle: u64) -> u64 {
         .copied()
         .unwrap_or_default();
     enqueue_bytes_future(format!("async-bytes:{value}").into_bytes())
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_async_counts(handle: u64, items: *const c_char) -> u64 {
+    let mut counts = if items.is_null() {
+        HashMap::<String, u32>::new()
+    } else {
+        let payload = unsafe { CStr::from_ptr(items) }
+            .to_string_lossy()
+            .into_owned();
+        serde_json::from_str::<HashMap<String, u32>>(&payload).unwrap_or_default()
+    };
+    let counter_value = COUNTERS
+        .lock()
+        .expect("counter map lock")
+        .get(&handle)
+        .copied()
+        .unwrap_or_default()
+        .max(0) as u32;
+    counts.insert("counter".to_string(), counter_value);
+    let total = counts.values().copied().sum::<u32>();
+    counts.insert("total".to_string(), total);
+    enqueue_string_future(serde_json::to_string(&counts).unwrap_or_else(|_| "{}".to_string()))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_async_label_echo(handle: u64, input: *const c_char) -> u64 {
+    let label = if input.is_null() {
+        String::new()
+    } else {
+        unsafe { CStr::from_ptr(input) }
+            .to_string_lossy()
+            .into_owned()
+    };
+    let value = COUNTERS
+        .lock()
+        .expect("counter map lock")
+        .get(&handle)
+        .copied()
+        .unwrap_or_default();
+    enqueue_string_future(format!("counter:{value}:{label}"))
 }
 
 #[unsafe(no_mangle)]

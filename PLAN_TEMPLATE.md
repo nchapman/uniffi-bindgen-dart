@@ -230,6 +230,7 @@ Use this checklist in the row notes before changing status to `Done`:
 4. Pass all relevant layers locally.
 5. Add regression coverage if fixing a bug.
 6. Document behavior/config in docs.
+7. Prefer delta-based assertions for memory/free counters in runtime tests when valid call-surface growth can change absolute totals.
 
 ### Definition Of Done For Any Feature
 - Unit/golden/runtime tests exist and pass.
@@ -266,6 +267,7 @@ Use this checklist in the row notes before changing status to `Done`:
 - Keep one rich end-to-end fixture that mixes features and exercises lifecycle/memory behavior.
 - Keep focused fixtures for deterministic golden coverage of specific type categories.
 - Add regression fixtures for every bug fix before implementing the fix.
+- Use relative/delta assertions for allocation/free counters to keep tests stable as valid feature coverage expands.
 
 ## Execution Phases and Gates
 ### Phase 0: Bootstrap

@@ -1,3 +1,6 @@
+[Custom]
+typedef string Label;
+
 namespace simple_fns {
   u32 add(u32 left, u32 right);
   u32 apply_adder(Adder adder, u32 left, u32 right);
@@ -28,6 +31,10 @@ namespace simple_fns {
   sequence<bytes> async_bytes_chunks_echo(sequence<bytes> input);
   [Async]
   bytes? async_bytes_maybe_echo(bytes? input);
+  [Async]
+  record<string, u32> async_counts(record<string, u32> items);
+  [Async]
+  Label async_label_echo(Label input);
   u32 bytes_free_count();
   u32 bytes_vec_free_count();
   u32 free_count();
@@ -127,6 +134,10 @@ interface Counter {
   bytes snapshot_bytes();
   [Async]
   bytes async_snapshot_bytes();
+  [Async]
+  record<string, u32> async_counts(record<string, u32> items);
+  [Async]
+  Label async_label_echo(Label input);
   [Throws=MathError]
   i32 divide_by(i32 divisor);
   [Throws=MathError]

@@ -138,6 +138,8 @@ void main() {
     expect(contents, contains('Future<String> asyncGreet(String name) {'));
     expect(contents, contains('Future<int> asyncAdd(int left, int right) {'));
     expect(contents, contains('Future<void> asyncTick() {'));
+    expect(contents, contains('Future<Map<String, int>> asyncCounts(Map<String, int> items) {'));
+    expect(contents, contains('Future<String> asyncLabelEcho(String input) {'));
     expect(contents, contains('Future<Uint8List> asyncBytesEcho(Uint8List input) {'));
     expect(contents, contains('Future<List<Uint8List>> asyncBytesChunksEcho(List<Uint8List> input) {'));
     expect(contents, contains('Future<Uint8List?> asyncBytesMaybeEcho(Uint8List? input) {'));
@@ -265,6 +267,8 @@ void main() {
     expect(contents, contains('Future<String> asyncDescribe() {'));
     expect(contents, contains('Future<int> asyncValue() {'));
     expect(contents, contains('Future<Uint8List> asyncSnapshotBytes() {'));
+    expect(contents, contains('Future<Map<String, int>> asyncCounts(Map<String, int> items) {'));
+    expect(contents, contains('Future<String> asyncLabelEcho(String input) {'));
     expect(contents, contains('Person snapshotPerson() {'));
     expect(contents, contains('Outcome snapshotOutcome() {'));
     expect(contents, contains('Uint8List snapshotBytes() {'));
@@ -454,7 +458,12 @@ void main() {
     final asyncTickBefore = bindings.currentTick();
     await bindings.asyncTick();
     expect(bindings.currentTick(), asyncTickBefore + 1);
-    expect(bindings.freeCount(), 7);
+    final asyncCountsResult = await bindings.asyncCounts({'alpha': 2, 'beta': 3});
+    expect(asyncCountsResult['alpha'], 2);
+    expect(asyncCountsResult['beta'], 3);
+    expect(asyncCountsResult['total'], 5);
+    expect(await bindings.asyncLabelEcho('dart'), 'label:dart');
+    expect(bindings.freeCount(), 9);
     expect(bindings.checkedDivide(12, 3), 4);
     expect(
       () => bindings.checkedDivide(10, 0),
@@ -470,7 +479,7 @@ void main() {
         ),
       ),
     );
-    expect(bindings.freeCount(), 10);
+    expect(bindings.freeCount(), 12);
     final counter = bindings.counterCreateNew(10);
     expect(counter.currentValue(), 10);
     counter.addValue(5);
@@ -506,6 +515,10 @@ void main() {
     equalCounter.close();
     expect(await counter.asyncDescribe(), 'async:counter:5:alpha');
     expect(await counter.asyncValue(), 5);
+    final counterCounts = await counter.asyncCounts({'x': 1, 'y': 2});
+    expect(counterCounts['counter'], 5);
+    expect(counterCounts['total'], 8);
+    expect(await counter.asyncLabelEcho('tail'), 'counter:5:tail');
     expect(counter.maybeLabel('tail'), 'counter:5:tail');
     expect(counter.maybeLabel(null), 'counter:5:none');
     counter.ingestPerson(const Person(name: 'Eve', age: 9));
@@ -712,7 +725,12 @@ void main() {
     final asyncGlobalBefore = currentTick();
     await asyncTick();
     expect(currentTick(), asyncGlobalBefore + 1);
-    expect(freeCount(), 7);
+    final asyncTopCounts = await asyncCounts({'m': 4, 'n': 1});
+    expect(asyncTopCounts['m'], 4);
+    expect(asyncTopCounts['n'], 1);
+    expect(asyncTopCounts['total'], 5);
+    expect(await asyncLabelEcho('ffi'), 'label:ffi');
+    expect(freeCount(), 9);
     expect(checkedDivide(20, 4), 5);
     expect(
       () => checkedDivide(7, 0),
@@ -728,13 +746,13 @@ void main() {
         ),
       ),
     );
-    expect(freeCount(), 10);
+    expect(freeCount(), 12);
     expect(maybeGreet('ffi'), 'maybe, ffi');
-    expect(freeCount(), 11);
+    expect(freeCount(), 13);
     expect(maybeGreet(null), isNull);
-    expect(freeCount(), 11);
+    expect(freeCount(), 13);
     expect(() => brokenGreet(), throwsA(isA<StateError>()));
-    expect(freeCount(), 11);
+    expect(freeCount(), 13);
     expect(isEven(10), isTrue);
     expect(cycleColor(Color.red), Color.green);
     final freeBeforeTopOutcome = freeCount();
@@ -756,6 +774,10 @@ void main() {
     topCounterSame.close();
     expect(await topCounter.asyncApplyAdderWith(const _TestAdder(2), 2, 3), 10);
     expect(topCounter.checkedApplyAdderWith(const _TestAdder(2), 2, 3), 10);
+    final topCounterCounts = await topCounter.asyncCounts({'k': 2});
+    expect(topCounterCounts['counter'], 3);
+    expect(topCounterCounts['total'], 5);
+    expect(await topCounter.asyncLabelEcho('ok'), 'counter:3:ok');
     expect(
       () => topCounter.checkedApplyAdderWith(const _TestAdder(2), 2, 0),
       throwsA(isA<MathErrorExceptionDivisionByZero>()),
