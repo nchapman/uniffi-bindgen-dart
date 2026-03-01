@@ -186,3 +186,16 @@ fn golden_regression_callback_custom_async_demo() {
     generate(&source, &out_dir, None);
     assert_matches_expected(&out_dir.join("callback_custom_async_demo.dart"), &expected);
 }
+
+#[test]
+fn golden_keywords_demo() {
+    let root = repo_root();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let out_dir = temp.path().join("out");
+
+    let source = root.join("fixtures/keywords-demo/src/keywords-demo.udl");
+    let expected = root.join("fixtures/keywords-demo/expected/keywords_demo.dart");
+
+    generate(&source, &out_dir, None);
+    assert_matches_expected(&out_dir.join("keywords_demo.dart"), &expected);
+}

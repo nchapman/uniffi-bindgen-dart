@@ -1,0 +1,29 @@
+namespace keywords_demo {
+  u32 class(u32 switch);
+  string return(string var);
+  boolean is(boolean sealed);
+};
+
+dictionary break {
+  string class;
+  u32 return;
+  boolean is;
+};
+
+enum async {
+  "void",
+  "yield",
+  "await",
+};
+
+[Error]
+enum throw {
+  "catch",
+  "rethrow",
+};
+
+interface super {
+  constructor();
+  string class(string var);
+  u32 return();
+};
