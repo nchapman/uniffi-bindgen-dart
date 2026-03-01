@@ -128,6 +128,6 @@ mod tests {
         .expect("run generate");
 
         assert!(out_dir.exists());
-        assert!(out_dir.join("simple-fns.dart").exists());
+        assert!(out_dir.join("simple_fns.dart").exists());
     }
 }

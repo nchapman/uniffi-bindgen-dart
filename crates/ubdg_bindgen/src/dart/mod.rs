@@ -49,6 +49,10 @@ pub fn generate_bindings(args: &GenerateArgs) -> Result<()> {
 }
 
 fn namespace_from_source(source: &Path) -> Result<String> {
+    if let Some(namespace) = extract_namespace_from_udl(source) {
+        return Ok(namespace);
+    }
+
     let stem = source
         .file_stem()
         .and_then(|s| s.to_str())
@@ -58,6 +62,32 @@ fn namespace_from_source(source: &Path) -> Result<String> {
         bail!("source path stem cannot be empty");
     }
     Ok(stem)
+}
+
+fn extract_namespace_from_udl(source: &Path) -> Option<String> {
+    if source.extension().and_then(|e| e.to_str()) != Some("udl") {
+        return None;
+    }
+
+    let udl = fs::read_to_string(source).ok()?;
+    let marker = "namespace";
+    let start = udl.find(marker)?;
+    let mut chars = udl[start + marker.len()..].chars().peekable();
+
+    while matches!(chars.peek(), Some(c) if c.is_whitespace()) {
+        chars.next();
+    }
+
+    let mut ns = String::new();
+    while matches!(chars.peek(), Some(c) if c.is_ascii_alphanumeric() || *c == '_') {
+        ns.push(chars.next()?);
+    }
+
+    if ns.is_empty() {
+        None
+    } else {
+        Some(ns)
+    }
 }
 
 fn render_dart_scaffold(module_name: &str, ffi_class_name: &str, library_name: &str) -> String {
@@ -137,12 +167,33 @@ mod tests {
 
         generate_bindings(&args).expect("generate");
 
-        let generated = out_dir.join("simple-fns.dart");
+        let generated = out_dir.join("simple_fns.dart");
         assert!(generated.exists());
         let content = fs::read_to_string(generated).expect("read generated file");
         assert!(content.contains("library simple_fns;"));
         assert!(content.contains("class SimpleFnsFfi {"));
         assert!(content.contains("libraryName = 'uniffi_simple_fns';"));
+    }
+
+    #[test]
+    fn uses_udl_namespace_when_available() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = temp.path().join("filename_does_not_match.udl");
+        let out_dir = temp.path().join("out");
+        fs::write(&source, "namespace from_udl { u32 add(u32 a, u32 b); };").expect("write source");
+
+        let args = GenerateArgs {
+            source,
+            out_dir: out_dir.clone(),
+            library: false,
+            config: None,
+            crate_name: None,
+            no_format: false,
+        };
+
+        generate_bindings(&args).expect("generate");
+        let content = fs::read_to_string(out_dir.join("from_udl.dart")).expect("read generated");
+        assert!(content.contains("library from_udl;"));
     }
 
     #[test]

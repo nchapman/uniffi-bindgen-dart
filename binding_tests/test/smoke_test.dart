@@ -8,12 +8,12 @@ void main() {
   });
 
   test('generated bindings file exists', () {
-    final generated = File('generated/simple-fns.dart');
+    final generated = File('generated/simple_fns.dart');
     expect(generated.existsSync(), isTrue);
   });
 
   test('generated bindings include expected symbols', () {
-    final generated = File('generated/simple-fns.dart');
+    final generated = File('generated/simple_fns.dart');
     final contents = generated.readAsStringSync();
     expect(contents, contains('library simple_fns;'));
     expect(contents, contains('class SimpleFnsBindings {'));
