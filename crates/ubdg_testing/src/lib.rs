@@ -1,6 +1,6 @@
 /// Shared test utilities for fixture and integration testing.
 ///
-/// This crate is scaffold-only for now.
+/// Provides shared helpers for fixture and integration testing.
 pub fn test_util_ready() -> bool {
     true
 }
