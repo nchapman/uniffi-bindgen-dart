@@ -12,6 +12,20 @@ final class _RustBuffer extends ffi.Struct {
   external int len;
 }
 
+final class _RustBufferOpt extends ffi.Struct {
+  @ffi.Uint8()
+  external int isSome;
+
+  external _RustBuffer value;
+}
+
+final class _RustBufferVec extends ffi.Struct {
+  external ffi.Pointer<_RustBuffer> data;
+
+  @ffi.Uint64()
+  external int len;
+}
+
 class SimpleFnsBindings {
   SimpleFnsBindings({ffi.DynamicLibrary? dynamicLibrary, String? libraryPath})
       : _dynamicLibrary = dynamicLibrary,
@@ -35,6 +49,8 @@ class SimpleFnsBindings {
   late final void Function(ffi.Pointer<Utf8>) _rustStringFree = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<Utf8>), void Function(ffi.Pointer<Utf8>)>('rust_string_free');
 
   late final void Function(_RustBuffer) _rustBytesFree = _lib.lookupFunction<ffi.Void Function(_RustBuffer), void Function(_RustBuffer)>('rust_bytes_free');
+
+  late final void Function(_RustBufferVec) _rustBytesVecFree = _lib.lookupFunction<ffi.Void Function(_RustBufferVec), void Function(_RustBufferVec)>('rust_bytes_vec_free');
 
   late final int Function(int left, int right) _add = _lib.lookupFunction<ffi.Uint32 Function(ffi.Uint32 left, ffi.Uint32 right), int Function(int left, int right)>('add');
 
@@ -67,6 +83,73 @@ class SimpleFnsBindings {
       } finally {
         _rustStringFree(resultPtr);
       }
+  }
+
+  late final _RustBufferVec Function(_RustBufferVec input) _bytesChunksEcho = _lib.lookupFunction<_RustBufferVec Function(_RustBufferVec input), _RustBufferVec Function(_RustBufferVec input)>('bytes_chunks_echo');
+
+  List<Uint8List> bytesChunksEcho(List<Uint8List> input) {
+    final ffi.Pointer<_RustBuffer> inputData = input.isEmpty ? ffi.nullptr : calloc<_RustBuffer>(input.length);
+    if (inputData != ffi.nullptr) {
+      for (var i = 0; i < input.length; i++) {
+        final item = input[i];
+        final ffi.Pointer<ffi.Uint8> itemData = item.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>(item.length);
+        if (itemData != ffi.nullptr) {
+          itemData.asTypedList(item.length).setAll(0, item);
+        }
+        (inputData + i).ref
+          ..data = itemData
+          ..len = item.length;
+      }
+    }
+    final ffi.Pointer<_RustBufferVec> inputVecPtr = calloc<_RustBufferVec>();
+    inputVecPtr.ref
+      ..data = inputData
+      ..len = input.length;
+    final _RustBufferVec inputNative = inputVecPtr.ref;
+    try {
+      final _RustBufferVec resultVec = _bytesChunksEcho(inputNative);
+      final ffi.Pointer<_RustBuffer> resultData = resultVec.data;
+      final int resultLen = resultVec.len;
+      if (resultData == ffi.nullptr) {
+        if (resultLen == 0) {
+          _rustBytesVecFree(resultVec);
+          return <Uint8List>[];
+        }
+        throw StateError('Rust returned invalid byte vector for bytes_chunks_echo');
+      }
+      try {
+        final out = <Uint8List>[];
+        for (var i = 0; i < resultLen; i++) {
+          final _RustBuffer item = (resultData + i).ref;
+          final ffi.Pointer<ffi.Uint8> itemData = item.data;
+          final int itemLen = item.len;
+          if (itemData == ffi.nullptr) {
+            if (itemLen == 0) {
+              out.add(Uint8List(0));
+              continue;
+            }
+            throw StateError('Rust returned invalid nested buffer for bytes_chunks_echo');
+          }
+          try {
+            out.add(Uint8List.fromList(itemData.asTypedList(itemLen)));
+          } finally {
+            _rustBytesFree(item);
+          }
+        }
+        return out;
+      } finally {
+        _rustBytesVecFree(resultVec);
+      }
+    } finally {
+    if (inputData != ffi.nullptr) {
+      for (var i = 0; i < input.length; i++) {
+        final data = (inputData + i).ref.data;
+        if (data != ffi.nullptr) calloc.free(data);
+      }
+      calloc.free(inputData);
+    }
+    calloc.free(inputVecPtr);
+    }
   }
 
   late final _RustBuffer Function(_RustBuffer input) _bytesEcho = _lib.lookupFunction<_RustBuffer Function(_RustBuffer input), _RustBuffer Function(_RustBuffer input)>('bytes_echo');
@@ -106,6 +189,55 @@ class SimpleFnsBindings {
 
   int bytesFreeCount() {
       return _bytesFreeCount();
+  }
+
+  late final _RustBufferOpt Function(_RustBufferOpt input) _bytesMaybeEcho = _lib.lookupFunction<_RustBufferOpt Function(_RustBufferOpt input), _RustBufferOpt Function(_RustBufferOpt input)>('bytes_maybe_echo');
+
+  Uint8List? bytesMaybeEcho(Uint8List? input) {
+    final bool inputIsSome = input != null;
+    final Uint8List inputValue = input ?? Uint8List(0);
+    final ffi.Pointer<ffi.Uint8> inputData = !inputIsSome || inputValue.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>(inputValue.length);
+    if (inputData != ffi.nullptr) {
+      inputData.asTypedList(inputValue.length).setAll(0, inputValue);
+    }
+    final ffi.Pointer<_RustBuffer> inputBufferPtr = calloc<_RustBuffer>();
+    inputBufferPtr.ref.data = inputData;
+    inputBufferPtr.ref.len = inputIsSome ? inputValue.length : 0;
+    final ffi.Pointer<_RustBufferOpt> inputOptPtr = calloc<_RustBufferOpt>();
+    inputOptPtr.ref.isSome = inputIsSome ? 1 : 0;
+    inputOptPtr.ref.value = inputBufferPtr.ref;
+    final _RustBufferOpt inputNative = inputOptPtr.ref;
+    try {
+      final _RustBufferOpt resultOpt = _bytesMaybeEcho(inputNative);
+      if (resultOpt.isSome == 0) {
+        return null;
+      }
+      final _RustBuffer resultBuf = resultOpt.value;
+      final ffi.Pointer<ffi.Uint8> resultData = resultBuf.data;
+      final int resultLen = resultBuf.len;
+      if (resultData == ffi.nullptr) {
+        if (resultLen == 0) {
+          _rustBytesFree(resultBuf);
+          return Uint8List(0);
+        }
+        throw StateError('Rust returned invalid optional buffer for bytes_maybe_echo');
+      }
+      try {
+        return Uint8List.fromList(resultData.asTypedList(resultLen));
+      } finally {
+        _rustBytesFree(resultBuf);
+      }
+    } finally {
+    if (inputData != ffi.nullptr) calloc.free(inputData);
+    calloc.free(inputBufferPtr);
+    calloc.free(inputOptPtr);
+    }
+  }
+
+  late final int Function() _bytesVecFreeCount = _lib.lookupFunction<ffi.Uint32 Function(), int Function()>('bytes_vec_free_count');
+
+  int bytesVecFreeCount() {
+      return _bytesVecFreeCount();
   }
 
   late final int Function() _currentTick = _lib.lookupFunction<ffi.Uint32 Function(), int Function()>('current_tick');
@@ -183,6 +315,12 @@ class SimpleFnsBindings {
       _resetBytesFreeCount();
   }
 
+  late final void Function() _resetBytesVecFreeCount = _lib.lookupFunction<ffi.Void Function(), void Function()>('reset_bytes_vec_free_count');
+
+  void resetBytesVecFreeCount() {
+      _resetBytesVecFreeCount();
+  }
+
   late final void Function() _resetFreeCount = _lib.lookupFunction<ffi.Void Function(), void Function()>('reset_free_count');
 
   void resetFreeCount() {
@@ -242,12 +380,24 @@ String brokenGreet() {
   return _bindings().brokenGreet();
 }
 
+List<Uint8List> bytesChunksEcho(List<Uint8List> input) {
+  return _bindings().bytesChunksEcho(input);
+}
+
 Uint8List bytesEcho(Uint8List input) {
   return _bindings().bytesEcho(input);
 }
 
 int bytesFreeCount() {
   return _bindings().bytesFreeCount();
+}
+
+Uint8List? bytesMaybeEcho(Uint8List? input) {
+  return _bindings().bytesMaybeEcho(input);
+}
+
+int bytesVecFreeCount() {
+  return _bindings().bytesVecFreeCount();
 }
 
 int currentTick() {
@@ -280,6 +430,10 @@ int negate(int value) {
 
 void resetBytesFreeCount() {
   _bindings().resetBytesFreeCount();
+}
+
+void resetBytesVecFreeCount() {
+  _bindings().resetBytesVecFreeCount();
 }
 
 void resetFreeCount() {

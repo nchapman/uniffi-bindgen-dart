@@ -5,6 +5,20 @@ import 'dart:ffi' as ffi;
 import 'package:ffi/ffi.dart';
 import 'dart:typed_data';
 
+final class _RustBuffer extends ffi.Struct {
+  external ffi.Pointer<ffi.Uint8> data;
+
+  @ffi.Uint64()
+  external int len;
+}
+
+final class _RustBufferVec extends ffi.Struct {
+  external ffi.Pointer<_RustBuffer> data;
+
+  @ffi.Uint64()
+  external int len;
+}
+
 class CompoundDemoFfi {
   CompoundDemoFfi({ffi.DynamicLibrary? dynamicLibrary, String? libraryPath})
       : _dynamicLibrary = dynamicLibrary,
@@ -26,6 +40,77 @@ class CompoundDemoFfi {
   late final ffi.DynamicLibrary _lib = open();
 
   late final void Function(ffi.Pointer<Utf8>) _rustStringFree = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<Utf8>), void Function(ffi.Pointer<Utf8>)>('rust_string_free');
+
+  late final void Function(_RustBuffer) _rustBytesFree = _lib.lookupFunction<ffi.Void Function(_RustBuffer), void Function(_RustBuffer)>('rust_bytes_free');
+
+  late final void Function(_RustBufferVec) _rustBytesVecFree = _lib.lookupFunction<ffi.Void Function(_RustBufferVec), void Function(_RustBufferVec)>('rust_bytes_vec_free');
+
+  late final _RustBufferVec Function(_RustBufferVec input) _chunk = _lib.lookupFunction<_RustBufferVec Function(_RustBufferVec input), _RustBufferVec Function(_RustBufferVec input)>('chunk');
+
+  List<Uint8List> chunk(List<Uint8List> input) {
+    final ffi.Pointer<_RustBuffer> inputData = input.isEmpty ? ffi.nullptr : calloc<_RustBuffer>(input.length);
+    if (inputData != ffi.nullptr) {
+      for (var i = 0; i < input.length; i++) {
+        final item = input[i];
+        final ffi.Pointer<ffi.Uint8> itemData = item.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>(item.length);
+        if (itemData != ffi.nullptr) {
+          itemData.asTypedList(item.length).setAll(0, item);
+        }
+        (inputData + i).ref
+          ..data = itemData
+          ..len = item.length;
+      }
+    }
+    final ffi.Pointer<_RustBufferVec> inputVecPtr = calloc<_RustBufferVec>();
+    inputVecPtr.ref
+      ..data = inputData
+      ..len = input.length;
+    final _RustBufferVec inputNative = inputVecPtr.ref;
+    try {
+      final _RustBufferVec resultVec = _chunk(inputNative);
+      final ffi.Pointer<_RustBuffer> resultData = resultVec.data;
+      final int resultLen = resultVec.len;
+      if (resultData == ffi.nullptr) {
+        if (resultLen == 0) {
+          _rustBytesVecFree(resultVec);
+          return <Uint8List>[];
+        }
+        throw StateError('Rust returned invalid byte vector for chunk');
+      }
+      try {
+        final out = <Uint8List>[];
+        for (var i = 0; i < resultLen; i++) {
+          final _RustBuffer item = (resultData + i).ref;
+          final ffi.Pointer<ffi.Uint8> itemData = item.data;
+          final int itemLen = item.len;
+          if (itemData == ffi.nullptr) {
+            if (itemLen == 0) {
+              out.add(Uint8List(0));
+              continue;
+            }
+            throw StateError('Rust returned invalid nested buffer for chunk');
+          }
+          try {
+            out.add(Uint8List.fromList(itemData.asTypedList(itemLen)));
+          } finally {
+            _rustBytesFree(item);
+          }
+        }
+        return out;
+      } finally {
+        _rustBytesVecFree(resultVec);
+      }
+    } finally {
+    if (inputData != ffi.nullptr) {
+      for (var i = 0; i < input.length; i++) {
+        final data = (inputData + i).ref.data;
+        if (data != ffi.nullptr) calloc.free(data);
+      }
+      calloc.free(inputData);
+    }
+    calloc.free(inputVecPtr);
+    }
+  }
 
   late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> value) _maybeName = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> value), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> value)>('maybe_name');
 
@@ -60,7 +145,7 @@ void resetDefaultBindings() {
 }
 
 List<Uint8List> chunk(List<Uint8List> input) {
-  throw UnimplementedError('TODO: bind to Rust FFI');
+  return _bindings().chunk(input);
 }
 
 Map<String, int> counts(Map<String, int> items) {

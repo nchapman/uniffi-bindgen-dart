@@ -5,11 +5,26 @@ use std::sync::atomic::{AtomicU32, Ordering};
 static TICK_COUNT: AtomicU32 = AtomicU32::new(0);
 static FREE_COUNT: AtomicU32 = AtomicU32::new(0);
 static BYTES_FREE_COUNT: AtomicU32 = AtomicU32::new(0);
+static BYTES_VEC_FREE_COUNT: AtomicU32 = AtomicU32::new(0);
 
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct RustBuffer {
     pub data: *mut u8,
+    pub len: u64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct RustBufferOpt {
+    pub is_some: u8,
+    pub value: RustBuffer,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct RustBufferVec {
+    pub data: *mut RustBuffer,
     pub len: u64,
 }
 
@@ -26,6 +41,29 @@ fn vec_into_rust_buffer(mut data: Vec<u8>) -> RustBuffer {
         len: data.len() as u64,
     };
     std::mem::forget(data);
+    out
+}
+
+fn rust_buffer_to_vec(buf: RustBuffer) -> Vec<u8> {
+    if buf.data.is_null() || buf.len == 0 {
+        Vec::new()
+    } else {
+        unsafe { std::slice::from_raw_parts(buf.data, buf.len as usize).to_vec() }
+    }
+}
+
+fn vec_into_rust_buffer_vec(mut items: Vec<RustBuffer>) -> RustBufferVec {
+    if items.is_empty() {
+        return RustBufferVec {
+            data: std::ptr::null_mut(),
+            len: 0,
+        };
+    }
+    let out = RustBufferVec {
+        data: items.as_mut_ptr(),
+        len: items.len() as u64,
+    };
+    std::mem::forget(items);
     out
 }
 
@@ -46,12 +84,43 @@ pub extern "C" fn add_u64(left: u64, right: u64) -> u64 {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn bytes_echo(input: RustBuffer) -> RustBuffer {
-    let out = if input.data.is_null() || input.len == 0 {
-        Vec::new()
-    } else {
-        unsafe { std::slice::from_raw_parts(input.data, input.len as usize).to_vec() }
-    };
+    let out = rust_buffer_to_vec(input);
     vec_into_rust_buffer(out)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn bytes_maybe_echo(input: RustBufferOpt) -> RustBufferOpt {
+    if input.is_some == 0 {
+        return RustBufferOpt {
+            is_some: 0,
+            value: RustBuffer {
+                data: std::ptr::null_mut(),
+                len: 0,
+            },
+        };
+    }
+    RustBufferOpt {
+        is_some: 1,
+        value: vec_into_rust_buffer(rust_buffer_to_vec(input.value)),
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn bytes_chunks_echo(input: RustBufferVec) -> RustBufferVec {
+    if input.data.is_null() || input.len == 0 {
+        return RustBufferVec {
+            data: std::ptr::null_mut(),
+            len: 0,
+        };
+    }
+    let in_items = unsafe { std::slice::from_raw_parts(input.data, input.len as usize) };
+    let out_items = in_items
+        .iter()
+        .copied()
+        .map(rust_buffer_to_vec)
+        .map(vec_into_rust_buffer)
+        .collect::<Vec<_>>();
+    vec_into_rust_buffer_vec(out_items)
 }
 
 #[unsafe(no_mangle)]
@@ -66,6 +135,17 @@ pub extern "C" fn rust_bytes_free(value: RustBuffer) {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn rust_bytes_vec_free(value: RustBufferVec) {
+    if value.data.is_null() {
+        return;
+    }
+    BYTES_VEC_FREE_COUNT.fetch_add(1, Ordering::Relaxed);
+    unsafe {
+        let _ = Vec::from_raw_parts(value.data, value.len as usize, value.len as usize);
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn reset_bytes_free_count() {
     BYTES_FREE_COUNT.store(0, Ordering::Relaxed);
 }
@@ -73,6 +153,16 @@ pub extern "C" fn reset_bytes_free_count() {
 #[unsafe(no_mangle)]
 pub extern "C" fn bytes_free_count() -> u32 {
     BYTES_FREE_COUNT.load(Ordering::Relaxed)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn reset_bytes_vec_free_count() {
+    BYTES_VEC_FREE_COUNT.store(0, Ordering::Relaxed);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn bytes_vec_free_count() -> u32 {
+    BYTES_VEC_FREE_COUNT.load(Ordering::Relaxed)
 }
 
 #[unsafe(no_mangle)]

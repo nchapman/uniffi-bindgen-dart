@@ -4,7 +4,10 @@ namespace simple_fns {
   u64 add_u64(u64 left, u64 right);
   string broken_greet();
   bytes bytes_echo(bytes input);
+  sequence<bytes> bytes_chunks_echo(sequence<bytes> input);
+  bytes? bytes_maybe_echo(bytes? input);
   u32 bytes_free_count();
+  u32 bytes_vec_free_count();
   u32 free_count();
   string greet(string name);
   duration multiply_duration(duration value, u32 factor);
@@ -12,6 +15,7 @@ namespace simple_fns {
   string? maybe_greet(string? name);
   i32 negate(i32 value);
   void reset_bytes_free_count();
+  void reset_bytes_vec_free_count();
   void reset_free_count();
   boolean is_even(i32 value);
   f32 scale32(f32 value, f32 factor);

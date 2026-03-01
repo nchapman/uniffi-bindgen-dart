@@ -25,9 +25,13 @@ void main() {
     expect(contents, contains('int addU64(int left, int right) {'));
     expect(contents, contains('int freeCount() {'));
     expect(contents, contains('Uint8List bytesEcho(Uint8List input) {'));
+    expect(contents, contains('List<Uint8List> bytesChunksEcho(List<Uint8List> input) {'));
+    expect(contents, contains('Uint8List? bytesMaybeEcho(Uint8List? input) {'));
     expect(contents, contains('int bytesFreeCount() {'));
+    expect(contents, contains('int bytesVecFreeCount() {'));
     expect(contents, contains('int negate(int value) {'));
     expect(contents, contains('void resetBytesFreeCount() {'));
+    expect(contents, contains('void resetBytesVecFreeCount() {'));
     expect(contents, contains('void resetFreeCount() {'));
     expect(contents, contains('String brokenGreet() {'));
     expect(contents, contains('String greet(String name) {'));
@@ -46,8 +50,13 @@ void main() {
     expect(contents, contains('late final int Function(int left, int right) _addU64 ='));
     expect(contents, contains('late final bool Function(int value) _isEven ='));
     expect(contents, contains('final class _RustBuffer extends ffi.Struct {'));
+    expect(contents, contains('final class _RustBufferOpt extends ffi.Struct {'));
+    expect(contents, contains('final class _RustBufferVec extends ffi.Struct {'));
     expect(contents, contains('late final void Function(_RustBuffer) _rustBytesFree ='));
+    expect(contents, contains('late final void Function(_RustBufferVec) _rustBytesVecFree ='));
     expect(contents, contains('final ffi.Pointer<_RustBuffer> inputBufferPtr = calloc<_RustBuffer>();'));
+    expect(contents, contains('final ffi.Pointer<_RustBufferOpt> inputOptPtr = calloc<_RustBufferOpt>();'));
+    expect(contents, contains('final ffi.Pointer<_RustBufferVec> inputVecPtr = calloc<_RustBufferVec>();'));
     expect(contents, contains('ffi.Pointer<Utf8> nameNative = name.toNativeUtf8();'));
     expect(
       contents,
@@ -89,8 +98,10 @@ void main() {
     final bindings = SimpleFnsBindings(libraryPath: libPath);
     bindings.resetFreeCount();
     bindings.resetBytesFreeCount();
+    bindings.resetBytesVecFreeCount();
     expect(bindings.freeCount(), 0);
     expect(bindings.bytesFreeCount(), 0);
+    expect(bindings.bytesVecFreeCount(), 0);
     expect(bindings.add(20, 22), 42);
     final baseTime = DateTime.fromMicrosecondsSinceEpoch(1000000, isUtc: true);
     expect(
@@ -105,6 +116,28 @@ void main() {
     expect(bindings.bytesFreeCount(), 1);
     expect(bindings.bytesEcho(Uint8List(0)), Uint8List(0));
     expect(bindings.bytesFreeCount(), 1);
+    expect(bindings.bytesMaybeEcho(Uint8List.fromList([5, 6])), Uint8List.fromList([5, 6]));
+    expect(bindings.bytesFreeCount(), 2);
+    expect(bindings.bytesMaybeEcho(Uint8List(0)), Uint8List(0));
+    expect(bindings.bytesFreeCount(), 2);
+    expect(bindings.bytesMaybeEcho(null), isNull);
+    expect(bindings.bytesFreeCount(), 2);
+    expect(
+      bindings.bytesChunksEcho([
+        Uint8List.fromList([3]),
+        Uint8List(0),
+        Uint8List.fromList([4, 5]),
+      ]),
+      [
+        Uint8List.fromList([3]),
+        Uint8List(0),
+        Uint8List.fromList([4, 5]),
+      ],
+    );
+    expect(bindings.bytesFreeCount(), 4);
+    expect(bindings.bytesVecFreeCount(), 1);
+    expect(bindings.bytesChunksEcho(<Uint8List>[]), <Uint8List>[]);
+    expect(bindings.bytesVecFreeCount(), 1);
     expect(bindings.negate(7), -7);
     expect(
       bindings.subtractI64(9000000000000000000, 1000000000000000000),
@@ -133,8 +166,10 @@ void main() {
     configureDefaultBindings(libraryPath: libPath);
     resetFreeCount();
     resetBytesFreeCount();
+    resetBytesVecFreeCount();
     expect(freeCount(), 0);
     expect(bytesFreeCount(), 0);
+    expect(bytesVecFreeCount(), 0);
     expect(add(1, 2), 3);
     expect(
       addSeconds(baseTime, 2),
@@ -145,6 +180,20 @@ void main() {
     expect(bytesFreeCount(), 1);
     expect(bytesEcho(Uint8List(0)), Uint8List(0));
     expect(bytesFreeCount(), 1);
+    expect(bytesMaybeEcho(Uint8List.fromList([7])), Uint8List.fromList([7]));
+    expect(bytesFreeCount(), 2);
+    expect(bytesMaybeEcho(Uint8List(0)), Uint8List(0));
+    expect(bytesFreeCount(), 2);
+    expect(bytesMaybeEcho(null), isNull);
+    expect(bytesFreeCount(), 2);
+    expect(
+      bytesChunksEcho([Uint8List.fromList([1, 2]), Uint8List(0)]),
+      [Uint8List.fromList([1, 2]), Uint8List(0)],
+    );
+    expect(bytesFreeCount(), 3);
+    expect(bytesVecFreeCount(), 1);
+    expect(bytesChunksEcho(<Uint8List>[]), <Uint8List>[]);
+    expect(bytesVecFreeCount(), 1);
     expect(negate(5), -5);
     expect(subtractI64(5000000000, 2000000000), 3000000000);
     expect(
