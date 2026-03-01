@@ -112,20 +112,22 @@ mod tests {
     }
 
     #[test]
-    fn run_generate_creates_output_dir() {
+    fn run_generate_creates_output_file() {
         let temp_dir = tempfile::tempdir().expect("create tempdir");
         let out_dir = temp_dir.path().join("out");
+        let source = temp_dir.path().join("simple-fns.udl");
+        std::fs::write(&source, "namespace simple_fns {}").expect("write source");
 
         run([
             "uniffi-bindgen-dart",
             "generate",
-            "fixtures/simple-fns/src/simple-fns.udl",
+            source.to_str().expect("source path to str"),
             "--out-dir",
             out_dir.to_str().expect("path to str"),
         ])
         .expect("run generate");
 
         assert!(out_dir.exists());
-        assert!(out_dir.join(".ubdg-stub").exists());
+        assert!(out_dir.join("simple-fns.dart").exists());
     }
 }
