@@ -21,6 +21,7 @@ void main() {
     expect(contents, contains('class SimpleFnsBindings {'));
     expect(contents, contains("libraryName = 'uniffi_simple_fns';"));
     expect(contents, contains('int add(int left, int right) {'));
+    expect(contents, contains('Person echoPerson(Person input) {'));
     expect(contents, contains('DateTime addSeconds(DateTime when_, int seconds) {'));
     expect(contents, contains('int addU64(int left, int right) {'));
     expect(contents, contains('int freeCount() {'));
@@ -41,6 +42,7 @@ void main() {
     );
     expect(contents, contains('String? maybeGreet(String? name) {'));
     expect(contents, contains('bool isEven(int value) {'));
+    expect(contents, contains('Color cycleColor(Color input) {'));
     expect(contents, contains('double scale(double value, double factor) {'));
     expect(contents, contains('double scale32(double value, double factor) {'));
     expect(contents, contains('int subtractI64(int left, int right) {'));
@@ -84,6 +86,10 @@ void main() {
     expect(contents, contains('value.inMicroseconds'));
     expect(contents, contains('return Duration(microseconds: micros);'));
     expect(contents, contains('return Uint8List.fromList(resultData.asTypedList(resultLen));'));
+    expect(contents, contains('class Person {'));
+    expect(contents, contains('enum Color {'));
+    expect(contents, contains('String _encodeColor(Color value) {'));
+    expect(contents, contains('Color _decodeColor(String raw) {'));
   });
 
   test('runtime ffi binding can call native exports', () {
@@ -103,6 +109,9 @@ void main() {
     expect(bindings.bytesFreeCount(), 0);
     expect(bindings.bytesVecFreeCount(), 0);
     expect(bindings.add(20, 22), 42);
+    final echoed = bindings.echoPerson(const Person(name: 'Ada', age: 33));
+    expect(echoed.name, 'Ada');
+    expect(echoed.age, 33);
     final baseTime = DateTime.fromMicrosecondsSinceEpoch(1000000, isUtc: true);
     expect(
       bindings.addSeconds(baseTime, 5),
@@ -148,14 +157,17 @@ void main() {
       const Duration(milliseconds: 1000),
     );
     expect(bindings.greet('dart'), 'hello, dart');
-    expect(bindings.freeCount(), 1);
+    expect(bindings.freeCount(), 2);
     expect(bindings.maybeGreet('dart'), 'maybe, dart');
-    expect(bindings.freeCount(), 2);
+    expect(bindings.freeCount(), 3);
     expect(bindings.maybeGreet(null), isNull);
-    expect(bindings.freeCount(), 2);
+    expect(bindings.freeCount(), 3);
     expect(() => bindings.brokenGreet(), throwsA(isA<StateError>()));
-    expect(bindings.freeCount(), 2);
+    expect(bindings.freeCount(), 3);
     expect(bindings.isEven(8), isTrue);
+    expect(bindings.cycleColor(Color.red), Color.green);
+    expect(bindings.cycleColor(Color.green), Color.blue);
+    expect(bindings.cycleColor(Color.blue), Color.red);
     expect(bindings.isEven(9), isFalse);
     expect(bindings.scale(2.5, 4.0), closeTo(10.0, 0.000001));
     expect(bindings.scale32(1.25, 8.0), closeTo(10.0, 0.0001));
@@ -171,6 +183,9 @@ void main() {
     expect(bytesFreeCount(), 0);
     expect(bytesVecFreeCount(), 0);
     expect(add(1, 2), 3);
+    final echoedTop = echoPerson(const Person(name: 'Lin', age: 10));
+    expect(echoedTop.name, 'Lin');
+    expect(echoedTop.age, 10);
     expect(
       addSeconds(baseTime, 2),
       DateTime.fromMicrosecondsSinceEpoch(3000000, isUtc: true),
@@ -201,14 +216,15 @@ void main() {
       const Duration(seconds: 6),
     );
     expect(greet('ffi'), 'hello, ffi');
-    expect(freeCount(), 1);
+    expect(freeCount(), 2);
     expect(maybeGreet('ffi'), 'maybe, ffi');
-    expect(freeCount(), 2);
+    expect(freeCount(), 3);
     expect(maybeGreet(null), isNull);
-    expect(freeCount(), 2);
+    expect(freeCount(), 3);
     expect(() => brokenGreet(), throwsA(isA<StateError>()));
-    expect(freeCount(), 2);
+    expect(freeCount(), 3);
     expect(isEven(10), isTrue);
+    expect(cycleColor(Color.red), Color.green);
     expect(isEven(11), isFalse);
     expect(scale(1.5, 3.0), closeTo(4.5, 0.000001));
     expect(scale32(0.5, 6.0), closeTo(3.0, 0.0001));

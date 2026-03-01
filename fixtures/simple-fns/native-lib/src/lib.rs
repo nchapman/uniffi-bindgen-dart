@@ -73,6 +73,15 @@ pub extern "C" fn add(left: u32, right: u32) -> u32 {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn echo_person(input: *const c_char) -> *mut c_char {
+    if input.is_null() {
+        return std::ptr::null_mut();
+    }
+    let payload = unsafe { CStr::from_ptr(input) }.to_string_lossy().into_owned();
+    CString::new(payload).expect("valid CString").into_raw()
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn add_seconds(when: i64, seconds: i64) -> i64 {
     when + (seconds * 1_000_000)
 }
@@ -163,6 +172,21 @@ pub extern "C" fn reset_bytes_vec_free_count() {
 #[unsafe(no_mangle)]
 pub extern "C" fn bytes_vec_free_count() -> u32 {
     BYTES_VEC_FREE_COUNT.load(Ordering::Relaxed)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cycle_color(input: *const c_char) -> *mut c_char {
+    if input.is_null() {
+        return std::ptr::null_mut();
+    }
+    let value = unsafe { CStr::from_ptr(input) }.to_string_lossy();
+    let next = match value.as_ref() {
+        "red" => "green",
+        "green" => "blue",
+        "blue" => "red",
+        _ => return std::ptr::null_mut(),
+    };
+    CString::new(next).expect("valid CString").into_raw()
 }
 
 #[unsafe(no_mangle)]

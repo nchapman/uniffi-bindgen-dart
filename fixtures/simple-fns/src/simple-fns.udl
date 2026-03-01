@@ -1,5 +1,6 @@
 namespace simple_fns {
   u32 add(u32 left, u32 right);
+  Person echo_person(Person input);
   timestamp add_seconds(timestamp when, i64 seconds);
   u64 add_u64(u64 left, u64 right);
   string broken_greet();
@@ -18,8 +19,20 @@ namespace simple_fns {
   void reset_bytes_vec_free_count();
   void reset_free_count();
   boolean is_even(i32 value);
+  Color cycle_color(Color input);
   f32 scale32(f32 value, f32 factor);
   f64 scale(f64 value, f64 factor);
   void tick();
   u32 current_tick();
+};
+
+dictionary Person {
+  string name;
+  u32 age;
+};
+
+enum Color {
+  "red",
+  "green",
+  "blue"
 };
