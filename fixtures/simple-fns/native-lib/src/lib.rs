@@ -1480,6 +1480,16 @@ pub extern "C" fn counter_uniffi_trait_hash(handle: u64) -> u64 {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn counter_uniffi_trait_eq(handle: u64, other: u64) -> bool {
+    counter_display_text(handle) == counter_display_text(other)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_uniffi_trait_ne(handle: u64, other: u64) -> bool {
+    !counter_uniffi_trait_eq(handle, other)
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn counter_async_describe(handle: u64) -> u64 {
     let value = COUNTERS
         .lock()

@@ -2252,10 +2252,22 @@ class SimpleFnsBindings {
     }
   }
 
+  late final bool Function(int handle, int other) _counterUniffiTraitEq = _lib.lookupFunction<ffi.Bool Function(ffi.Uint64 handle, ffi.Uint64 other), bool Function(int handle, int other)>('counter_uniffi_trait_eq');
+
+  bool counterInvokeUniffiTraitEq(int handle, int other) {
+    return _counterUniffiTraitEq(handle, other);
+  }
+
   late final int Function(int handle) _counterUniffiTraitHash = _lib.lookupFunction<ffi.Uint64 Function(ffi.Uint64 handle), int Function(int handle)>('counter_uniffi_trait_hash');
 
   int counterInvokeUniffiTraitHash(int handle) {
     return _counterUniffiTraitHash(handle);
+  }
+
+  late final bool Function(int handle, int other) _counterUniffiTraitNe = _lib.lookupFunction<ffi.Bool Function(ffi.Uint64 handle, ffi.Uint64 other), bool Function(int handle, int other)>('counter_uniffi_trait_ne');
+
+  bool counterInvokeUniffiTraitNe(int handle, int other) {
+    return _counterUniffiTraitNe(handle, other);
   }
 }
 
@@ -2415,6 +2427,20 @@ final class Counter {
   int get hashCode {
     _ensureOpen();
     return _ffi.counterInvokeUniffiTraitHash(_handle);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    if (other is! Counter) {
+      return false;
+    }
+    if (_closed || other._closed) {
+      return false;
+    }
+    return _ffi.counterInvokeUniffiTraitEq(_handle, other._handle);
   }
 
 }

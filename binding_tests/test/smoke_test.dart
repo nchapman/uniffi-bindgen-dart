@@ -263,6 +263,8 @@ void main() {
     expect(contents, contains('void close() {'));
     expect(contents, contains('String toString() {'));
     expect(contents, contains('int get hashCode {'));
+    expect(contents, contains('bool operator ==(Object other) {'));
+    expect(contents, contains('return _ffi.counterInvokeUniffiTraitEq(_handle, other._handle);'));
     expect(contents, contains('return _ffi.counterInvokeUniffiTraitDisplay(_handle);'));
     expect(contents, contains('return _ffi.counterInvokeUniffiTraitHash(_handle);'));
     expect(contents, contains('final class OutcomeSuccess extends Outcome {'));
@@ -458,6 +460,12 @@ void main() {
     expect(counter.describe(), 'counter:5:alpha');
     expect(counter.toString(), 'counter:5:alpha');
     expect(counter.hashCode, isNot(0));
+    final equalCounter = bindings.counterCreateNew(5);
+    equalCounter.setLabel('alpha');
+    expect(counter == equalCounter, isTrue);
+    equalCounter.setLabel('beta');
+    expect(counter == equalCounter, isFalse);
+    equalCounter.close();
     expect(await counter.asyncDescribe(), 'async:counter:5:alpha');
     expect(await counter.asyncValue(), 5);
     expect(counter.maybeLabel('tail'), 'counter:5:tail');
@@ -688,6 +696,9 @@ void main() {
     expect(topCounter.applyAdderWith(const _TestAdder(2), 2, 3), 10);
     expect(topCounter.toString(), 'counter:3');
     expect(topCounter.hashCode, isNot(0));
+    final topCounterSame = Counter.create(3);
+    expect(topCounter == topCounterSame, isTrue);
+    topCounterSame.close();
     expect(await topCounter.asyncApplyAdderWith(const _TestAdder(2), 2, 3), 10);
     expect(topCounter.checkedApplyAdderWith(const _TestAdder(2), 2, 3), 10);
     expect(

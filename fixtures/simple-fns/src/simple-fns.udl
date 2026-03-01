@@ -92,7 +92,7 @@ interface MathError {
   NegativeInput(i32 value);
 };
 
-[Traits=(Display, Hash)]
+[Traits=(Display, Hash, Eq)]
 interface Counter {
   constructor(u32 initial);
   [Name=with_person]
