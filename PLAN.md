@@ -41,6 +41,7 @@ A repeatable backend-development process that can be applied with minimal change
 - Phase 5: Async Rust-future ABI now covers string, `void`, integer, object-handle (`u64`), bytes, optional-bytes, bytes-sequence, and string-keyed map return/argument fixture paths for top-level functions and object methods, including builtin-backed custom typedefs (for example, `[Custom] typedef string Label`); dedicated futures-stress golden coverage is in place, and runtime smoke tests now cover error and timeout/non-completion edges with cancel/free counter assertions.
 - Phase 6: Advanced config is partially implemented (`rename`/`exclude` for generated public API wrappers with dedicated `rename-demo` golden coverage) and docstring emission is now in place with dedicated `docstrings-demo` coverage; external type support now covers external record/enum typedef wrapper binding, external enum throw-contract decoding, and external interface typedef argument/return handle paths with `external_packages` import mapping, with broader external parity still pending. Library-mode metadata ingestion is now wired for `--library` source paths, and metadata-defined record/enum methods now generate idiomatic Dart API wrappers plus runtime FFI call paths.
 - Phase 7+: Documentation hardening and release workflow completion pending.
+- CI hardening: strict `clippy` gate and artifact-split runtime binding test matrix (Linux + macOS) are now wired in GitHub Actions.
 
 ### Blocked/Deferred
 - None currently.
@@ -448,4 +449,4 @@ These rules are part of the template and should not be skipped:
 4. Extend record/enum method parity tests to include async/throws/custom/external combinations as fixture depth increases.
 5. Keep `docs/supported-features.md` synchronized with every parity change.
 6. Extend remaining custom/external parity (nested custom/container lift/lower families + cross-crate/ext-type scenarios).
-7. Add CI jobs for clippy strict mode and artifact-split runtime binding tests (Linux + macOS).
+7. Keep CI coverage aligned with new fixture/runtime surfaces as parity expands (strict clippy + artifact-split Linux/macOS runtime matrix now implemented).

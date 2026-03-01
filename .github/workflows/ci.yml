@@ -6,47 +6,73 @@ on:
   pull_request:
 
 jobs:
-  build:
+  lint-and-unit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Clippy (deny warnings)
+        run: cargo clippy --all-targets -- -D warnings
       - name: Test workspace
         run: cargo test --workspace
-      - name: Generate bindings artifacts
-        run: ./scripts/build_bindings.sh
-      - name: Build native fixture library
-        run: ./scripts/build_fixture.sh
-      - name: Upload generated bindings artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: generated-bindings
-          path: binding_tests/generated
-      - name: Upload native fixture artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: native-fixtures
-          path: binding_tests/native
 
-  test-bindings:
-    needs: build
-    runs-on: ubuntu-latest
+  build-runtime-artifacts:
+    needs: lint-and-unit
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build fixture libraries and generated bindings
+        run: |
+          FIXTURE_LIB="$(./scripts/build_fixture.sh)"
+          RECORD_ENUM_METHODS_LIB="$(./scripts/build_record_enum_methods_fixture.sh)"
+          UBDG_RECORD_ENUM_METHODS_LIB="$RECORD_ENUM_METHODS_LIB" ./scripts/build_bindings.sh
+      - name: Upload runtime artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-artifacts-${{ matrix.os }}
+          path: |
+            binding_tests/generated
+            binding_tests/native
+
+  test-bindings-runtime:
+    needs: build-runtime-artifacts
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: dart-lang/setup-dart@v1
-      - name: Download generated bindings artifact
+      - name: Download runtime artifacts
         uses: actions/download-artifact@v4
         with:
-          name: generated-bindings
-          path: binding_tests/generated
-      - name: Download native fixture artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: native-fixtures
-          path: binding_tests/native
-      - name: Dart tests
+          name: runtime-artifacts-${{ matrix.os }}
+          path: .
+      - name: Dart analyze and runtime tests
         run: |
           cd binding_tests
           dart pub get
           dart analyze
-          UBDG_SIMPLE_FNS_LIB="$PWD/native/libuniffi_simple_fns.so" dart test
+          case "$(uname -s)" in
+            Darwin)
+              SIMPLE_LIB="libuniffi_simple_fns.dylib"
+              RECORD_LIB="libuniffi_record_enum_methods.dylib"
+              ;;
+            Linux)
+              SIMPLE_LIB="libuniffi_simple_fns.so"
+              RECORD_LIB="libuniffi_record_enum_methods.so"
+              ;;
+            *)
+              echo "unsupported platform: $(uname -s)" >&2
+              exit 1
+              ;;
+          esac
+          UBDG_SIMPLE_FNS_LIB="$PWD/native/$SIMPLE_LIB" \
+          UBDG_RECORD_ENUM_METHODS_LIB="$PWD/native/$RECORD_LIB" \
+          dart test
