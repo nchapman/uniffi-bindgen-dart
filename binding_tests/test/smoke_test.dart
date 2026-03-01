@@ -18,5 +18,6 @@ void main() {
     expect(contents, contains('library simple_fns;'));
     expect(contents, contains('class SimpleFnsBindings {'));
     expect(contents, contains("libraryName = 'uniffi_simple_fns';"));
+    expect(contents, contains('int add(int left, int right) {'));
   });
 }
