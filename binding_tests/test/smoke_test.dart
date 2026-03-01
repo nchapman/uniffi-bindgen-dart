@@ -510,8 +510,18 @@ void main() {
     expect(contents, contains('final class MethodErrorExceptionNegativeInput'));
     expect(
       contents,
-      contains(
-          "throw UnsupportedError('runtime invocation for this UniFFI ABI (RustCallStatus out-arg) is not implemented yet (methodpoint_async_label)');"),
+      isNot(contains(
+          "throw UnsupportedError('runtime invocation for this UniFFI ABI (RustCallStatus out-arg) is not implemented yet (methodpoint_async_label)');")),
+    );
+    expect(
+      contents,
+      isNot(contains(
+          "throw UnsupportedError('runtime invocation for this UniFFI ABI (RustCallStatus out-arg) is not implemented yet (methodstate_async_label)');")),
+    );
+    expect(
+      contents,
+      isNot(contains(
+          "throw UnsupportedError('runtime invocation for this UniFFI ABI (RustCallStatus out-arg) is not implemented yet (methodoutcome_async_label)');")),
     );
     expect(contents, contains('_uniffiLiftMethodErrorException(Uint8List bytes)'));
     expect(contents,
@@ -520,6 +530,10 @@ void main() {
         contains('uniffi_ffibuffer_uniffi_record_enum_methods_fn_func_method_state_busy'));
     expect(contents,
         contains('uniffi_ffibuffer_uniffi_record_enum_methods_fn_func_method_outcome_ok'));
+    expect(contents,
+        contains('uniffi_ffibuffer_uniffi_record_enum_methods_fn_method_methodpoint_async_label'));
+    expect(contents,
+        contains('ffi_uniffi_record_enum_methods_rust_future_complete_rust_buffer'));
     expect(contents, contains('class RecordEnumMethodsFfi {'));
   });
 
@@ -546,7 +560,7 @@ void main() {
     expect((decodedOk as rem.MethodOutcomeOk).value, 7);
   });
 
-  test('record/enum runtime methods call ffibuffer fallback exports', () {
+  test('record/enum runtime methods call ffibuffer fallback exports', () async {
     final libPath = Platform.environment['UBDG_RECORD_ENUM_METHODS_LIB'];
     expect(
       libPath,
@@ -562,15 +576,22 @@ void main() {
     expect(point.y, 3);
     expect(point.checksum(), 189);
     expect(point.asState(), rem.MethodState.busy);
+    expect(await point.asyncLabel('prefix'), 'prefix:6:3');
 
     final busy = rem.methodStateBusy();
     expect(busy, rem.MethodState.busy);
     expect(busy.weight(), 9);
+    expect(await busy.asyncLabel('prefix'), 'prefix:busy');
 
     final outcome = rem.methodOutcomeOk(11);
     expect(outcome, isA<rem.MethodOutcomeOk>());
     expect((outcome as rem.MethodOutcomeOk).value, 11);
     expect(outcome.score(), 11);
+    expect(await outcome.asyncLabel('prefix'), 'prefix:ok:11');
+    expect(
+      await rem.MethodOutcomeErr(message: 'x').asyncLabel('prefix'),
+      'prefix:err:x',
+    );
 
     expect(
       point.checkedDivide(3),
