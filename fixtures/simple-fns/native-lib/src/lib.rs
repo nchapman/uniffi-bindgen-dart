@@ -3,6 +3,7 @@ use std::os::raw::c_char;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 static TICK_COUNT: AtomicU32 = AtomicU32::new(0);
+static FREE_COUNT: AtomicU32 = AtomicU32::new(0);
 
 #[unsafe(no_mangle)]
 pub extern "C" fn add(left: u32, right: u32) -> u32 {
@@ -50,9 +51,20 @@ pub extern "C" fn rust_string_free(value: *mut c_char) {
     if value.is_null() {
         return;
     }
+    FREE_COUNT.fetch_add(1, Ordering::Relaxed);
     unsafe {
         let _ = CString::from_raw(value);
     }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn reset_free_count() {
+    FREE_COUNT.store(0, Ordering::Relaxed);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn free_count() -> u32 {
+    FREE_COUNT.load(Ordering::Relaxed)
 }
 
 #[unsafe(no_mangle)]

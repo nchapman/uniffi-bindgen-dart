@@ -21,7 +21,9 @@ void main() {
     expect(contents, contains("libraryName = 'uniffi_simple_fns';"));
     expect(contents, contains('int add(int left, int right) {'));
     expect(contents, contains('int addU64(int left, int right) {'));
+    expect(contents, contains('int freeCount() {'));
     expect(contents, contains('int negate(int value) {'));
+    expect(contents, contains('void resetFreeCount() {'));
     expect(contents, contains('String brokenGreet() {'));
     expect(contents, contains('String greet(String name) {'));
     expect(contents, contains('String? maybeGreet(String? name) {'));
@@ -63,6 +65,8 @@ void main() {
     );
 
     final bindings = SimpleFnsBindings(libraryPath: libPath);
+    bindings.resetFreeCount();
+    expect(bindings.freeCount(), 0);
     expect(bindings.add(20, 22), 42);
     expect(bindings.addU64(10000000000, 25), 10000000025);
     expect(bindings.negate(7), -7);
@@ -71,9 +75,13 @@ void main() {
       8000000000000000000,
     );
     expect(bindings.greet('dart'), 'hello, dart');
+    expect(bindings.freeCount(), 1);
     expect(bindings.maybeGreet('dart'), 'maybe, dart');
+    expect(bindings.freeCount(), 2);
     expect(bindings.maybeGreet(null), isNull);
+    expect(bindings.freeCount(), 2);
     expect(() => bindings.brokenGreet(), throwsA(isA<StateError>()));
+    expect(bindings.freeCount(), 2);
     expect(bindings.isEven(8), isTrue);
     expect(bindings.isEven(9), isFalse);
     expect(bindings.scale(2.5, 4.0), closeTo(10.0, 0.000001));
@@ -83,14 +91,20 @@ void main() {
     expect(bindings.currentTick(), before + 1);
 
     configureDefaultBindings(libraryPath: libPath);
+    resetFreeCount();
+    expect(freeCount(), 0);
     expect(add(1, 2), 3);
     expect(addU64(4000000000, 2), 4000000002);
     expect(negate(5), -5);
     expect(subtractI64(5000000000, 2000000000), 3000000000);
     expect(greet('ffi'), 'hello, ffi');
+    expect(freeCount(), 1);
     expect(maybeGreet('ffi'), 'maybe, ffi');
+    expect(freeCount(), 2);
     expect(maybeGreet(null), isNull);
+    expect(freeCount(), 2);
     expect(() => brokenGreet(), throwsA(isA<StateError>()));
+    expect(freeCount(), 2);
     expect(isEven(10), isTrue);
     expect(isEven(11), isFalse);
     expect(scale(1.5, 3.0), closeTo(4.5, 0.000001));

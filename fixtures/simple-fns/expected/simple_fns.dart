@@ -58,6 +58,12 @@ class SimpleFnsBindings {
       return _currentTick();
   }
 
+  late final int Function() _freeCount = _lib.lookupFunction<ffi.Uint32 Function(), int Function()>('free_count');
+
+  int freeCount() {
+      return _freeCount();
+  }
+
   late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> name) _greet = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> name), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> name)>('greet');
 
   String greet(String name) {
@@ -106,6 +112,12 @@ class SimpleFnsBindings {
 
   int negate(int value) {
       return _negate(value);
+  }
+
+  late final void Function() _resetFreeCount = _lib.lookupFunction<ffi.Void Function(), void Function()>('reset_free_count');
+
+  void resetFreeCount() {
+      _resetFreeCount();
   }
 
   late final double Function(double value, double factor) _scale = _lib.lookupFunction<ffi.Double Function(ffi.Double value, ffi.Double factor), double Function(double value, double factor)>('scale');
@@ -161,6 +173,10 @@ int currentTick() {
   return _bindings().currentTick();
 }
 
+int freeCount() {
+  return _bindings().freeCount();
+}
+
 String greet(String name) {
   return _bindings().greet(name);
 }
@@ -175,6 +191,10 @@ String? maybeGreet(String? name) {
 
 int negate(int value) {
   return _bindings().negate(value);
+}
+
+void resetFreeCount() {
+  _bindings().resetFreeCount();
 }
 
 double scale(double value, double factor) {
