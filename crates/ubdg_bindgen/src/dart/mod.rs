@@ -114,6 +114,7 @@ fn extract_namespace_from_udl(source: &Path) -> Option<String> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct UdlFunction {
     name: String,
+    ffi_symbol: Option<String>,
     docstring: Option<String>,
     is_async: bool,
     return_type: Option<Type>,
@@ -141,6 +142,7 @@ struct UdlObject {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct UdlObjectConstructor {
     name: String,
+    ffi_symbol: Option<String>,
     docstring: Option<String>,
     is_async: bool,
     args: Vec<UdlArg>,
@@ -150,6 +152,7 @@ struct UdlObjectConstructor {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct UdlObjectMethod {
     name: String,
+    ffi_symbol: Option<String>,
     docstring: Option<String>,
     is_async: bool,
     return_type: Option<Type>,
@@ -295,7 +298,7 @@ fn parse_udl_metadata(
                 .next()
                 .ok_or_else(|| anyhow::anyhow!("no UniFFI components found in library metadata"))?
         };
-        return component_interface_to_metadata(ci, None);
+        return component_interface_to_metadata(ci, None, true);
     }
 
     let udl = fs::read_to_string(source)
@@ -303,12 +306,13 @@ fn parse_udl_metadata(
     let module_path = crate_name.unwrap_or("crate_name");
     let ci = ComponentInterface::from_webidl(&udl, module_path)
         .with_context(|| format!("failed to parse UDL: {}", source.display()))?;
-    component_interface_to_metadata(ci, Some(&udl))
+    component_interface_to_metadata(ci, Some(&udl), false)
 }
 
 fn component_interface_to_metadata(
     ci: ComponentInterface,
     udl_source: Option<&str>,
+    include_ffi_symbols: bool,
 ) -> Result<UdlMetadata> {
     let udl_interface_traits = udl_source
         .map(parse_udl_interface_traits)
@@ -322,6 +326,7 @@ fn component_interface_to_metadata(
         .iter()
         .map(|f| UdlFunction {
             name: f.name().to_string(),
+            ffi_symbol: include_ffi_symbols.then(|| f.ffi_func().name().to_string()),
             docstring: f.docstring().map(ToString::to_string),
             is_async: f.is_async(),
             return_type: f.return_type().cloned(),
@@ -366,6 +371,7 @@ fn component_interface_to_metadata(
                 .iter()
                 .map(|m| UdlObjectMethod {
                     name: m.name().to_string(),
+                    ffi_symbol: include_ffi_symbols.then(|| m.ffi_func().name().to_string()),
                     docstring: m.docstring().map(ToString::to_string),
                     is_async: m.is_async(),
                     return_type: m.return_type().cloned(),
@@ -414,6 +420,7 @@ fn component_interface_to_metadata(
                 .iter()
                 .map(|m| UdlObjectMethod {
                     name: m.name().to_string(),
+                    ffi_symbol: include_ffi_symbols.then(|| m.ffi_func().name().to_string()),
                     docstring: m.docstring().map(ToString::to_string),
                     is_async: m.is_async(),
                     return_type: m.return_type().cloned(),
@@ -441,6 +448,7 @@ fn component_interface_to_metadata(
                 .into_iter()
                 .map(|m| UdlObjectMethod {
                     name: m.name().to_string(),
+                    ffi_symbol: include_ffi_symbols.then(|| m.ffi_func().name().to_string()),
                     docstring: m.docstring().map(ToString::to_string),
                     is_async: m.is_async(),
                     return_type: m.return_type().cloned(),
@@ -477,6 +485,7 @@ fn component_interface_to_metadata(
                 trait_methods.display = Some("uniffi_trait_display".to_string());
                 methods.push(UdlObjectMethod {
                     name: "uniffi_trait_display".to_string(),
+                    ffi_symbol: None,
                     docstring: None,
                     is_async: false,
                     return_type: Some(Type::String),
@@ -488,6 +497,7 @@ fn component_interface_to_metadata(
                 trait_methods.debug = Some("uniffi_trait_debug".to_string());
                 methods.push(UdlObjectMethod {
                     name: "uniffi_trait_debug".to_string(),
+                    ffi_symbol: None,
                     docstring: None,
                     is_async: false,
                     return_type: Some(Type::String),
@@ -499,6 +509,7 @@ fn component_interface_to_metadata(
                 trait_methods.hash = Some("uniffi_trait_hash".to_string());
                 methods.push(UdlObjectMethod {
                     name: "uniffi_trait_hash".to_string(),
+                    ffi_symbol: None,
                     docstring: None,
                     is_async: false,
                     return_type: Some(Type::UInt64),
@@ -510,6 +521,7 @@ fn component_interface_to_metadata(
                 trait_methods.eq = Some("uniffi_trait_eq".to_string());
                 methods.push(UdlObjectMethod {
                     name: "uniffi_trait_eq".to_string(),
+                    ffi_symbol: None,
                     docstring: None,
                     is_async: false,
                     return_type: Some(Type::Boolean),
@@ -526,6 +538,7 @@ fn component_interface_to_metadata(
                 trait_methods.ne = Some("uniffi_trait_ne".to_string());
                 methods.push(UdlObjectMethod {
                     name: "uniffi_trait_ne".to_string(),
+                    ffi_symbol: None,
                     docstring: None,
                     is_async: false,
                     return_type: Some(Type::Boolean),
@@ -542,6 +555,7 @@ fn component_interface_to_metadata(
                 trait_methods.ord_cmp = Some("uniffi_trait_ord_cmp".to_string());
                 methods.push(UdlObjectMethod {
                     name: "uniffi_trait_ord_cmp".to_string(),
+                    ffi_symbol: None,
                     docstring: None,
                     is_async: false,
                     return_type: Some(Type::Int8),
@@ -565,6 +579,7 @@ fn component_interface_to_metadata(
                     .into_iter()
                     .map(|ctor| UdlObjectConstructor {
                         name: ctor.name().to_string(),
+                        ffi_symbol: include_ffi_symbols.then(|| ctor.ffi_func().name().to_string()),
                         docstring: ctor.docstring().map(ToString::to_string),
                         is_async: ctor.is_async(),
                         args: ctor
@@ -2396,6 +2411,7 @@ fn render_bound_methods(
                     dart_identifier(&record.name),
                     dart_identifier(&method.name)
                 ),
+                ffi_symbol: method.ffi_symbol.clone(),
                 docstring: method.docstring.clone(),
                 is_async: method.is_async,
                 return_type: method.return_type.clone(),
@@ -2422,6 +2438,7 @@ fn render_bound_methods(
                     dart_identifier(&enum_.name),
                     dart_identifier(&method.name)
                 ),
+                ffi_symbol: method.ffi_symbol.clone(),
                 docstring: method.docstring.clone(),
                 is_async: method.is_async,
                 return_type: method.return_type.clone(),
@@ -2596,6 +2613,7 @@ fn render_bound_methods(
 
         let method_name = safe_dart_identifier(&to_lower_camel(&function.name));
         let field_name = format!("_{}", method_name);
+        let function_symbol = function.ffi_symbol.as_deref().unwrap_or(&function.name);
         if is_sync_callback_supported {
             let return_type = function
                 .return_type
@@ -2666,7 +2684,7 @@ fn render_bound_methods(
             out.push('\n');
             out.push_str(&format!(
                 "  late final {dart_ffi_sig} {field_name} = _lib.lookupFunction<{native_sig}, {dart_ffi_sig}>('{}');\n",
-                function.name
+                function_symbol
             ));
             out.push('\n');
             out.push_str(&format!("  {return_type} {method_name}({dart_sig}) {{\n"));
@@ -2836,7 +2854,7 @@ fn render_bound_methods(
             out.push('\n');
             out.push_str(&format!(
                 "  late final {start_dart_sig} {field_name} = _lib.lookupFunction<{start_native_sig}, {start_dart_sig}>('{}');\n",
-                function.name
+                function_symbol
             ));
             out.push_str(&format!(
                 "  late final void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData) {poll_field} = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, ffi.Uint64 callbackData), void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData)>('{poll_symbol}');\n"
@@ -3154,7 +3172,7 @@ fn render_bound_methods(
         out.push('\n');
         out.push_str(&format!(
             "  late final {dart_sig} {field_name} = _lib.lookupFunction<{native_sig}, {dart_sig}>('{}');\n",
-            function.name
+            function_symbol
         ));
         out.push('\n');
         out.push_str(&format!(
@@ -3466,7 +3484,10 @@ fn render_bound_methods(
             let ctor_camel = to_upper_camel(&ctor.name);
             let ctor_field = format!("_{}Ctor{}", object_lower, ctor_camel);
             let ctor_method = format!("{}Create{}", object_lower, ctor_camel);
-            let ctor_symbol = format!("{}_{}", object_symbol, dart_identifier(&ctor.name));
+            let ctor_symbol = ctor
+                .ffi_symbol
+                .clone()
+                .unwrap_or_else(|| format!("{}_{}", object_symbol, dart_identifier(&ctor.name)));
             let is_throwing = ctor.throws_type.is_some();
             let native_return = if is_throwing {
                 "ffi.Pointer<Utf8>"
@@ -3610,7 +3631,10 @@ fn render_bound_methods(
             let method_camel = to_upper_camel(&method.name);
             let method_field = format!("_{}{}", object_lower, method_camel);
             let method_invoke = format!("{}Invoke{}", object_lower, method_camel);
-            let method_symbol = format!("{}_{}", object_symbol, dart_identifier(&method.name));
+            let method_symbol = method
+                .ffi_symbol
+                .clone()
+                .unwrap_or_else(|| format!("{}_{}", object_symbol, dart_identifier(&method.name)));
             let is_throwing = method.throws_type.is_some();
 
             let mut native_args = vec!["ffi.Uint64 handle".to_string()];
@@ -7000,6 +7024,7 @@ interface Outcome {
             }],
             methods: vec![UdlObjectMethod {
                 name: "checksum".to_string(),
+                ffi_symbol: None,
                 docstring: None,
                 is_async: false,
                 return_type: Some(Type::UInt32),
@@ -7025,6 +7050,7 @@ interface Outcome {
             ],
             methods: vec![UdlObjectMethod {
                 name: "rank".to_string(),
+                ffi_symbol: None,
                 docstring: None,
                 is_async: false,
                 return_type: Some(Type::UInt32),

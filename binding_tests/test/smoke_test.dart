@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:test/test.dart';
 import '../generated/simple_fns.dart';
+import '../generated/record_enum_methods.dart' as rem;
 
 final class _TestAdder implements Adder {
   const _TestAdder(this.offset);
@@ -41,7 +42,8 @@ final class _TestFormatter implements Formatter {
   }
 
   @override
-  Future<String> formatAsync(String? prefix, Person person, Outcome outcome) async {
+  Future<String> formatAsync(
+      String? prefix, Person person, Outcome outcome) async {
     final String prefixPart = prefix ?? 'none';
     final String outcomeTag = switch (outcome) {
       OutcomeSuccess() => 'success',
@@ -84,12 +86,12 @@ final class _TestFormatter implements Formatter {
   ) async {
     return switch (outcome) {
       OutcomeSuccess(message: final message) => OutcomeFailure(
-        code: message.length,
-        reason: prefix ?? 'none',
-      ),
+          code: message.length,
+          reason: prefix ?? 'none',
+        ),
       OutcomeFailure(code: final code, reason: final reason) => OutcomeSuccess(
-        message: '$code:$reason:${person.name}',
-      ),
+          message: '$code:$reason:${person.name}',
+        ),
     };
   }
 }
@@ -102,6 +104,8 @@ void main() {
   test('generated bindings file exists', () {
     final generated = File('generated/simple_fns.dart');
     expect(generated.existsSync(), isTrue);
+    final recordEnumGenerated = File('generated/record_enum_methods.dart');
+    expect(recordEnumGenerated.existsSync(), isTrue);
   });
 
   test('generated bindings include expected symbols', () {
@@ -111,21 +115,43 @@ void main() {
     expect(contents, contains('class SimpleFnsBindings {'));
     expect(contents, contains("libraryName = 'uniffi_simple_fns';"));
     expect(contents, contains('int add(int left, int right) {'));
-    expect(contents, contains('int applyAdder(Adder adder, int left, int right) {'));
-    expect(contents, contains('Future<int> asyncApplyAdder(Adder adder, int left, int right) {'));
-    expect(contents, contains('int checkedApplyAdder(Adder adder, int left, int right) {'));
-    expect(contents, contains('int applyFormatter(Formatter formatter, String? prefix, Person person, Outcome outcome) {'));
-    expect(contents, contains('Future<String> asyncApplyFormatter(Formatter formatter, String? prefix, Person person, Outcome outcome) {'));
-    expect(contents, contains('Future<int> asyncApplyFormatterOptionalLen(Formatter formatter, String? prefix, Person person, Outcome outcome) {'));
-    expect(contents, contains('Future<int> asyncApplyFormatterPersonLen(Formatter formatter, String? prefix, Person person, Outcome outcome) {'));
-    expect(contents, contains('Future<int> asyncApplyFormatterOutcomeLen(Formatter formatter, String? prefix, Person person, Outcome outcome) {'));
+    expect(contents,
+        contains('int applyAdder(Adder adder, int left, int right) {'));
+    expect(
+        contents,
+        contains(
+            'Future<int> asyncApplyAdder(Adder adder, int left, int right) {'));
+    expect(contents,
+        contains('int checkedApplyAdder(Adder adder, int left, int right) {'));
+    expect(
+        contents,
+        contains(
+            'int applyFormatter(Formatter formatter, String? prefix, Person person, Outcome outcome) {'));
+    expect(
+        contents,
+        contains(
+            'Future<String> asyncApplyFormatter(Formatter formatter, String? prefix, Person person, Outcome outcome) {'));
+    expect(
+        contents,
+        contains(
+            'Future<int> asyncApplyFormatterOptionalLen(Formatter formatter, String? prefix, Person person, Outcome outcome) {'));
+    expect(
+        contents,
+        contains(
+            'Future<int> asyncApplyFormatterPersonLen(Formatter formatter, String? prefix, Person person, Outcome outcome) {'));
+    expect(
+        contents,
+        contains(
+            'Future<int> asyncApplyFormatterOutcomeLen(Formatter formatter, String? prefix, Person person, Outcome outcome) {'));
     expect(contents, contains('Person echoPerson(Person input) {'));
     expect(contents, contains('Outcome evolveOutcome(Outcome input) {'));
-    expect(contents, contains('DateTime addSeconds(DateTime when_, int seconds) {'));
+    expect(contents,
+        contains('DateTime addSeconds(DateTime when_, int seconds) {'));
     expect(contents, contains('int addU64(int left, int right) {'));
     expect(contents, contains('int freeCount() {'));
     expect(contents, contains('Uint8List bytesEcho(Uint8List input) {'));
-    expect(contents, contains('List<Uint8List> bytesChunksEcho(List<Uint8List> input) {'));
+    expect(contents,
+        contains('List<Uint8List> bytesChunksEcho(List<Uint8List> input) {'));
     expect(contents, contains('Uint8List? bytesMaybeEcho(Uint8List? input) {'));
     expect(contents, contains('int bytesFreeCount() {'));
     expect(contents, contains('int bytesVecFreeCount() {'));
@@ -139,35 +165,59 @@ void main() {
     expect(contents, contains('Future<String> asyncGreet(String name) {'));
     expect(contents, contains('Future<int> asyncAdd(int left, int right) {'));
     expect(contents, contains('Future<void> asyncTick() {'));
-    expect(contents, contains('Future<Map<String, int>> asyncCounts(Map<String, int> items) {'));
+    expect(
+        contents,
+        contains(
+            'Future<Map<String, int>> asyncCounts(Map<String, int> items) {'));
     expect(contents, contains('Future<String> asyncLabelEcho(String input) {'));
     expect(contents, contains('int countAdd(int left, int right) {'));
-    expect(contents, contains('Future<int> asyncCountAdd(int left, int right) {'));
+    expect(
+        contents, contains('Future<int> asyncCountAdd(int left, int right) {'));
     expect(contents, contains('Uint8List blobEcho(Uint8List input) {'));
-    expect(contents, contains('Future<Uint8List> asyncBlobEcho(Uint8List input) {'));
+    expect(contents,
+        contains('Future<Uint8List> asyncBlobEcho(Uint8List input) {'));
     expect(contents, contains('Uint8List? blobMaybeEcho(Uint8List? input) {'));
-    expect(contents, contains('Future<Uint8List?> asyncBlobMaybeEcho(Uint8List? input) {'));
-    expect(contents, contains('Map<String, int> countMapEcho(Map<String, int> items) {'));
-    expect(contents, contains('Future<Map<String, int>> asyncCountMapEcho(Map<String, int> items) {'));
-    expect(contents, contains('Map<String, List<int>> countBucketsEcho(Map<String, List<int>> input) {'));
+    expect(contents,
+        contains('Future<Uint8List?> asyncBlobMaybeEcho(Uint8List? input) {'));
+    expect(contents,
+        contains('Map<String, int> countMapEcho(Map<String, int> items) {'));
+    expect(
+        contents,
+        contains(
+            'Future<Map<String, int>> asyncCountMapEcho(Map<String, int> items) {'));
+    expect(
+        contents,
+        contains(
+            'Map<String, List<int>> countBucketsEcho(Map<String, List<int>> input) {'));
     expect(
       contents,
-      contains('Future<Map<String, List<int>>> asyncCountBucketsEcho(Map<String, List<int>> input) {'),
+      contains(
+          'Future<Map<String, List<int>>> asyncCountBucketsEcho(Map<String, List<int>> input) {'),
     );
-    expect(contents, contains('Map<String, Uint8List?> maybeBlobMapEcho(Map<String, Uint8List?> input) {'));
+    expect(
+        contents,
+        contains(
+            'Map<String, Uint8List?> maybeBlobMapEcho(Map<String, Uint8List?> input) {'));
     expect(
       contents,
-      contains('Future<Map<String, Uint8List?>> asyncMaybeBlobMapEcho(Map<String, Uint8List?> input) {'),
+      contains(
+          'Future<Map<String, Uint8List?>> asyncMaybeBlobMapEcho(Map<String, Uint8List?> input) {'),
     );
     expect(contents, contains('Future<String> asyncFailString() {'));
     expect(contents, contains('Future<String> asyncNeverString() {'));
-    expect(contents, contains('Future<Counter> asyncCounterCreateNew(int initial) {'));
+    expect(contents,
+        contains('Future<Counter> asyncCounterCreateNew(int initial) {'));
     expect(contents, contains('int asyncCancelCount() {'));
     expect(contents, contains('int asyncFreeCount() {'));
     expect(contents, contains('void resetAsyncFutureCounts() {'));
-    expect(contents, contains('Future<Uint8List> asyncBytesEcho(Uint8List input) {'));
-    expect(contents, contains('Future<List<Uint8List>> asyncBytesChunksEcho(List<Uint8List> input) {'));
-    expect(contents, contains('Future<Uint8List?> asyncBytesMaybeEcho(Uint8List? input) {'));
+    expect(contents,
+        contains('Future<Uint8List> asyncBytesEcho(Uint8List input) {'));
+    expect(
+        contents,
+        contains(
+            'Future<List<Uint8List>> asyncBytesChunksEcho(List<Uint8List> input) {'));
+    expect(contents,
+        contains('Future<Uint8List?> asyncBytesMaybeEcho(Uint8List? input) {'));
     expect(contents, contains('rust_future_poll_string'));
     expect(contents, contains('rust_future_cancel_string'));
     expect(contents, contains('rust_future_complete_string'));
@@ -184,7 +234,8 @@ void main() {
     expect(contents, contains('rust_future_complete_bytes_opt'));
     expect(contents, contains('rust_future_poll_bytes_vec'));
     expect(contents, contains('rust_future_complete_bytes_vec'));
-    expect(contents, contains('final class _RustCallStatus extends ffi.Struct {'));
+    expect(
+        contents, contains('final class _RustCallStatus extends ffi.Struct {'));
     expect(
       contents,
       contains('Duration multiplyDuration(Duration value, int factor) {'),
@@ -197,39 +248,92 @@ void main() {
     expect(contents, contains('int subtractI64(int left, int right) {'));
     expect(contents, contains('void tick() {'));
     expect(contents, contains('int currentTick() {'));
-    expect(contents, contains('late final int Function(int left, int right) _add ='));
-    expect(contents, contains("lookupFunction<ffi.Void Function(ffi.Pointer<_AdderVTable>)"));
+    expect(contents,
+        contains('late final int Function(int left, int right) _add ='));
+    expect(
+        contents,
+        contains(
+            "lookupFunction<ffi.Void Function(ffi.Pointer<_AdderVTable>)"));
     expect(contents, contains("'adder_callback_init'"));
     expect(contents, contains('final class _AdderVTable extends ffi.Struct {'));
     expect(contents, contains('final class _AdderCallbackBridge {'));
     expect(contents, contains('Future<int> addAsync(int left, int right);'));
     expect(contents, contains('int checkedAdd(int left, int right);'));
-    expect(contents, contains('final class _ForeignFutureDroppedCallbackStruct extends ffi.Struct {'));
-    expect(contents, contains('final class _AdderAddAsyncAsyncResult extends ffi.Struct {'));
+    expect(
+        contents,
+        contains(
+            'final class _ForeignFutureDroppedCallbackStruct extends ffi.Struct {'));
+    expect(contents,
+        contains('final class _AdderAddAsyncAsyncResult extends ffi.Struct {'));
     expect(contents, contains('abstract interface class Formatter {'));
-    expect(contents, contains('String format(String? prefix, Person person, Outcome outcome);'));
-    expect(contents, contains('Future<String> formatAsync(String? prefix, Person person, Outcome outcome);'));
-    expect(contents, contains('Future<String?> formatAsyncOptional(String? prefix, Person person, Outcome outcome);'));
-    expect(contents, contains('Future<Person> formatAsyncPerson(String? prefix, Person person, Outcome outcome);'));
-    expect(contents, contains('Future<Outcome> formatAsyncOutcome(String? prefix, Person person, Outcome outcome);'));
-    expect(contents, contains('final class _FormatterFormatAsyncAsyncResult extends ffi.Struct {'));
-    expect(contents, contains('final class _FormatterFormatAsyncOptionalAsyncResult extends ffi.Struct {'));
-    expect(contents, contains('final class _FormatterFormatAsyncPersonAsyncResult extends ffi.Struct {'));
-    expect(contents, contains('final class _FormatterFormatAsyncOutcomeAsyncResult extends ffi.Struct {'));
+    expect(
+        contents,
+        contains(
+            'String format(String? prefix, Person person, Outcome outcome);'));
+    expect(
+        contents,
+        contains(
+            'Future<String> formatAsync(String? prefix, Person person, Outcome outcome);'));
+    expect(
+        contents,
+        contains(
+            'Future<String?> formatAsyncOptional(String? prefix, Person person, Outcome outcome);'));
+    expect(
+        contents,
+        contains(
+            'Future<Person> formatAsyncPerson(String? prefix, Person person, Outcome outcome);'));
+    expect(
+        contents,
+        contains(
+            'Future<Outcome> formatAsyncOutcome(String? prefix, Person person, Outcome outcome);'));
+    expect(
+        contents,
+        contains(
+            'final class _FormatterFormatAsyncAsyncResult extends ffi.Struct {'));
+    expect(
+        contents,
+        contains(
+            'final class _FormatterFormatAsyncOptionalAsyncResult extends ffi.Struct {'));
+    expect(
+        contents,
+        contains(
+            'final class _FormatterFormatAsyncPersonAsyncResult extends ffi.Struct {'));
+    expect(
+        contents,
+        contains(
+            'final class _FormatterFormatAsyncOutcomeAsyncResult extends ffi.Struct {'));
     expect(contents, contains("'formatter_callback_init'"));
-    expect(contents, contains('final class _FormatterVTable extends ffi.Struct {'));
+    expect(contents,
+        contains('final class _FormatterVTable extends ffi.Struct {'));
     expect(contents, contains('final class _FormatterCallbackBridge {'));
-    expect(contents, contains('late final int Function(int left, int right) _addU64 ='));
+    expect(contents,
+        contains('late final int Function(int left, int right) _addU64 ='));
     expect(contents, contains('late final bool Function(int value) _isEven ='));
     expect(contents, contains('final class _RustBuffer extends ffi.Struct {'));
-    expect(contents, contains('final class _RustBufferOpt extends ffi.Struct {'));
-    expect(contents, contains('final class _RustBufferVec extends ffi.Struct {'));
-    expect(contents, contains('late final void Function(_RustBuffer) _rustBytesFree ='));
-    expect(contents, contains('late final void Function(_RustBufferVec) _rustBytesVecFree ='));
-    expect(contents, contains('final ffi.Pointer<_RustBuffer> inputBufferPtr = calloc<_RustBuffer>();'));
-    expect(contents, contains('final ffi.Pointer<_RustBufferOpt> inputOptPtr = calloc<_RustBufferOpt>();'));
-    expect(contents, contains('final ffi.Pointer<_RustBufferVec> inputVecPtr = calloc<_RustBufferVec>();'));
-    expect(contents, contains('ffi.Pointer<Utf8> nameNative = name.toNativeUtf8();'));
+    expect(
+        contents, contains('final class _RustBufferOpt extends ffi.Struct {'));
+    expect(
+        contents, contains('final class _RustBufferVec extends ffi.Struct {'));
+    expect(contents,
+        contains('late final void Function(_RustBuffer) _rustBytesFree ='));
+    expect(
+        contents,
+        contains(
+            'late final void Function(_RustBufferVec) _rustBytesVecFree ='));
+    expect(
+        contents,
+        contains(
+            'final ffi.Pointer<_RustBuffer> inputBufferPtr = calloc<_RustBuffer>();'));
+    expect(
+        contents,
+        contains(
+            'final ffi.Pointer<_RustBufferOpt> inputOptPtr = calloc<_RustBufferOpt>();'));
+    expect(
+        contents,
+        contains(
+            'final ffi.Pointer<_RustBufferVec> inputVecPtr = calloc<_RustBufferVec>();'));
+    expect(contents,
+        contains('ffi.Pointer<Utf8> nameNative = name.toNativeUtf8();'));
     expect(
       contents,
       contains(
@@ -255,32 +359,56 @@ void main() {
     );
     expect(contents, contains('value.inMicroseconds'));
     expect(contents, contains('return Duration(microseconds: micros);'));
-    expect(contents, contains('return Uint8List.fromList(resultData.asTypedList(resultLen));'));
+    expect(
+        contents,
+        contains(
+            'return Uint8List.fromList(resultData.asTypedList(resultLen));'));
     expect(contents, contains('class Person {'));
     expect(contents, contains('enum Color {'));
     expect(contents, contains('sealed class Outcome {'));
-    expect(contents, contains('sealed class MathErrorException implements Exception {'));
-    expect(contents, contains('final class MathErrorExceptionDivisionByZero extends MathErrorException {'));
-    expect(contents, contains('final class MathErrorExceptionNegativeInput extends MathErrorException {'));
-    expect(contents, contains('MathErrorException _decodeMathErrorException(Object? raw) {'));
-    expect(contents, contains('final class Counter implements Comparable<Counter> {'));
+    expect(contents,
+        contains('sealed class MathErrorException implements Exception {'));
+    expect(
+        contents,
+        contains(
+            'final class MathErrorExceptionDivisionByZero extends MathErrorException {'));
+    expect(
+        contents,
+        contains(
+            'final class MathErrorExceptionNegativeInput extends MathErrorException {'));
+    expect(
+        contents,
+        contains(
+            'MathErrorException _decodeMathErrorException(Object? raw) {'));
+    expect(contents,
+        contains('final class Counter implements Comparable<Counter> {'));
     expect(contents, contains('static Counter create(int initial) {'));
     expect(contents, contains('static Counter withPerson(Person seed) {'));
     expect(contents, contains('void addValue(int amount) {'));
-    expect(contents, contains('int applyAdderWith(Adder adder, int left, int right) {'));
-    expect(contents, contains('Future<int> asyncApplyAdderWith(Adder adder, int left, int right) {'));
-    expect(contents, contains('int checkedApplyAdderWith(Adder adder, int left, int right) {'));
+    expect(contents,
+        contains('int applyAdderWith(Adder adder, int left, int right) {'));
+    expect(
+        contents,
+        contains(
+            'Future<int> asyncApplyAdderWith(Adder adder, int left, int right) {'));
+    expect(
+        contents,
+        contains(
+            'int checkedApplyAdderWith(Adder adder, int left, int right) {'));
     expect(
       contents,
-      contains('int counterInvokeApplyAdderWith(int handle, Adder adder, int left, int right) {'),
+      contains(
+          'int counterInvokeApplyAdderWith(int handle, Adder adder, int left, int right) {'),
     );
     expect(
       contents,
-      contains('Future<int> counterInvokeAsyncApplyAdderWith(int handle, Adder adder, int left, int right) async {'),
+      contains(
+          'Future<int> counterInvokeAsyncApplyAdderWith(int handle, Adder adder, int left, int right) async {'),
     );
     expect(
       contents,
-      contains('int counterInvokeCheckedApplyAdderWith(int handle, Adder adder, int left, int right) {'),
+      contains(
+          'int counterInvokeCheckedApplyAdderWith(int handle, Adder adder, int left, int right) {'),
     );
     expect(contents, contains('int currentValue() {'));
     expect(contents, contains('void setLabel(String label) {'));
@@ -294,25 +422,42 @@ void main() {
     expect(contents, contains('Future<String> asyncDescribe() {'));
     expect(contents, contains('Future<int> asyncValue() {'));
     expect(contents, contains('Future<Uint8List> asyncSnapshotBytes() {'));
-    expect(contents, contains('Future<Map<String, int>> asyncCounts(Map<String, int> items) {'));
+    expect(
+        contents,
+        contains(
+            'Future<Map<String, int>> asyncCounts(Map<String, int> items) {'));
     expect(contents, contains('Future<String> asyncLabelEcho(String input) {'));
     expect(contents, contains('int countPlus(int amount) {'));
     expect(contents, contains('Future<int> asyncCountPlus(int amount) {'));
     expect(contents, contains('Uint8List blobEcho(Uint8List input) {'));
-    expect(contents, contains('Future<Uint8List> asyncBlobEcho(Uint8List input) {'));
+    expect(contents,
+        contains('Future<Uint8List> asyncBlobEcho(Uint8List input) {'));
     expect(contents, contains('Uint8List? blobMaybeEcho(Uint8List? input) {'));
-    expect(contents, contains('Future<Uint8List?> asyncBlobMaybeEcho(Uint8List? input) {'));
-    expect(contents, contains('Map<String, int> countMapEcho(Map<String, int> items) {'));
-    expect(contents, contains('Future<Map<String, int>> asyncCountMapEcho(Map<String, int> items) {'));
-    expect(contents, contains('Map<String, List<int>> countBucketsEcho(Map<String, List<int>> input) {'));
+    expect(contents,
+        contains('Future<Uint8List?> asyncBlobMaybeEcho(Uint8List? input) {'));
+    expect(contents,
+        contains('Map<String, int> countMapEcho(Map<String, int> items) {'));
+    expect(
+        contents,
+        contains(
+            'Future<Map<String, int>> asyncCountMapEcho(Map<String, int> items) {'));
+    expect(
+        contents,
+        contains(
+            'Map<String, List<int>> countBucketsEcho(Map<String, List<int>> input) {'));
     expect(
       contents,
-      contains('Future<Map<String, List<int>>> asyncCountBucketsEcho(Map<String, List<int>> input) {'),
+      contains(
+          'Future<Map<String, List<int>>> asyncCountBucketsEcho(Map<String, List<int>> input) {'),
     );
-    expect(contents, contains('Map<String, Uint8List?> maybeBlobMapEcho(Map<String, Uint8List?> input) {'));
+    expect(
+        contents,
+        contains(
+            'Map<String, Uint8List?> maybeBlobMapEcho(Map<String, Uint8List?> input) {'));
     expect(
       contents,
-      contains('Future<Map<String, Uint8List?>> asyncMaybeBlobMapEcho(Map<String, Uint8List?> input) {'),
+      contains(
+          'Future<Map<String, Uint8List?>> asyncMaybeBlobMapEcho(Map<String, Uint8List?> input) {'),
     );
     expect(contents, contains('Person snapshotPerson() {'));
     expect(contents, contains('Outcome snapshotOutcome() {'));
@@ -324,16 +469,94 @@ void main() {
     expect(contents, contains('int get hashCode {'));
     expect(contents, contains('bool operator ==(Object other) {'));
     expect(contents, contains('int compareTo(Counter other) {'));
-    expect(contents, contains('return _ffi.counterInvokeUniffiTraitEq(_handle, other._handle);'));
-    expect(contents, contains('return _ffi.counterInvokeUniffiTraitOrdCmp(_handle, other._handle);'));
-    expect(contents, contains('return _ffi.counterInvokeUniffiTraitDisplay(_handle);'));
-    expect(contents, contains('return _ffi.counterInvokeUniffiTraitHash(_handle);'));
+    expect(
+        contents,
+        contains(
+            'return _ffi.counterInvokeUniffiTraitEq(_handle, other._handle);'));
+    expect(
+        contents,
+        contains(
+            'return _ffi.counterInvokeUniffiTraitOrdCmp(_handle, other._handle);'));
+    expect(contents,
+        contains('return _ffi.counterInvokeUniffiTraitDisplay(_handle);'));
+    expect(contents,
+        contains('return _ffi.counterInvokeUniffiTraitHash(_handle);'));
     expect(contents, contains('final class OutcomeSuccess extends Outcome {'));
     expect(contents, contains('final class OutcomeFailure extends Outcome {'));
     expect(contents, contains('String _encodeColor(Color value) {'));
     expect(contents, contains('Color _decodeColor(String raw) {'));
     expect(contents, contains('String _encodeOutcome(Outcome value) {'));
     expect(contents, contains('Outcome _decodeOutcome(String raw) {'));
+  });
+
+  test('generated record/enum method bindings include expected symbols', () {
+    final generated = File('generated/record_enum_methods.dart');
+    final contents = generated.readAsStringSync();
+    expect(contents, contains('library record_enum_methods;'));
+    expect(contents, contains('class MethodPoint {'));
+    expect(contents, contains('Future<String> asyncLabel(String prefix) {'));
+    expect(contents, contains('int checkedDivide(int divisor) {'));
+    expect(contents, contains('int checksum() {'));
+    expect(contents, contains('enum MethodState {'));
+    expect(contents, contains('extension MethodStateMethods on MethodState {'));
+    expect(contents, contains('int checkedCode(bool allowBusy) {'));
+    expect(contents, contains('MethodOutcome toOutcome() {'));
+    expect(contents, contains('sealed class MethodOutcome {'));
+    expect(contents, contains('int checkedValue() {'));
+    expect(contents,
+        contains('sealed class MethodErrorException implements Exception {'));
+    expect(
+        contents, contains('final class MethodErrorExceptionDivisionByZero'));
+    expect(contents, contains('final class MethodErrorExceptionNegativeInput'));
+    expect(
+        contents,
+        contains(
+            "'uniffi_uniffi_record_enum_methods_fn_method_methodpoint_async_label'"));
+    expect(
+        contents,
+        contains(
+            "'uniffi_uniffi_record_enum_methods_fn_method_methodstate_checked_code'"));
+    expect(
+        contents,
+        contains(
+            "'uniffi_uniffi_record_enum_methods_fn_method_methodoutcome_checked_value'"));
+    expect(contents, contains('_methodPointNew = _lib.lookupFunction<'));
+    expect(
+        contents,
+        contains(
+            "'uniffi_uniffi_record_enum_methods_fn_func_method_point_new'"));
+    expect(
+        contents,
+        contains(
+            "'uniffi_uniffi_record_enum_methods_fn_func_method_state_busy'"));
+    expect(
+        contents,
+        contains(
+            "'uniffi_uniffi_record_enum_methods_fn_func_method_outcome_ok'"));
+    expect(contents, contains('class RecordEnumMethodsFfi {'));
+  });
+
+  test('record/enum generated models are usable without FFI calls', () {
+    final point = rem.MethodPoint(x: 6, y: 3);
+    expect(point.toJson(), {'x': 6, 'y': 3});
+    expect(rem.MethodPoint.fromJson({'x': 6, 'y': 3}).toJson(),
+        equals(point.toJson()));
+
+    final state = rem.MethodState.busy;
+    expect(
+        rem.MethodStateFfiCodec.decode(rem.MethodStateFfiCodec.encode(state)),
+        state);
+
+    final errOutcome = rem.MethodOutcomeErr(message: 'boom');
+    final okOutcome = rem.MethodOutcomeOk(value: 7);
+    final decodedErr = rem.MethodOutcomeFfiCodec.decode(
+        rem.MethodOutcomeFfiCodec.encode(errOutcome));
+    expect(decodedErr, isA<rem.MethodOutcomeErr>());
+    expect((decodedErr as rem.MethodOutcomeErr).message, 'boom');
+    final decodedOk = rem.MethodOutcomeFfiCodec.decode(
+        rem.MethodOutcomeFfiCodec.encode(okOutcome));
+    expect(decodedOk, isA<rem.MethodOutcomeOk>());
+    expect((decodedOk as rem.MethodOutcomeOk).value, 7);
   });
 
   test('runtime ffi binding can call native exports', () async {
@@ -443,7 +666,8 @@ void main() {
     expect(bindings.bytesFreeCount(), 1);
     expect(bindings.bytesEcho(Uint8List(0)), Uint8List(0));
     expect(bindings.bytesFreeCount(), 1);
-    expect(bindings.bytesMaybeEcho(Uint8List.fromList([5, 6])), Uint8List.fromList([5, 6]));
+    expect(bindings.bytesMaybeEcho(Uint8List.fromList([5, 6])),
+        Uint8List.fromList([5, 6]));
     expect(bindings.bytesFreeCount(), 2);
     expect(bindings.bytesMaybeEcho(Uint8List(0)), Uint8List(0));
     expect(bindings.bytesFreeCount(), 2);
@@ -508,7 +732,8 @@ void main() {
     final asyncTickBefore = bindings.currentTick();
     await bindings.asyncTick();
     expect(bindings.currentTick(), asyncTickBefore + 1);
-    final asyncCountsResult = await bindings.asyncCounts({'alpha': 2, 'beta': 3});
+    final asyncCountsResult =
+        await bindings.asyncCounts({'alpha': 2, 'beta': 3});
     expect(asyncCountsResult['alpha'], 2);
     expect(asyncCountsResult['beta'], 3);
     expect(asyncCountsResult['total'], 5);
@@ -516,18 +741,23 @@ void main() {
     expect(bindings.countAdd(9, 4), 13);
     expect(await bindings.asyncCountAdd(7, 8), 15);
     final customBlobBytesBefore = bindings.bytesFreeCount();
-    expect(bindings.blobEcho(Uint8List.fromList([6, 7])), Uint8List.fromList([6, 7]));
-    expect(await bindings.asyncBlobEcho(Uint8List.fromList([8, 9])), Uint8List.fromList([8, 9]));
-    expect(bindings.blobMaybeEcho(Uint8List.fromList([1])), Uint8List.fromList([1]));
+    expect(bindings.blobEcho(Uint8List.fromList([6, 7])),
+        Uint8List.fromList([6, 7]));
+    expect(await bindings.asyncBlobEcho(Uint8List.fromList([8, 9])),
+        Uint8List.fromList([8, 9]));
+    expect(bindings.blobMaybeEcho(Uint8List.fromList([1])),
+        Uint8List.fromList([1]));
     expect(bindings.blobMaybeEcho(null), isNull);
-    expect(await bindings.asyncBlobMaybeEcho(Uint8List.fromList([2])), Uint8List.fromList([2]));
+    expect(await bindings.asyncBlobMaybeEcho(Uint8List.fromList([2])),
+        Uint8List.fromList([2]));
     expect(await bindings.asyncBlobMaybeEcho(null), isNull);
     expect(bindings.bytesFreeCount(), customBlobBytesBefore + 4);
     final bindingsCountMapEcho = bindings.countMapEcho({'a': 2, 'b': 4});
     expect(bindingsCountMapEcho['a'], 2);
     expect(bindingsCountMapEcho['b'], 4);
     expect(bindingsCountMapEcho['total'], 6);
-    final bindingsAsyncCountMapEcho = await bindings.asyncCountMapEcho({'c': 1, 'd': 2});
+    final bindingsAsyncCountMapEcho =
+        await bindings.asyncCountMapEcho({'c': 1, 'd': 2});
     expect(bindingsAsyncCountMapEcho['c'], 1);
     expect(bindingsAsyncCountMapEcho['d'], 2);
     expect(bindingsAsyncCountMapEcho['total'], 3);
@@ -633,11 +863,15 @@ void main() {
     expect(counter.countPlus(4), 9);
     expect(await counter.asyncCountPlus(4), 9);
     final counterBlobBytesBefore = bindings.bytesFreeCount();
-    expect(counter.blobEcho(Uint8List.fromList([4, 4])), Uint8List.fromList([4, 4]));
-    expect(await counter.asyncBlobEcho(Uint8List.fromList([5, 5])), Uint8List.fromList([5, 5]));
-    expect(counter.blobMaybeEcho(Uint8List.fromList([6])), Uint8List.fromList([6]));
+    expect(counter.blobEcho(Uint8List.fromList([4, 4])),
+        Uint8List.fromList([4, 4]));
+    expect(await counter.asyncBlobEcho(Uint8List.fromList([5, 5])),
+        Uint8List.fromList([5, 5]));
+    expect(counter.blobMaybeEcho(Uint8List.fromList([6])),
+        Uint8List.fromList([6]));
     expect(counter.blobMaybeEcho(null), isNull);
-    expect(await counter.asyncBlobMaybeEcho(Uint8List.fromList([7])), Uint8List.fromList([7]));
+    expect(await counter.asyncBlobMaybeEcho(Uint8List.fromList([7])),
+        Uint8List.fromList([7]));
     expect(await counter.asyncBlobMaybeEcho(null), isNull);
     expect(bindings.bytesFreeCount(), counterBlobBytesBefore + 4);
     final counterCountMap = counter.countMapEcho({'x': 2});
@@ -687,7 +921,11 @@ void main() {
     expect(counter.optionalBytesLen(Uint8List.fromList([9, 8])), 2);
     expect(counter.optionalBytesLen(null), 0);
     expect(
-      counter.chunksTotalLen([Uint8List.fromList([1]), Uint8List(0), Uint8List.fromList([2, 3])]),
+      counter.chunksTotalLen([
+        Uint8List.fromList([1]),
+        Uint8List(0),
+        Uint8List.fromList([2, 3])
+      ]),
       3,
     );
     final snapPerson = counter.snapshotPerson();
@@ -702,7 +940,8 @@ void main() {
     expect(counter.snapshotBytes(), Uint8List.fromList('bytes:9'.codeUnits));
     expect(bindings.bytesFreeCount(), bytesBeforeSnapshot + 1);
     final bytesBeforeAsyncSnapshot = bindings.bytesFreeCount();
-    expect(await counter.asyncSnapshotBytes(), Uint8List.fromList('async-bytes:9'.codeUnits));
+    expect(await counter.asyncSnapshotBytes(),
+        Uint8List.fromList('async-bytes:9'.codeUnits));
     expect(bindings.bytesFreeCount(), bytesBeforeAsyncSnapshot + 1);
     final risky = counter.riskyOutcome(5);
     expect(risky, isA<OutcomeSuccess>());
@@ -712,11 +951,13 @@ void main() {
       () => counter.riskyOutcome(0),
       throwsA(isA<MathErrorExceptionDivisionByZero>()),
     );
-    expect(() => counter.divideBy(0), throwsA(isA<MathErrorExceptionDivisionByZero>()));
+    expect(() => counter.divideBy(0),
+        throwsA(isA<MathErrorExceptionDivisionByZero>()));
     expect(
       () => counter.divideBy(-2),
       throwsA(
-        isA<MathErrorExceptionNegativeInput>().having((e) => e.value, 'value', -2),
+        isA<MathErrorExceptionNegativeInput>()
+            .having((e) => e.value, 'value', -2),
       ),
     );
     counter.close();
@@ -742,7 +983,8 @@ void main() {
     expect(bindings.cycleColor(Color.green), Color.blue);
     expect(bindings.cycleColor(Color.blue), Color.red);
     final freeBeforeOutcome = bindings.freeCount();
-    final evolved1 = bindings.evolveOutcome(const OutcomeSuccess(message: 'ok'));
+    final evolved1 =
+        bindings.evolveOutcome(const OutcomeSuccess(message: 'ok'));
     expect(evolved1, isA<OutcomeFailure>());
     final evolved1Failure = evolved1 as OutcomeFailure;
     expect(evolved1Failure.code, 2);
@@ -853,8 +1095,14 @@ void main() {
     expect(bytesMaybeEcho(null), isNull);
     expect(bytesFreeCount(), 2);
     expect(
-      bytesChunksEcho([Uint8List.fromList([1, 2]), Uint8List(0)]),
-      [Uint8List.fromList([1, 2]), Uint8List(0)],
+      bytesChunksEcho([
+        Uint8List.fromList([1, 2]),
+        Uint8List(0)
+      ]),
+      [
+        Uint8List.fromList([1, 2]),
+        Uint8List(0)
+      ],
     );
     expect(bytesFreeCount(), 3);
     expect(bytesVecFreeCount(), 1);
@@ -862,14 +1110,22 @@ void main() {
     expect(bytesVecFreeCount(), 1);
     final topBytesFreeBeforeAsync = bytesFreeCount();
     final topBytesVecFreeBeforeAsync = bytesVecFreeCount();
-    expect(await asyncBytesEcho(Uint8List.fromList([5, 4])), Uint8List.fromList([5, 4]));
+    expect(await asyncBytesEcho(Uint8List.fromList([5, 4])),
+        Uint8List.fromList([5, 4]));
     expect(await asyncBytesEcho(Uint8List(0)), Uint8List(0));
-    expect(await asyncBytesMaybeEcho(Uint8List.fromList([3])), Uint8List.fromList([3]));
+    expect(await asyncBytesMaybeEcho(Uint8List.fromList([3])),
+        Uint8List.fromList([3]));
     expect(await asyncBytesMaybeEcho(Uint8List(0)), Uint8List(0));
     expect(await asyncBytesMaybeEcho(null), isNull);
     expect(
-      await asyncBytesChunksEcho([Uint8List.fromList([8]), Uint8List(0)]),
-      [Uint8List.fromList([8]), Uint8List(0)],
+      await asyncBytesChunksEcho([
+        Uint8List.fromList([8]),
+        Uint8List(0)
+      ]),
+      [
+        Uint8List.fromList([8]),
+        Uint8List(0)
+      ],
     );
     expect(await asyncBytesChunksEcho(<Uint8List>[]), <Uint8List>[]);
     expect(bytesFreeCount(), topBytesFreeBeforeAsync + 3);
@@ -895,10 +1151,12 @@ void main() {
     expect(await asyncCountAdd(10, 1), 11);
     final topBlobBytesBefore = bytesFreeCount();
     expect(blobEcho(Uint8List.fromList([9, 1])), Uint8List.fromList([9, 1]));
-    expect(await asyncBlobEcho(Uint8List.fromList([2, 3])), Uint8List.fromList([2, 3]));
+    expect(await asyncBlobEcho(Uint8List.fromList([2, 3])),
+        Uint8List.fromList([2, 3]));
     expect(blobMaybeEcho(Uint8List.fromList([4])), Uint8List.fromList([4]));
     expect(blobMaybeEcho(null), isNull);
-    expect(await asyncBlobMaybeEcho(Uint8List.fromList([5])), Uint8List.fromList([5]));
+    expect(await asyncBlobMaybeEcho(Uint8List.fromList([5])),
+        Uint8List.fromList([5]));
     expect(await asyncBlobMaybeEcho(null), isNull);
     expect(bytesFreeCount(), topBlobBytesBefore + 4);
     final topCountMapEcho = countMapEcho({'m': 9});
@@ -1000,18 +1258,23 @@ void main() {
     expect(topCounter.countPlus(7), 10);
     expect(await topCounter.asyncCountPlus(7), 10);
     final topCounterBlobBytesBefore = bytesFreeCount();
-    expect(topCounter.blobEcho(Uint8List.fromList([1, 3])), Uint8List.fromList([1, 3]));
-    expect(await topCounter.asyncBlobEcho(Uint8List.fromList([2, 4])), Uint8List.fromList([2, 4]));
-    expect(topCounter.blobMaybeEcho(Uint8List.fromList([6])), Uint8List.fromList([6]));
+    expect(topCounter.blobEcho(Uint8List.fromList([1, 3])),
+        Uint8List.fromList([1, 3]));
+    expect(await topCounter.asyncBlobEcho(Uint8List.fromList([2, 4])),
+        Uint8List.fromList([2, 4]));
+    expect(topCounter.blobMaybeEcho(Uint8List.fromList([6])),
+        Uint8List.fromList([6]));
     expect(topCounter.blobMaybeEcho(null), isNull);
-    expect(await topCounter.asyncBlobMaybeEcho(Uint8List.fromList([8])), Uint8List.fromList([8]));
+    expect(await topCounter.asyncBlobMaybeEcho(Uint8List.fromList([8])),
+        Uint8List.fromList([8]));
     expect(await topCounter.asyncBlobMaybeEcho(null), isNull);
     expect(bytesFreeCount(), topCounterBlobBytesBefore + 4);
     final topCounterCountMap = topCounter.countMapEcho({'k': 2});
     expect(topCounterCountMap['k'], 2);
     expect(topCounterCountMap['counter'], 3);
     expect(topCounterCountMap['total'], 5);
-    final topCounterAsyncCountMap = await topCounter.asyncCountMapEcho({'w': 5});
+    final topCounterAsyncCountMap =
+        await topCounter.asyncCountMapEcho({'w': 5});
     expect(topCounterAsyncCountMap['w'], 5);
     expect(topCounterAsyncCountMap['counter'], 3);
     expect(topCounterAsyncCountMap['total'], 8);

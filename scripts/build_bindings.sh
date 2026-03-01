@@ -13,4 +13,12 @@ cargo run -p ubdg_bindgen --bin uniffi-bindgen-dart -- \
   --out-dir "$OUT_DIR" \
   --config "$CONFIG_FILE"
 
+if [[ -n "${UBDG_RECORD_ENUM_METHODS_LIB:-}" ]]; then
+  cargo run -p ubdg_bindgen --bin uniffi-bindgen-dart -- \
+    generate "${UBDG_RECORD_ENUM_METHODS_LIB}" \
+    --library \
+    --crate "uniffi_record_enum_methods" \
+    --out-dir "$OUT_DIR"
+fi
+
 echo "Generated bindings in $OUT_DIR"
