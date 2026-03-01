@@ -4,6 +4,30 @@ use std::sync::atomic::{AtomicU32, Ordering};
 
 static TICK_COUNT: AtomicU32 = AtomicU32::new(0);
 static FREE_COUNT: AtomicU32 = AtomicU32::new(0);
+static BYTES_FREE_COUNT: AtomicU32 = AtomicU32::new(0);
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct RustBuffer {
+    pub data: *mut u8,
+    pub len: u64,
+}
+
+fn vec_into_rust_buffer(mut data: Vec<u8>) -> RustBuffer {
+    if data.is_empty() {
+        return RustBuffer {
+            data: std::ptr::null_mut(),
+            len: 0,
+        };
+    }
+
+    let out = RustBuffer {
+        data: data.as_mut_ptr(),
+        len: data.len() as u64,
+    };
+    std::mem::forget(data);
+    out
+}
 
 #[unsafe(no_mangle)]
 pub extern "C" fn add(left: u32, right: u32) -> u32 {
@@ -18,6 +42,37 @@ pub extern "C" fn add_seconds(when: i64, seconds: i64) -> i64 {
 #[unsafe(no_mangle)]
 pub extern "C" fn add_u64(left: u64, right: u64) -> u64 {
     left + right
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn bytes_echo(input: RustBuffer) -> RustBuffer {
+    let out = if input.data.is_null() || input.len == 0 {
+        Vec::new()
+    } else {
+        unsafe { std::slice::from_raw_parts(input.data, input.len as usize).to_vec() }
+    };
+    vec_into_rust_buffer(out)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_bytes_free(value: RustBuffer) {
+    if value.data.is_null() {
+        return;
+    }
+    BYTES_FREE_COUNT.fetch_add(1, Ordering::Relaxed);
+    unsafe {
+        let _ = Vec::from_raw_parts(value.data, value.len as usize, value.len as usize);
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn reset_bytes_free_count() {
+    BYTES_FREE_COUNT.store(0, Ordering::Relaxed);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn bytes_free_count() -> u32 {
+    BYTES_FREE_COUNT.load(Ordering::Relaxed)
 }
 
 #[unsafe(no_mangle)]

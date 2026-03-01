@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:test/test.dart';
 import '../generated/simple_fns.dart';
@@ -23,7 +24,10 @@ void main() {
     expect(contents, contains('DateTime addSeconds(DateTime when_, int seconds) {'));
     expect(contents, contains('int addU64(int left, int right) {'));
     expect(contents, contains('int freeCount() {'));
+    expect(contents, contains('Uint8List bytesEcho(Uint8List input) {'));
+    expect(contents, contains('int bytesFreeCount() {'));
     expect(contents, contains('int negate(int value) {'));
+    expect(contents, contains('void resetBytesFreeCount() {'));
     expect(contents, contains('void resetFreeCount() {'));
     expect(contents, contains('String brokenGreet() {'));
     expect(contents, contains('String greet(String name) {'));
@@ -41,6 +45,9 @@ void main() {
     expect(contents, contains('late final int Function(int left, int right) _add ='));
     expect(contents, contains('late final int Function(int left, int right) _addU64 ='));
     expect(contents, contains('late final bool Function(int value) _isEven ='));
+    expect(contents, contains('final class _RustBuffer extends ffi.Struct {'));
+    expect(contents, contains('late final void Function(_RustBuffer) _rustBytesFree ='));
+    expect(contents, contains('final ffi.Pointer<_RustBuffer> inputBufferPtr = calloc<_RustBuffer>();'));
     expect(contents, contains('ffi.Pointer<Utf8> nameNative = name.toNativeUtf8();'));
     expect(
       contents,
@@ -67,6 +74,7 @@ void main() {
     );
     expect(contents, contains('value.inMicroseconds'));
     expect(contents, contains('return Duration(microseconds: micros);'));
+    expect(contents, contains('return Uint8List.fromList(resultData.asTypedList(resultLen));'));
   });
 
   test('runtime ffi binding can call native exports', () {
@@ -80,7 +88,9 @@ void main() {
 
     final bindings = SimpleFnsBindings(libraryPath: libPath);
     bindings.resetFreeCount();
+    bindings.resetBytesFreeCount();
     expect(bindings.freeCount(), 0);
+    expect(bindings.bytesFreeCount(), 0);
     expect(bindings.add(20, 22), 42);
     final baseTime = DateTime.fromMicrosecondsSinceEpoch(1000000, isUtc: true);
     expect(
@@ -88,6 +98,13 @@ void main() {
       DateTime.fromMicrosecondsSinceEpoch(6000000, isUtc: true),
     );
     expect(bindings.addU64(10000000000, 25), 10000000025);
+    expect(
+      bindings.bytesEcho(Uint8List.fromList([1, 2, 3, 4])),
+      Uint8List.fromList([1, 2, 3, 4]),
+    );
+    expect(bindings.bytesFreeCount(), 1);
+    expect(bindings.bytesEcho(Uint8List(0)), Uint8List(0));
+    expect(bindings.bytesFreeCount(), 1);
     expect(bindings.negate(7), -7);
     expect(
       bindings.subtractI64(9000000000000000000, 1000000000000000000),
@@ -115,13 +132,19 @@ void main() {
 
     configureDefaultBindings(libraryPath: libPath);
     resetFreeCount();
+    resetBytesFreeCount();
     expect(freeCount(), 0);
+    expect(bytesFreeCount(), 0);
     expect(add(1, 2), 3);
     expect(
       addSeconds(baseTime, 2),
       DateTime.fromMicrosecondsSinceEpoch(3000000, isUtc: true),
     );
     expect(addU64(4000000000, 2), 4000000002);
+    expect(bytesEcho(Uint8List.fromList([9, 8])), Uint8List.fromList([9, 8]));
+    expect(bytesFreeCount(), 1);
+    expect(bytesEcho(Uint8List(0)), Uint8List(0));
+    expect(bytesFreeCount(), 1);
     expect(negate(5), -5);
     expect(subtractI64(5000000000, 2000000000), 3000000000);
     expect(

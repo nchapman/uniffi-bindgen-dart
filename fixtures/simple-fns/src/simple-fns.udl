@@ -3,12 +3,15 @@ namespace simple_fns {
   timestamp add_seconds(timestamp when, i64 seconds);
   u64 add_u64(u64 left, u64 right);
   string broken_greet();
+  bytes bytes_echo(bytes input);
+  u32 bytes_free_count();
   u32 free_count();
   string greet(string name);
   duration multiply_duration(duration value, u32 factor);
   i64 subtract_i64(i64 left, i64 right);
   string? maybe_greet(string? name);
   i32 negate(i32 value);
+  void reset_bytes_free_count();
   void reset_free_count();
   boolean is_even(i32 value);
   f32 scale32(f32 value, f32 factor);

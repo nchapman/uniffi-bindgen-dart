@@ -3,6 +3,14 @@ library simple_fns;
 
 import 'dart:ffi' as ffi;
 import 'package:ffi/ffi.dart';
+import 'dart:typed_data';
+
+final class _RustBuffer extends ffi.Struct {
+  external ffi.Pointer<ffi.Uint8> data;
+
+  @ffi.Uint64()
+  external int len;
+}
 
 class SimpleFnsBindings {
   SimpleFnsBindings({ffi.DynamicLibrary? dynamicLibrary, String? libraryPath})
@@ -25,6 +33,8 @@ class SimpleFnsBindings {
   late final ffi.DynamicLibrary _lib = open();
 
   late final void Function(ffi.Pointer<Utf8>) _rustStringFree = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<Utf8>), void Function(ffi.Pointer<Utf8>)>('rust_string_free');
+
+  late final void Function(_RustBuffer) _rustBytesFree = _lib.lookupFunction<ffi.Void Function(_RustBuffer), void Function(_RustBuffer)>('rust_bytes_free');
 
   late final int Function(int left, int right) _add = _lib.lookupFunction<ffi.Uint32 Function(ffi.Uint32 left, ffi.Uint32 right), int Function(int left, int right)>('add');
 
@@ -57,6 +67,45 @@ class SimpleFnsBindings {
       } finally {
         _rustStringFree(resultPtr);
       }
+  }
+
+  late final _RustBuffer Function(_RustBuffer input) _bytesEcho = _lib.lookupFunction<_RustBuffer Function(_RustBuffer input), _RustBuffer Function(_RustBuffer input)>('bytes_echo');
+
+  Uint8List bytesEcho(Uint8List input) {
+    final ffi.Pointer<ffi.Uint8> inputData = input.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>(input.length);
+    if (inputData != ffi.nullptr) {
+      inputData.asTypedList(input.length).setAll(0, input);
+    }
+    final ffi.Pointer<_RustBuffer> inputBufferPtr = calloc<_RustBuffer>();
+    inputBufferPtr.ref.data = inputData;
+    inputBufferPtr.ref.len = input.length;
+    final _RustBuffer inputNative = inputBufferPtr.ref;
+    try {
+      final _RustBuffer resultBuf = _bytesEcho(inputNative);
+      final ffi.Pointer<ffi.Uint8> resultData = resultBuf.data;
+      final int resultLen = resultBuf.len;
+      if (resultData == ffi.nullptr) {
+        if (resultLen == 0) {
+          _rustBytesFree(resultBuf);
+          return Uint8List(0);
+        }
+        throw StateError('Rust returned invalid buffer for bytes_echo');
+      }
+      try {
+        return Uint8List.fromList(resultData.asTypedList(resultLen));
+      } finally {
+        _rustBytesFree(resultBuf);
+      }
+    } finally {
+    if (inputData != ffi.nullptr) calloc.free(inputData);
+    calloc.free(inputBufferPtr);
+    }
+  }
+
+  late final int Function() _bytesFreeCount = _lib.lookupFunction<ffi.Uint32 Function(), int Function()>('bytes_free_count');
+
+  int bytesFreeCount() {
+      return _bytesFreeCount();
   }
 
   late final int Function() _currentTick = _lib.lookupFunction<ffi.Uint32 Function(), int Function()>('current_tick');
@@ -128,6 +177,12 @@ class SimpleFnsBindings {
       return _negate(value);
   }
 
+  late final void Function() _resetBytesFreeCount = _lib.lookupFunction<ffi.Void Function(), void Function()>('reset_bytes_free_count');
+
+  void resetBytesFreeCount() {
+      _resetBytesFreeCount();
+  }
+
   late final void Function() _resetFreeCount = _lib.lookupFunction<ffi.Void Function(), void Function()>('reset_free_count');
 
   void resetFreeCount() {
@@ -187,6 +242,14 @@ String brokenGreet() {
   return _bindings().brokenGreet();
 }
 
+Uint8List bytesEcho(Uint8List input) {
+  return _bindings().bytesEcho(input);
+}
+
+int bytesFreeCount() {
+  return _bindings().bytesFreeCount();
+}
+
 int currentTick() {
   return _bindings().currentTick();
 }
@@ -213,6 +276,10 @@ Duration multiplyDuration(Duration value, int factor) {
 
 int negate(int value) {
   return _bindings().negate(value);
+}
+
+void resetBytesFreeCount() {
+  _bindings().resetBytesFreeCount();
 }
 
 void resetFreeCount() {
