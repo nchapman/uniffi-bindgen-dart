@@ -3,6 +3,7 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::{bail, Context, Result};
+use camino::Utf8Path;
 use uniffi_bindgen::interface::{AsType, ComponentInterface, DefaultValue, Literal, Radix, Type};
 
 use crate::GenerateArgs;
@@ -19,9 +20,12 @@ pub mod primitives;
 pub mod record;
 
 pub fn generate_bindings(args: &GenerateArgs) -> Result<()> {
-    let namespace = namespace_from_source(&args.source)?;
     let cfg = config::load(args)?;
-    let metadata = parse_udl_metadata(&args.source, args.crate_name.as_deref())?;
+    let metadata = parse_udl_metadata(&args.source, args.crate_name.as_deref(), args.library)?;
+    let namespace = metadata
+        .namespace
+        .clone()
+        .unwrap_or(namespace_from_source(&args.source)?);
 
     let module_name = cfg
         .module_name
@@ -245,6 +249,7 @@ impl UdlFunction {
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 struct UdlMetadata {
+    namespace: Option<String>,
     local_module_path: String,
     namespace_docstring: Option<String>,
     functions: Vec<UdlFunction>,
@@ -254,13 +259,41 @@ struct UdlMetadata {
     enums: Vec<UdlEnum>,
 }
 
-fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMetadata> {
+fn parse_udl_metadata(
+    source: &Path,
+    crate_name: Option<&str>,
+    library_mode: bool,
+) -> Result<UdlMetadata> {
     if source.extension().and_then(|e| e.to_str()) != Some("udl") {
-        return Ok(UdlMetadata {
-            local_module_path: String::new(),
-            namespace_docstring: None,
-            ..UdlMetadata::default()
-        });
+        if !library_mode {
+            return Ok(UdlMetadata {
+                namespace: None,
+                local_module_path: String::new(),
+                namespace_docstring: None,
+                ..UdlMetadata::default()
+            });
+        }
+        let source_str = source
+            .to_str()
+            .ok_or_else(|| anyhow::anyhow!("library source path must be valid UTF-8"))?;
+        let source_utf8 = Utf8Path::new(source_str);
+        let cis = uniffi_bindgen::library_mode::find_cis(
+            source_utf8,
+            &uniffi_bindgen::EmptyCrateConfigSupplier,
+        )
+        .with_context(|| format!("failed to parse library metadata: {}", source.display()))?;
+        let ci = if let Some(crate_name) = crate_name {
+            cis.into_iter()
+                .find(|ci| ci.crate_name() == crate_name)
+                .ok_or_else(|| {
+                    anyhow::anyhow!("crate '{crate_name}' not found in library metadata")
+                })?
+        } else {
+            cis.into_iter()
+                .next()
+                .ok_or_else(|| anyhow::anyhow!("no UniFFI components found in library metadata"))?
+        };
+        return component_interface_to_metadata(ci, None);
     }
 
     let udl = fs::read_to_string(source)
@@ -268,8 +301,19 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
     let module_path = crate_name.unwrap_or("crate_name");
     let ci = ComponentInterface::from_webidl(&udl, module_path)
         .with_context(|| format!("failed to parse UDL: {}", source.display()))?;
-    let udl_interface_traits = parse_udl_interface_traits(&udl);
-    let udl_namespace_function_docstrings = parse_udl_namespace_function_docstrings(&udl);
+    component_interface_to_metadata(ci, Some(&udl))
+}
+
+fn component_interface_to_metadata(
+    ci: ComponentInterface,
+    udl_source: Option<&str>,
+) -> Result<UdlMetadata> {
+    let udl_interface_traits = udl_source
+        .map(parse_udl_interface_traits)
+        .unwrap_or_default();
+    let udl_namespace_function_docstrings = udl_source
+        .map(parse_udl_namespace_function_docstrings)
+        .unwrap_or_default();
 
     let mut functions = ci
         .function_definitions()
@@ -528,7 +572,8 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
         .collect::<Vec<_>>();
 
     Ok(UdlMetadata {
-        local_module_path: module_path.to_string(),
+        namespace: Some(ci.namespace().to_string()),
+        local_module_path: ci.crate_name().to_string(),
         namespace_docstring: ci.namespace_docstring().map(ToString::to_string),
         functions,
         objects,
@@ -5520,6 +5565,27 @@ mod tests {
         assert!(content.contains("library simple_fns;"));
         assert!(content.contains("class SimpleFnsFfi {"));
         assert!(content.contains("libraryName = 'uniffi_simple_fns';"));
+    }
+
+    #[test]
+    fn library_mode_uses_library_metadata_path() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let out_dir = temp.path().join("out");
+        let source = temp.path().join("libmissing.dylib");
+        fs::write(&source, b"not-a-real-library").expect("write source");
+
+        let args = GenerateArgs {
+            source,
+            out_dir,
+            library: true,
+            config: None,
+            crate_name: None,
+            no_format: false,
+        };
+
+        let err = generate_bindings(&args).expect_err("library mode should attempt metadata parse");
+        let msg = format!("{err:#}");
+        assert!(msg.contains("failed to parse library metadata"));
     }
 
     #[test]

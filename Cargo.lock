@@ -645,6 +645,7 @@ name = "ubdg_bindgen"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "camino",
  "clap",
  "serde",
  "tempfile",

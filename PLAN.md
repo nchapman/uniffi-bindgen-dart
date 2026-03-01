@@ -39,7 +39,7 @@ A repeatable backend-development process that can be applied with minimal change
 ### In Progress
 - Phase 4: Enums/errors are in place; trait parity now covers object-level `Display`/`Debug`/`Hash`/`Eq`/`Ord` mapping with idiomatic Dart (`toString()`/`hashCode`/`operator ==`/`Comparable<T>.compareTo`) and runtime fixture validation.
 - Phase 5: Async Rust-future ABI now covers string, `void`, integer, object-handle (`u64`), bytes, optional-bytes, bytes-sequence, and string-keyed map return/argument fixture paths for top-level functions and object methods, including builtin-backed custom typedefs (for example, `[Custom] typedef string Label`); dedicated futures-stress golden coverage is in place, and runtime smoke tests now cover error and timeout/non-completion edges with cancel/free counter assertions.
-- Phase 6: Advanced config is partially implemented (`rename`/`exclude` for generated public API wrappers with dedicated `rename-demo` golden coverage) and docstring emission is now in place with dedicated `docstrings-demo` coverage; external type support now covers external record/enum typedef wrapper binding, external enum throw-contract decoding, and external interface typedef argument/return handle paths with `external_packages` import mapping, with broader external parity still pending.
+- Phase 6: Advanced config is partially implemented (`rename`/`exclude` for generated public API wrappers with dedicated `rename-demo` golden coverage) and docstring emission is now in place with dedicated `docstrings-demo` coverage; external type support now covers external record/enum typedef wrapper binding, external enum throw-contract decoding, and external interface typedef argument/return handle paths with `external_packages` import mapping, with broader external parity still pending. Library-mode metadata ingestion is now wired for `--library` source paths.
 - Phase 7+: Documentation hardening and release workflow completion pending.
 
 ### Blocked/Deferred
@@ -444,6 +444,7 @@ These rules are part of the template and should not be skipped:
 1. Add broader trait fixture coverage around `Eq` semantics (edge cases/lifecycle scenarios) and keep trait behavior synchronized with upstream `uniffi-rs`.
 2. Extend remaining async parity for external/custom families and add broader cancellation-path runtime hooks where host-side explicit cancellation is available.
 3. Implement library-mode metadata ingestion for Dart generation, then add fixtures for UniFFI `0.31` record/enum method surfaces.
-4. Keep `docs/supported-features.md` synchronized with every parity change.
-5. Extend remaining custom/external parity (nested custom/container lift/lower families + cross-crate/ext-type scenarios).
-6. Add CI jobs for clippy strict mode and artifact-split runtime binding tests (Linux + macOS).
+4. Add fixtures and generation/runtime coverage for UniFFI `0.31` record/enum method surfaces via library-mode metadata.
+5. Keep `docs/supported-features.md` synchronized with every parity change.
+6. Extend remaining custom/external parity (nested custom/container lift/lower families + cross-crate/ext-type scenarios).
+7. Add CI jobs for clippy strict mode and artifact-split runtime binding tests (Linux + macOS).
