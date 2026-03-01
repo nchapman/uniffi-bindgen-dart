@@ -3382,6 +3382,11 @@ fn render_bound_methods(
                     .as_ref()
                     .map(map_uniffi_type_to_dart)
                     .unwrap_or_else(|| "void".to_string());
+                let signature_return_type = if function.is_async {
+                    format!("Future<{value_return_type}>")
+                } else {
+                    value_return_type.clone()
+                };
                 let dart_sig = function
                     .args
                     .iter()
@@ -3435,7 +3440,8 @@ fn render_bound_methods(
                     let escaped_reason = reason.replace('\'', "\\'");
                     out.push('\n');
                     out.push_str(&format!(
-                        "  {value_return_type} {method_name}({dart_sig}) {{\n"
+                        "  {signature_return_type} {method_name}({dart_sig}){} {{\n",
+                        if function.is_async { " async" } else { "" }
                     ));
                     out.push_str(&format!(
                         "    throw UnsupportedError('{escaped_reason} ({})');\n",
@@ -3451,7 +3457,8 @@ fn render_bound_methods(
                 ));
                 out.push('\n');
                 out.push_str(&format!(
-                    "  {value_return_type} {method_name}({dart_sig}) {{\n"
+                    "  {signature_return_type} {method_name}({dart_sig}){} {{\n",
+                    if function.is_async { " async" } else { "" }
                 ));
                 out.push_str(&format!(
                     "    final ffi.Pointer<_UniFfiFfiBufferElement> argBuf = calloc<_UniFfiFfiBufferElement>({arg_cursor});\n"
@@ -3473,10 +3480,12 @@ fn render_bound_methods(
                     let arg_name = safe_dart_identifier(&to_lower_camel(&arg.name));
                     match ffi_type {
                         FfiType::RustBuffer(_) => {
-                            let encode_expr = match &arg.type_ {
+                            let encode_expr = match runtime_unwrapped_type(&arg.type_) {
                                 Type::Record { name, .. } | Type::Enum { name, .. } => {
                                     format!("_uniffiEncode{}({arg_name})", to_upper_camel(name))
                                 }
+                                Type::String => format!("Uint8List.fromList(utf8.encode({arg_name}))"),
+                                Type::Bytes => arg_name.clone(),
                                 _ => {
                                     let escaped_reason = reason.replace('\'', "\\'");
                                     out.push_str(&format!(
@@ -3496,11 +3505,18 @@ fn render_bound_methods(
                                 "      if ({arg_name}Bytes.isNotEmpty) {{ {arg_name}Ptr.asTypedList({arg_name}Bytes.length).setAll(0, {arg_name}Bytes); }}\n"
                             ));
                             out.push_str(&format!("      foreignArgPtrs.add({arg_name}Ptr);\n"));
-                            out.push_str(
-                                "      final ffi.Pointer<_UniFfiRustCallStatus> fromBytesStatusPtr = calloc<_UniFfiRustCallStatus>();\n",
-                            );
-                            out.push_str("      fromBytesStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;\n");
-                            out.push_str("      fromBytesStatusPtr.ref.errorBuf\n");
+                            let from_bytes_status_ptr = format!("{arg_name}FromBytesStatusPtr");
+                            let from_bytes_code = format!("{arg_name}FromBytesCode");
+                            let from_bytes_err_buf = format!("{arg_name}FromBytesErrBuf");
+                            let from_bytes_err_buf_ptr =
+                                format!("{arg_name}FromBytesErrBufPtr");
+                            out.push_str(&format!(
+                                "      final ffi.Pointer<_UniFfiRustCallStatus> {from_bytes_status_ptr} = calloc<_UniFfiRustCallStatus>();\n"
+                            ));
+                            out.push_str(&format!(
+                                "      {from_bytes_status_ptr}.ref.code = _uniFfiRustCallStatusSuccess;\n"
+                            ));
+                            out.push_str(&format!("      {from_bytes_status_ptr}.ref.errorBuf\n"));
                             out.push_str("        ..capacity = 0\n");
                             out.push_str("        ..len = 0\n");
                             out.push_str("        ..data = ffi.nullptr;\n");
@@ -3511,27 +3527,31 @@ fn render_bound_methods(
                                 "      {arg_name}ForeignPtr.ref\n        ..len = {arg_name}Bytes.length\n        ..data = {arg_name}Ptr;\n"
                             ));
                             out.push_str(&format!(
-                                "      final _UniFfiRustBuffer {arg_name}RustBuffer = _uniFfiRustBufferFromBytes({arg_name}ForeignPtr.ref, fromBytesStatusPtr);\n"
+                                "      final _UniFfiRustBuffer {arg_name}RustBuffer = _uniFfiRustBufferFromBytes({arg_name}ForeignPtr.ref, {from_bytes_status_ptr});\n"
                             ));
                             out.push_str(&format!("      calloc.free({arg_name}ForeignPtr);\n"));
-                            out.push_str(
-                                "      final int fromBytesCode = fromBytesStatusPtr.ref.code;\n",
-                            );
-                            out.push_str("      final _UniFfiRustBuffer fromBytesErrBuf = fromBytesStatusPtr.ref.errorBuf;\n");
-                            out.push_str("      calloc.free(fromBytesStatusPtr);\n");
-                            out.push_str(
-                                "      if (fromBytesCode != _uniFfiRustCallStatusSuccess) {\n",
-                            );
-                            out.push_str(
-                                "        final ffi.Pointer<_UniFfiRustBuffer> fromBytesErrBufPtr = calloc<_UniFfiRustBuffer>();\n",
-                            );
-                            out.push_str(
-                                "        fromBytesErrBufPtr.ref\n          ..capacity = fromBytesErrBuf.capacity\n          ..len = fromBytesErrBuf.len\n          ..data = fromBytesErrBuf.data;\n",
-                            );
-                            out.push_str("        rustRetBufferPtrs.add(fromBytesErrBufPtr);\n");
-                            out.push_str(
-                                "        throw StateError('UniFFI rustbuffer_from_bytes failed with status $fromBytesCode');\n",
-                            );
+                            out.push_str(&format!(
+                                "      final int {from_bytes_code} = {from_bytes_status_ptr}.ref.code;\n"
+                            ));
+                            out.push_str(&format!(
+                                "      final _UniFfiRustBuffer {from_bytes_err_buf} = {from_bytes_status_ptr}.ref.errorBuf;\n"
+                            ));
+                            out.push_str(&format!("      calloc.free({from_bytes_status_ptr});\n"));
+                            out.push_str(&format!(
+                                "      if ({from_bytes_code} != _uniFfiRustCallStatusSuccess) {{\n"
+                            ));
+                            out.push_str(&format!(
+                                "        final ffi.Pointer<_UniFfiRustBuffer> {from_bytes_err_buf_ptr} = calloc<_UniFfiRustBuffer>();\n"
+                            ));
+                            out.push_str(&format!(
+                                "        {from_bytes_err_buf_ptr}.ref\n          ..capacity = {from_bytes_err_buf}.capacity\n          ..len = {from_bytes_err_buf}.len\n          ..data = {from_bytes_err_buf}.data;\n"
+                            ));
+                            out.push_str(&format!(
+                                "        rustRetBufferPtrs.add({from_bytes_err_buf_ptr});\n"
+                            ));
+                            out.push_str(&format!(
+                                "        throw StateError('UniFFI rustbuffer_from_bytes failed with status ${from_bytes_code}');\n"
+                            ));
                             out.push_str("      }\n");
                             out.push_str(&format!(
                                 "      (argBuf + {}).ref.u64 = {arg_name}RustBuffer.capacity;\n",
@@ -3616,32 +3636,50 @@ fn render_bound_methods(
                     None => out.push_str("      return;\n"),
                     Some(ret_type) => match &ffi_return_type {
                         FfiType::RustBuffer(_) => {
-                            let decode_expr = match ret_type {
+                            let decode_expr = match runtime_unwrapped_type(ret_type) {
+                                Type::String => "utf8.decode(retBytes)".to_string(),
+                                Type::Bytes => "retBytes".to_string(),
                                 Type::Record { name, .. } | Type::Enum { name, .. } => {
                                     format!("_uniffiDecode{}(retBytes)", to_upper_camel(name))
                                 }
                                 _ => {
-                                    let escaped_reason = reason.replace('\'', "\\'");
-                                    out.push_str(&format!(
-                                        "      throw UnsupportedError('{escaped_reason} ({})');\n",
-                                        function.name
-                                    ));
-                                    String::new()
+                                    render_uniffi_binary_read_expression(
+                                        ret_type,
+                                        "retReader",
+                                        enums,
+                                    )
                                 }
                             };
-                            if !decode_expr.is_empty() {
+                            out.push_str(
+                                "      final ffi.Pointer<_UniFfiRustBuffer> retBufPtr = calloc<_UniFfiRustBuffer>();\n",
+                            );
+                            out.push_str(
+                                "      retBufPtr.ref\n        ..capacity = (returnBuf + 0).ref.u64\n        ..len = (returnBuf + 1).ref.u64\n        ..data = (returnBuf + 2).ref.ptr.cast<ffi.Uint8>();\n",
+                            );
+                            out.push_str("      rustRetBufferPtrs.add(retBufPtr);\n");
+                            out.push_str(
+                                "      final Uint8List retBytes = retBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(retBufPtr.ref.data.asTypedList(retBufPtr.ref.len));\n",
+                            );
+                            if matches!(
+                                runtime_unwrapped_type(ret_type),
+                                Type::String
+                                    | Type::Bytes
+                                    | Type::Record { .. }
+                                    | Type::Enum { .. }
+                            ) {
+                                out.push_str(&format!("      final decodedValue = {decode_expr};\n"));
+                            } else {
                                 out.push_str(
-                                    "      final ffi.Pointer<_UniFfiRustBuffer> retBufPtr = calloc<_UniFfiRustBuffer>();\n",
+                                    "      final _UniFfiBinaryReader retReader = _UniFfiBinaryReader(retBytes);\n",
                                 );
+                                out.push_str(&format!("      final decodedValue = {decode_expr};\n"));
+                                out.push_str("      if (!retReader.isDone) {\n");
                                 out.push_str(
-                                    "      retBufPtr.ref\n        ..capacity = (returnBuf + 0).ref.u64\n        ..len = (returnBuf + 1).ref.u64\n        ..data = (returnBuf + 2).ref.ptr.cast<ffi.Uint8>();\n",
+                                    "        throw StateError('extra bytes remaining while decoding UniFFI ffibuffer return payload');\n",
                                 );
-                                out.push_str("      rustRetBufferPtrs.add(retBufPtr);\n");
-                                out.push_str(
-                                    "      final Uint8List retBytes = retBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(retBufPtr.ref.data.asTypedList(retBufPtr.ref.len));\n",
-                                );
-                                out.push_str(&format!("      return {decode_expr};\n"));
+                                out.push_str("      }\n");
                             }
+                            out.push_str("      return decodedValue;\n");
                         }
                         _ => {
                             let Some(union_field) =
