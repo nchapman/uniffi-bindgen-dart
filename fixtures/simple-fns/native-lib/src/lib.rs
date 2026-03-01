@@ -2014,6 +2014,17 @@ pub extern "C" fn counter_uniffi_trait_ne(handle: u64, other: u64) -> bool {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn counter_uniffi_trait_ord_cmp(handle: u64, other: u64) -> i8 {
+    use std::cmp::Ordering;
+
+    match counter_display_text(handle).cmp(&counter_display_text(other)) {
+        Ordering::Less => -1,
+        Ordering::Equal => 0,
+        Ordering::Greater => 1,
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn counter_async_describe(handle: u64) -> u64 {
     let value = COUNTERS
         .lock()

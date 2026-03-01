@@ -159,6 +159,7 @@ struct UdlObjectTraitMethods {
     hash: Option<String>,
     eq: Option<String>,
     ne: Option<String>,
+    ord_cmp: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -371,6 +372,7 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
                     Some("hash") => trait_methods.hash = Some(method.name.clone()),
                     Some("eq") => trait_methods.eq = Some(method.name.clone()),
                     Some("ne") => trait_methods.ne = Some(method.name.clone()),
+                    Some("ord_cmp") => trait_methods.ord_cmp = Some(method.name.clone()),
                     _ => {}
                 }
             }
@@ -433,6 +435,21 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
                     docstring: None,
                     is_async: false,
                     return_type: Some(Type::Boolean),
+                    throws_type: None,
+                    args: vec![UdlArg {
+                        name: "other".to_string(),
+                        type_: Type::UInt64,
+                        docstring: None,
+                    }],
+                });
+            }
+            if traits_for_object.iter().any(|t| t == "Ord") && trait_methods.ord_cmp.is_none() {
+                trait_methods.ord_cmp = Some("uniffi_trait_ord_cmp".to_string());
+                methods.push(UdlObjectMethod {
+                    name: "uniffi_trait_ord_cmp".to_string(),
+                    docstring: None,
+                    is_async: false,
+                    return_type: Some(Type::Int8),
                     throws_type: None,
                     args: vec![UdlArg {
                         name: "other".to_string(),
@@ -3928,7 +3945,13 @@ fn render_object_classes(
             "final class {token_name} {{\n  const {token_name}(this.free, this.handle);\n  final void Function(int) free;\n  final int handle;\n}}\n\n"
         ));
         out.push_str(&render_doc_comment(object.docstring.as_deref(), ""));
-        out.push_str(&format!("final class {object_name} {{\n"));
+        if object.trait_methods.ord_cmp.is_some() {
+            out.push_str(&format!(
+                "final class {object_name} implements Comparable<{object_name}> {{\n"
+            ));
+        } else {
+            out.push_str(&format!("final class {object_name} {{\n"));
+        }
         out.push_str(&format!("  {object_name}._(this._ffi, this._handle) {{\n"));
         out.push_str(&format!(
             "    _finalizer.attach(this, {token_name}(_ffi.{free_field}, _handle), detach: this);\n"
@@ -4145,6 +4168,18 @@ fn render_object_classes(
             out.push_str("    if (_closed || other._closed) {\n");
             out.push_str("      return false;\n");
             out.push_str("    }\n");
+            out.push_str(&format!(
+                "    return _ffi.{invoke_name}(_handle, other._handle);\n"
+            ));
+            out.push_str("  }\n\n");
+        }
+
+        if let Some(ord_cmp_method) = object.trait_methods.ord_cmp.as_deref() {
+            let invoke_name = format!("{}Invoke{}", object_lower, to_upper_camel(ord_cmp_method));
+            out.push_str("  @override\n");
+            out.push_str(&format!("  int compareTo({object_name} other) {{\n"));
+            out.push_str("    _ensureOpen();\n");
+            out.push_str("    other._ensureOpen();\n");
             out.push_str(&format!(
                 "    return _ffi.{invoke_name}(_handle, other._handle);\n"
             ));
@@ -5256,6 +5291,7 @@ fn uniffi_trait_method_kind(name: &str) -> Option<&'static str> {
         "uniffitraithash" => Some("hash"),
         "uniffitraiteq" | "uniffitraiteqeq" => Some("eq"),
         "uniffitraitne" => Some("ne"),
+        "uniffitraitordcmp" => Some("ord_cmp"),
         _ => None,
     }
 }
@@ -5830,7 +5866,7 @@ interface Outcome {
   Failure(i32 code, string reason);
 };
 
-[Traits=(Display, Hash, Eq)]
+[Traits=(Display, Hash, Eq, Ord)]
 interface Counter {
   constructor();
   u32 apply_adder_with(Adder adder, u32 left, u32 right);
@@ -6251,7 +6287,7 @@ interface Outcome {
   Failure(i32 code, string reason);
 };
 
-[Traits=(Display, Hash, Eq)]
+[Traits=(Display, Hash, Eq, Ord)]
 interface Counter {
   constructor(u32 initial);
   [Name=with_person]
@@ -6289,7 +6325,7 @@ interface Counter {
 
         generate_bindings(&args).expect("generate");
         let content = fs::read_to_string(out_dir.join("objects.dart")).expect("read generated");
-        assert!(content.contains("final class Counter {"));
+        assert!(content.contains("final class Counter implements Comparable<Counter> {"));
         assert!(content.contains("Counter._(this._ffi, this._handle) {"));
         assert!(content.contains("void close() {"));
         assert!(content.contains("static Counter withPerson(Person seed) {"));
@@ -6311,7 +6347,11 @@ interface Counter {
         assert!(content.contains("String toString() {"));
         assert!(content.contains("int get hashCode {"));
         assert!(content.contains("bool operator ==(Object other) {"));
+        assert!(content.contains("int compareTo(Counter other) {"));
         assert!(content.contains("return _ffi.counterInvokeUniffiTraitEq(_handle, other._handle);"));
+        assert!(
+            content.contains("return _ffi.counterInvokeUniffiTraitOrdCmp(_handle, other._handle);")
+        );
         assert!(content.contains("return _ffi.counterInvokeUniffiTraitDisplay(_handle);"));
         assert!(content.contains("return _ffi.counterInvokeUniffiTraitHash(_handle);"));
         assert!(!content.contains("uniffiTraitDisplay() {"));

@@ -263,7 +263,7 @@ void main() {
     expect(contents, contains('final class MathErrorExceptionDivisionByZero extends MathErrorException {'));
     expect(contents, contains('final class MathErrorExceptionNegativeInput extends MathErrorException {'));
     expect(contents, contains('MathErrorException _decodeMathErrorException(Object? raw) {'));
-    expect(contents, contains('final class Counter {'));
+    expect(contents, contains('final class Counter implements Comparable<Counter> {'));
     expect(contents, contains('static Counter create(int initial) {'));
     expect(contents, contains('static Counter withPerson(Person seed) {'));
     expect(contents, contains('void addValue(int amount) {'));
@@ -323,7 +323,9 @@ void main() {
     expect(contents, contains('String toString() {'));
     expect(contents, contains('int get hashCode {'));
     expect(contents, contains('bool operator ==(Object other) {'));
+    expect(contents, contains('int compareTo(Counter other) {'));
     expect(contents, contains('return _ffi.counterInvokeUniffiTraitEq(_handle, other._handle);'));
+    expect(contents, contains('return _ffi.counterInvokeUniffiTraitOrdCmp(_handle, other._handle);'));
     expect(contents, contains('return _ffi.counterInvokeUniffiTraitDisplay(_handle);'));
     expect(contents, contains('return _ffi.counterInvokeUniffiTraitHash(_handle);'));
     expect(contents, contains('final class OutcomeSuccess extends Outcome {'));
@@ -616,8 +618,11 @@ void main() {
     final equalCounter = bindings.counterCreateNew(5);
     equalCounter.setLabel('alpha');
     expect(counter == equalCounter, isTrue);
+    expect(counter.compareTo(equalCounter), 0);
     equalCounter.setLabel('beta');
     expect(counter == equalCounter, isFalse);
+    expect(counter.compareTo(equalCounter), lessThan(0));
+    expect(equalCounter.compareTo(counter), greaterThan(0));
     equalCounter.close();
     expect(await counter.asyncDescribe(), 'async:counter:5:alpha');
     expect(await counter.asyncValue(), 5);

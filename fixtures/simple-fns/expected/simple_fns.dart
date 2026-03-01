@@ -4358,6 +4358,12 @@ class SimpleFnsBindings {
   bool counterInvokeUniffiTraitNe(int handle, int other) {
     return _counterUniffiTraitNe(handle, other);
   }
+
+  late final int Function(int handle, int other) _counterUniffiTraitOrdCmp = _lib.lookupFunction<ffi.Int8 Function(ffi.Uint64 handle, ffi.Uint64 other), int Function(int handle, int other)>('counter_uniffi_trait_ord_cmp');
+
+  int counterInvokeUniffiTraitOrdCmp(int handle, int other) {
+    return _counterUniffiTraitOrdCmp(handle, other);
+  }
 }
 
 final class _CounterFinalizerToken {
@@ -4366,7 +4372,7 @@ final class _CounterFinalizerToken {
   final int handle;
 }
 
-final class Counter {
+final class Counter implements Comparable<Counter> {
   Counter._(this._ffi, this._handle) {
     _finalizer.attach(this, _CounterFinalizerToken(_ffi._counterFree, _handle), detach: this);
   }
@@ -4605,6 +4611,13 @@ final class Counter {
       return false;
     }
     return _ffi.counterInvokeUniffiTraitEq(_handle, other._handle);
+  }
+
+  @override
+  int compareTo(Counter other) {
+    _ensureOpen();
+    other._ensureOpen();
+    return _ffi.counterInvokeUniffiTraitOrdCmp(_handle, other._handle);
   }
 
 }
