@@ -513,16 +513,7 @@ void main() {
       contains(
           "throw UnsupportedError('runtime invocation for this UniFFI ABI (RustCallStatus out-arg) is not implemented yet (methodpoint_async_label)');"),
     );
-    expect(
-      contents,
-      contains(
-          "throw UnsupportedError('runtime invocation for this UniFFI ABI (RustCallStatus out-arg) is not implemented yet (methodstate_checked_code)');"),
-    );
-    expect(
-      contents,
-      contains(
-          "throw UnsupportedError('runtime invocation for this UniFFI ABI (RustCallStatus out-arg) is not implemented yet (methodoutcome_checked_value)');"),
-    );
+    expect(contents, contains('_uniffiLiftMethodErrorException(Uint8List bytes)'));
     expect(contents,
         contains('uniffi_ffibuffer_uniffi_record_enum_methods_fn_func_method_point_new'));
     expect(contents,
@@ -582,13 +573,25 @@ void main() {
     expect(outcome.score(), 11);
 
     expect(
-      () => point.checkedDivide(3),
+      point.checkedDivide(3),
+      3,
+    );
+    expect(
+      () => point.checkedDivide(0),
+      throwsA(isA<rem.MethodErrorExceptionDivisionByZero>()),
+    );
+    expect(
+      () => busy.checkedCode(false),
       throwsA(
-        isA<UnsupportedError>().having(
-          (e) => e.message,
-          'message',
-          contains('RustCallStatus out-arg'),
-        ),
+        isA<rem.MethodErrorExceptionNegativeInput>()
+            .having((e) => e.value, 'value', -9),
+      ),
+    );
+    expect(
+      () => rem.MethodOutcomeErr(message: 'x').checkedValue(),
+      throwsA(
+        isA<rem.MethodErrorExceptionNegativeInput>()
+            .having((e) => e.value, 'value', -1),
       ),
     );
   });

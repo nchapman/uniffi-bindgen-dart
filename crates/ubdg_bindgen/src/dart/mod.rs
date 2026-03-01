@@ -809,7 +809,7 @@ fn is_ffibuffer_supported_ffi_type(type_: &FfiType) -> bool {
 
 #[allow(dead_code)]
 fn is_ffibuffer_eligible_function(function: &UdlFunction) -> bool {
-    function.ffi_symbol.is_some() && !function.is_async && function.throws_type.is_none()
+    function.ffi_symbol.is_some() && !function.is_async
 }
 
 fn ffibuffer_symbol_name(ffi_symbol: &str) -> String {
@@ -892,11 +892,11 @@ fn ffibuffer_ffi_type_from_uniffi_type(type_: &Type) -> Option<FfiType> {
 }
 
 fn is_ffibuffer_eligible_object_member(method: &UdlObjectMethod) -> bool {
-    method.ffi_symbol.is_some() && !method.is_async && method.throws_type.is_none()
+    method.ffi_symbol.is_some() && !method.is_async
 }
 
 fn is_ffibuffer_eligible_object_constructor(ctor: &UdlObjectConstructor) -> bool {
-    ctor.ffi_symbol.is_some() && !ctor.is_async && ctor.throws_type.is_none()
+    ctor.ffi_symbol.is_some() && !ctor.is_async
 }
 
 fn parse_udl_interface_traits(udl: &str) -> std::collections::HashMap<String, Vec<String>> {
@@ -1354,7 +1354,12 @@ fn render_dart_scaffold(
         out.push_str("const int _rustFuturePollReady = 0;\n");
         out.push_str("const int _rustFuturePollWake = 1;\n\n");
     }
-    out.push_str(&render_data_models(records, enums, callback_interfaces));
+    out.push_str(&render_data_models(
+        records,
+        enums,
+        callback_interfaces,
+        has_runtime_unsupported,
+    ));
     if has_runtime_unsupported {
         out.push_str(&render_uniffi_binary_helpers(records, enums));
     }
@@ -1575,6 +1580,7 @@ fn render_data_models(
     records: &[UdlRecord],
     enums: &[UdlEnum],
     callback_interfaces: &[UdlCallbackInterface],
+    emit_uniffi_error_lift_helpers: bool,
 ) -> String {
     let mut out = String::new();
 
@@ -1898,6 +1904,37 @@ fn render_data_models(
                     ));
                 }
             }
+            out.push_str("}\n\n");
+        }
+        if emit_uniffi_error_lift_helpers {
+            out.push_str(&format!(
+                "{exception_name} _uniffiLift{exception_name}(Uint8List bytes) {{\n"
+            ));
+            out.push_str(&format!(
+                "  final {enum_name} value = _uniffiDecode{enum_name}(bytes);\n"
+            ));
+            for variant in &enum_.variants {
+                let variant_name = to_upper_camel(&variant.name);
+                let variant_class = format!("{enum_name}{variant_name}");
+                let variant_exception = format!("{exception_name}{variant_name}");
+                if variant.fields.is_empty() {
+                    out.push_str(&format!(
+                        "  if (value is {variant_class}) return const {variant_exception}();\n"
+                    ));
+                } else {
+                    out.push_str(&format!("  if (value is {variant_class}) {{\n"));
+                    out.push_str(&format!("    return {variant_exception}(\n"));
+                    for field in &variant.fields {
+                        let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
+                        out.push_str(&format!("      {field_name}: value.{field_name},\n"));
+                    }
+                    out.push_str("    );\n");
+                    out.push_str("  }\n");
+                }
+            }
+            out.push_str(&format!(
+                "  throw StateError('Unknown {enum_name} error variant while lifting exception: $value');\n"
+            ));
             out.push_str("}\n\n");
         }
     }
@@ -3525,9 +3562,16 @@ fn render_bound_methods(
                                     offset, arg_name
                                 ));
                             } else {
+                                let value_expr = if union_field == "i8"
+                                    && matches!(runtime_unwrapped_type(&arg.type_), Type::Boolean)
+                                {
+                                    format!("{arg_name} ? 1 : 0")
+                                } else {
+                                    arg_name.clone()
+                                };
                                 out.push_str(&format!(
                                     "      (argBuf + {}).ref.{} = {};\n",
-                                    offset, union_field, arg_name
+                                    offset, union_field, value_expr
                                 ));
                             }
                         }
@@ -3547,6 +3591,22 @@ fn render_bound_methods(
                     return_ffi_elements + 3
                 ));
                 out.push_str("        rustRetBufferPtrs.add(errBufPtr);\n");
+                if let Some(throws_name) = function
+                    .throws_type
+                    .as_ref()
+                    .and_then(enum_name_from_type)
+                    .map(to_upper_camel)
+                {
+                    let exception_name = format!("{throws_name}Exception");
+                    out.push_str("        if (statusCode == _uniFfiRustCallStatusError) {\n");
+                    out.push_str(
+                        "          final Uint8List errBytes = errBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(errBufPtr.ref.data.asTypedList(errBufPtr.ref.len));\n",
+                    );
+                    out.push_str(&format!(
+                        "          throw _uniffiLift{exception_name}(errBytes);\n"
+                    ));
+                    out.push_str("        }\n");
+                }
                 out.push_str(
                     "        throw StateError('UniFFI ffibuffer call failed with status $statusCode');\n",
                 );
@@ -4748,8 +4808,17 @@ fn render_bound_methods(
                                         offset, arg_name
                                     ));
                                 } else {
+                                    let value_expr = if union_field == "i8"
+                                        && matches!(
+                                            runtime_unwrapped_type(&arg.type_),
+                                            Type::Boolean
+                                        ) {
+                                        format!("{arg_name} ? 1 : 0")
+                                    } else {
+                                        arg_name.clone()
+                                    };
                                     out.push_str(&format!(
-                                        "      (argBuf + {}).ref.{union_field} = {arg_name};\n",
+                                        "      (argBuf + {}).ref.{union_field} = {value_expr};\n",
                                         offset
                                     ));
                                 }
@@ -4769,6 +4838,22 @@ fn render_bound_methods(
                         return_ffi_elements + 3
                     ));
                     out.push_str("        rustRetBufferPtrs.add(errBufPtr);\n");
+                    if let Some(throws_name) = ctor
+                        .throws_type
+                        .as_ref()
+                        .and_then(enum_name_from_type)
+                        .map(to_upper_camel)
+                    {
+                        let exception_name = format!("{throws_name}Exception");
+                        out.push_str("        if (statusCode == _uniFfiRustCallStatusError) {\n");
+                        out.push_str(
+                            "          final Uint8List errBytes = errBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(errBufPtr.ref.data.asTypedList(errBufPtr.ref.len));\n",
+                        );
+                        out.push_str(&format!(
+                            "          throw _uniffiLift{exception_name}(errBytes);\n"
+                        ));
+                        out.push_str("        }\n");
+                    }
                     out.push_str(
                         "        throw StateError('UniFFI ffibuffer call failed with status $statusCode');\n",
                     );
@@ -5203,8 +5288,17 @@ fn render_bound_methods(
                                         offset, arg_name
                                     ));
                                 } else {
+                                    let value_expr = if union_field == "i8"
+                                        && matches!(
+                                            runtime_unwrapped_type(&arg.type_),
+                                            Type::Boolean
+                                        ) {
+                                        format!("{arg_name} ? 1 : 0")
+                                    } else {
+                                        arg_name.clone()
+                                    };
                                     out.push_str(&format!(
-                                        "      (argBuf + {}).ref.{union_field} = {arg_name};\n",
+                                        "      (argBuf + {}).ref.{union_field} = {value_expr};\n",
                                         offset
                                     ));
                                 }
@@ -5225,6 +5319,22 @@ fn render_bound_methods(
                         return_ffi_elements + 3
                     ));
                     out.push_str("        rustRetBufferPtrs.add(errBufPtr);\n");
+                    if let Some(throws_name) = method
+                        .throws_type
+                        .as_ref()
+                        .and_then(enum_name_from_type)
+                        .map(to_upper_camel)
+                    {
+                        let exception_name = format!("{throws_name}Exception");
+                        out.push_str("        if (statusCode == _uniFfiRustCallStatusError) {\n");
+                        out.push_str(
+                            "          final Uint8List errBytes = errBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(errBufPtr.ref.data.asTypedList(errBufPtr.ref.len));\n",
+                        );
+                        out.push_str(&format!(
+                            "          throw _uniffiLift{exception_name}(errBytes);\n"
+                        ));
+                        out.push_str("        }\n");
+                    }
                     out.push_str(
                         "        throw StateError('UniFFI ffibuffer call failed with status $statusCode');\n",
                     );
@@ -8917,7 +9027,7 @@ interface Outcome {
     }
 
     #[test]
-    fn ffibuffer_eligibility_rejects_async_and_throwing_functions() {
+    fn ffibuffer_eligibility_rejects_async_functions_and_allows_throwing_functions() {
         let async_function = UdlFunction {
             name: "methodpoint_async_label".to_string(),
             ffi_symbol: Some(
@@ -8954,7 +9064,7 @@ interface Outcome {
             }),
             args: vec![],
         };
-        assert!(!is_ffibuffer_eligible_function(&throwing_function));
+        assert!(is_ffibuffer_eligible_function(&throwing_function));
     }
 
     #[test]
