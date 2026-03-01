@@ -378,7 +378,7 @@ fn render_dart_scaffold(
     enums: &[UdlEnum],
 ) -> String {
     let needs_callback_runtime =
-        has_runtime_callback_support(functions, callback_interfaces, records, enums);
+        has_runtime_callback_support(functions, objects, callback_interfaces, records, enums);
     let needs_async_rust_future =
         has_runtime_async_rust_future_support(functions, objects, records, enums);
     let needs_rust_call_status = needs_async_rust_future || needs_callback_runtime;
@@ -512,6 +512,7 @@ fn render_dart_scaffold(
     out.push_str(&render_callback_interfaces(callback_interfaces));
     out.push_str(&render_callback_bridges(
         functions,
+        objects,
         callback_interfaces,
         records,
         enums,
@@ -543,6 +544,7 @@ fn render_dart_scaffold(
     out.push_str("}\n");
     out.push_str(&render_object_classes(
         objects,
+        callback_interfaces,
         ffi_class_name,
         records,
         enums,
@@ -1091,11 +1093,18 @@ fn render_callback_interfaces(callback_interfaces: &[UdlCallbackInterface]) -> S
 
 fn render_callback_bridges(
     functions: &[UdlFunction],
+    objects: &[UdlObject],
     callback_interfaces: &[UdlCallbackInterface],
     records: &[UdlRecord],
     enums: &[UdlEnum],
 ) -> String {
-    let used = callback_interfaces_used_for_runtime(functions, callback_interfaces, records, enums);
+    let used = callback_interfaces_used_for_runtime(
+        functions,
+        objects,
+        callback_interfaces,
+        records,
+        enums,
+    );
     if used.is_empty() {
         return String::new();
     }
@@ -1203,10 +1212,7 @@ fn render_callback_bridges(
                 ffi_args.push(format!("{arg_native} {arg_name}"));
                 dart_args.push(format!("{arg_dart} {arg_name}"));
                 callback_args.push(render_callback_arg_decode_expr(
-                    &arg.type_,
-                    &arg_name,
-                    records,
-                    enums,
+                    &arg.type_, &arg_name, records, enums,
                 ));
             }
             if let Some(return_type) = method.return_type.as_ref() {
@@ -1295,8 +1301,13 @@ fn render_bound_methods(
     enums: &[UdlEnum],
 ) -> String {
     let mut out = String::new();
-    let callback_runtime_interfaces =
-        callback_interfaces_used_for_runtime(functions, callback_interfaces, records, enums);
+    let callback_runtime_interfaces = callback_interfaces_used_for_runtime(
+        functions,
+        objects,
+        callback_interfaces,
+        records,
+        enums,
+    );
     let needs_async_rust_future =
         has_runtime_async_rust_future_support(functions, objects, records, enums);
     let needs_string_free = needs_async_rust_future
@@ -2323,17 +2334,18 @@ fn render_bound_methods(
         }
 
         for method in &object.methods {
+            let is_callback_supported =
+                is_runtime_callback_compatible_method(method, callback_interfaces, records, enums);
             let supported_return = method
                 .return_type
                 .as_ref()
                 .map(|t| is_runtime_ffi_compatible_type(t, records, enums))
                 .unwrap_or(true);
-            if !supported_return
-                || !method
-                    .args
-                    .iter()
-                    .all(|a| is_runtime_ffi_compatible_type(&a.type_, records, enums))
-            {
+            let supports_runtime_args = method
+                .args
+                .iter()
+                .all(|a| is_runtime_ffi_compatible_type(&a.type_, records, enums));
+            if !is_callback_supported && (!supported_return || !supports_runtime_args) {
                 continue;
             }
             let method_camel = to_upper_camel(&method.name);
@@ -2351,30 +2363,69 @@ fn render_bound_methods(
             let mut signature_compatible = true;
             for arg in &method.args {
                 let arg_name = safe_dart_identifier(&to_lower_camel(&arg.name));
-                let Some(native_ty) = map_runtime_native_ffi_type(&arg.type_, records, enums)
-                else {
-                    signature_compatible = false;
-                    break;
-                };
-                let Some(dart_ffi_ty) = map_runtime_dart_ffi_type(&arg.type_, records, enums)
-                else {
-                    signature_compatible = false;
-                    break;
-                };
-                native_args.push(format!("{native_ty} {arg_name}"));
-                dart_ffi_args.push(format!("{dart_ffi_ty} {arg_name}"));
                 dart_args.push(format!(
                     "{} {arg_name}",
                     map_uniffi_type_to_dart(&arg.type_)
                 ));
-                append_runtime_arg_marshalling(
-                    &arg_name,
-                    &arg.type_,
-                    enums,
-                    &mut pre_call,
-                    &mut post_call,
-                    &mut call_args,
-                );
+                if is_callback_supported {
+                    if let Some(callback_name) = callback_interface_name_from_type(&arg.type_) {
+                        let init_done_field = callback_init_done_field_name(callback_name);
+                        let bridge_name = callback_bridge_class_name(callback_name);
+                        let handle_name = format!("{arg_name}Handle");
+                        native_args.push(format!("ffi.Uint64 {arg_name}"));
+                        dart_ffi_args.push(format!("int {arg_name}"));
+                        pre_call.push(format!("    {init_done_field};\n"));
+                        pre_call.push(format!(
+                            "    final int {handle_name} = {bridge_name}.instance.register({arg_name});\n"
+                        ));
+                        post_call.push(format!(
+                            "    {bridge_name}.instance.release({handle_name});\n"
+                        ));
+                        call_args.push(handle_name);
+                        continue;
+                    }
+                    let Some(native_ty) = map_runtime_native_ffi_type(&arg.type_, records, enums)
+                    else {
+                        signature_compatible = false;
+                        break;
+                    };
+                    let Some(dart_ffi_ty) = map_runtime_dart_ffi_type(&arg.type_, records, enums)
+                    else {
+                        signature_compatible = false;
+                        break;
+                    };
+                    native_args.push(format!("{native_ty} {arg_name}"));
+                    dart_ffi_args.push(format!("{dart_ffi_ty} {arg_name}"));
+                    append_runtime_arg_marshalling(
+                        &arg_name,
+                        &arg.type_,
+                        enums,
+                        &mut pre_call,
+                        &mut post_call,
+                        &mut call_args,
+                    );
+                } else {
+                    let Some(native_ty) = map_runtime_native_ffi_type(&arg.type_, records, enums)
+                    else {
+                        signature_compatible = false;
+                        break;
+                    };
+                    let Some(dart_ffi_ty) = map_runtime_dart_ffi_type(&arg.type_, records, enums)
+                    else {
+                        signature_compatible = false;
+                        break;
+                    };
+                    native_args.push(format!("{native_ty} {arg_name}"));
+                    dart_ffi_args.push(format!("{dart_ffi_ty} {arg_name}"));
+                    append_runtime_arg_marshalling(
+                        &arg_name,
+                        &arg.type_,
+                        enums,
+                        &mut pre_call,
+                        &mut post_call,
+                        &mut call_args,
+                    );
+                }
             }
             if !signature_compatible {
                 continue;
@@ -2833,6 +2884,7 @@ fn render_bound_methods(
 
 fn render_object_classes(
     objects: &[UdlObject],
+    callback_interfaces: &[UdlCallbackInterface],
     ffi_class_name: &str,
     records: &[UdlRecord],
     enums: &[UdlEnum],
@@ -2929,17 +2981,18 @@ fn render_object_classes(
         }
 
         for method in &object.methods {
+            let is_callback_supported =
+                is_runtime_callback_compatible_method(method, callback_interfaces, records, enums);
             let supported_return = method
                 .return_type
                 .as_ref()
                 .map(|t| is_runtime_ffi_compatible_type(t, records, enums))
                 .unwrap_or(true);
-            if !supported_return
-                || !method
-                    .args
-                    .iter()
-                    .all(|a| is_runtime_ffi_compatible_type(&a.type_, records, enums))
-            {
+            let supports_runtime_args = method
+                .args
+                .iter()
+                .all(|a| is_runtime_ffi_compatible_type(&a.type_, records, enums));
+            if !is_callback_supported && (!supported_return || !supports_runtime_args) {
                 continue;
             }
             let method_name = safe_dart_identifier(&to_lower_camel(&method.name));
@@ -2998,8 +3051,6 @@ fn render_object_classes(
         out.push_str("}\n");
     }
 
-    // keep these params intentionally available for feature-parity expansion.
-    let _ = (records, enums);
     out
 }
 
@@ -3097,6 +3148,7 @@ fn render_function_stubs(
 
 fn has_runtime_callback_support(
     functions: &[UdlFunction],
+    objects: &[UdlObject],
     callback_interfaces: &[UdlCallbackInterface],
     records: &[UdlRecord],
     enums: &[UdlEnum],
@@ -3104,6 +3156,11 @@ fn has_runtime_callback_support(
     functions
         .iter()
         .any(|f| is_runtime_callback_compatible_function(f, callback_interfaces, records, enums))
+        || objects.iter().any(|o| {
+            o.methods.iter().any(|m| {
+                is_runtime_callback_compatible_method(m, callback_interfaces, records, enums)
+            })
+        })
 }
 
 fn is_runtime_callback_compatible_function(
@@ -3145,8 +3202,48 @@ fn is_runtime_callback_compatible_function(
     saw_callback
 }
 
+fn is_runtime_callback_compatible_method(
+    method: &UdlObjectMethod,
+    callback_interfaces: &[UdlCallbackInterface],
+    records: &[UdlRecord],
+    enums: &[UdlEnum],
+) -> bool {
+    if method.is_async || method.throws_type.is_some() {
+        return false;
+    }
+    let return_supported = method
+        .return_type
+        .as_ref()
+        .map(is_runtime_callback_function_return_compatible_type)
+        .unwrap_or(true);
+    if !return_supported {
+        return false;
+    }
+    let mut saw_callback = false;
+    for arg in &method.args {
+        if let Some(callback_name) = callback_interface_name_from_type(&arg.type_) {
+            saw_callback = true;
+            let Some(callback_interface) = callback_interfaces
+                .iter()
+                .find(|cb| cb.name == callback_name)
+            else {
+                return false;
+            };
+            if !is_runtime_callback_interface_compatible(callback_interface, records, enums) {
+                return false;
+            }
+            continue;
+        }
+        if !is_runtime_ffi_compatible_type(&arg.type_, records, enums) {
+            return false;
+        }
+    }
+    saw_callback
+}
+
 fn callback_interfaces_used_for_runtime<'a>(
     functions: &[UdlFunction],
+    objects: &[UdlObject],
     callback_interfaces: &'a [UdlCallbackInterface],
     records: &[UdlRecord],
     enums: &[UdlEnum],
@@ -3164,6 +3261,19 @@ fn callback_interfaces_used_for_runtime<'a>(
                     ) && function.args.iter().any(|arg| {
                         callback_interface_name_from_type(&arg.type_)
                             .is_some_and(|name| name == callback_interface.name)
+                    })
+                })
+                || objects.iter().any(|object| {
+                    object.methods.iter().any(|method| {
+                        is_runtime_callback_compatible_method(
+                            method,
+                            callback_interfaces,
+                            records,
+                            enums,
+                        ) && method.args.iter().any(|arg| {
+                            callback_interface_name_from_type(&arg.type_)
+                                .is_some_and(|name| name == callback_interface.name)
+                        })
                     })
                 })
         })
@@ -3233,7 +3343,9 @@ fn is_runtime_callback_method_type_compatible(
     is_runtime_callback_function_return_compatible_type(type_)
         || is_runtime_string_type(type_)
         || is_runtime_optional_string_type(type_)
-        || records.iter().any(|r| record_name_from_type(type_) == Some(r.name.as_str()))
+        || records
+            .iter()
+            .any(|r| record_name_from_type(type_) == Some(r.name.as_str()))
         || is_runtime_enum_type(type_, enums)
 }
 
@@ -3313,15 +3425,19 @@ fn render_callback_return_encode_expr(
         Type::Optional { inner_type } if is_runtime_string_type(inner_type) => {
             format!("{value_expr} == null ? ffi.nullptr : {value_expr}.toNativeUtf8()")
         }
-        Type::Record { .. } if records
-            .iter()
-            .any(|r| record_name_from_type(type_) == Some(r.name.as_str())) =>
+        Type::Record { .. }
+            if records
+                .iter()
+                .any(|r| record_name_from_type(type_) == Some(r.name.as_str())) =>
         {
             format!("jsonEncode({value_expr}.toJson()).toNativeUtf8()")
         }
         Type::Enum { .. } if is_runtime_enum_type(type_, enums) => {
             let enum_name = enum_name_from_type(type_).unwrap_or("Enum");
-            format!("_encode{}({value_expr}).toNativeUtf8()", to_upper_camel(enum_name))
+            format!(
+                "_encode{}({value_expr}).toNativeUtf8()",
+                to_upper_camel(enum_name)
+            )
         }
         Type::Timestamp => format!("{value_expr}.toUtc().microsecondsSinceEpoch"),
         Type::Duration => format!("{value_expr}.inMicroseconds"),
@@ -4061,6 +4177,11 @@ interface Outcome {
   Success(string message);
   Failure(i32 code, string reason);
 };
+
+interface Counter {
+  constructor();
+  u32 apply_adder_with(Adder adder, u32 left, u32 right);
+};
 "#,
         )
         .expect("write source");
@@ -4091,6 +4212,10 @@ interface Outcome {
         assert!(content.contains("final class _FormatterCallbackBridge {"));
         assert!(content
             .contains("int applyFormatter(Formatter formatter, String? prefix, Person person, Outcome outcome) {"));
+        assert!(content.contains(
+            "int counterInvokeApplyAdderWith(int handle, Adder adder, int left, int right) {"
+        ));
+        assert!(content.contains("int applyAdderWith(Adder adder, int left, int right) {"));
     }
 
     #[test]

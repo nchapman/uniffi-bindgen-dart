@@ -1092,6 +1092,18 @@ class SimpleFnsBindings {
     _counterAddValue(handle, amount);
   }
 
+  late final int Function(int handle, int adder, int left, int right) _counterApplyAdderWith = _lib.lookupFunction<ffi.Uint32 Function(ffi.Uint64 handle, ffi.Uint64 adder, ffi.Uint32 left, ffi.Uint32 right), int Function(int handle, int adder, int left, int right)>('counter_apply_adder_with');
+
+  int counterInvokeApplyAdderWith(int handle, Adder adder, int left, int right) {
+    _adderCallbackInitDone;
+    final int adderHandle = _AdderCallbackBridge.instance.register(adder);
+    try {
+    return _counterApplyAdderWith(handle, adderHandle, left, right);
+    } finally {
+    _AdderCallbackBridge.instance.release(adderHandle);
+    }
+  }
+
   late final int Function(int handle) _counterAsyncDescribe = _lib.lookupFunction<ffi.Uint64 Function(ffi.Uint64 handle), int Function(int handle)>('counter_async_describe');
   late final void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData) _counterAsyncDescribeRustFuturePoll = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, ffi.Uint64 callbackData), void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData)>('rust_future_poll_string');
   late final void Function(int handle) _counterAsyncDescribeRustFutureCancel = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_cancel_string');
@@ -1519,6 +1531,11 @@ final class Counter {
   void addValue(int amount) {
     _ensureOpen();
     _ffi.counterInvokeAddValue(_handle, amount);
+  }
+
+  int applyAdderWith(Adder adder, int left, int right) {
+    _ensureOpen();
+    return _ffi.counterInvokeApplyAdderWith(_handle, adder, left, right);
   }
 
   Future<String> asyncDescribe() {

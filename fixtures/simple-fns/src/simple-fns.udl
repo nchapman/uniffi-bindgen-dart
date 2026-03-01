@@ -72,6 +72,7 @@ interface Counter {
   constructor(u32 initial);
   [Name=with_person]
   constructor(Person seed);
+  u32 apply_adder_with(Adder adder, u32 left, u32 right);
   void add_value(u32 amount);
   u32 current_value();
   void set_label(string label);

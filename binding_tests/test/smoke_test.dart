@@ -144,6 +144,11 @@ void main() {
     expect(contents, contains('static Counter create(int initial) {'));
     expect(contents, contains('static Counter withPerson(Person seed) {'));
     expect(contents, contains('void addValue(int amount) {'));
+    expect(contents, contains('int applyAdderWith(Adder adder, int left, int right) {'));
+    expect(
+      contents,
+      contains('int counterInvokeApplyAdderWith(int handle, Adder adder, int left, int right) {'),
+    );
     expect(contents, contains('int currentValue() {'));
     expect(contents, contains('void setLabel(String label) {'));
     expect(contents, contains('String maybeLabel(String? suffix) {'));
@@ -270,6 +275,7 @@ void main() {
     expect(counter.currentValue(), 10);
     counter.addValue(5);
     expect(counter.currentValue(), 15);
+    expect(counter.applyAdderWith(const _TestAdder(1), 2, 3), 21);
     expect(counter.divideBy(3), 5);
     expect(counter.currentValue(), 5);
     counter.setLabel('alpha');
@@ -448,6 +454,9 @@ void main() {
     expect(isEven(11), isFalse);
     expect(scale(1.5, 3.0), closeTo(4.5, 0.000001));
     expect(scale32(0.5, 6.0), closeTo(3.0, 0.0001));
+    final topCounter = Counter.create(3);
+    expect(topCounter.applyAdderWith(const _TestAdder(2), 2, 3), 10);
+    topCounter.close();
     final globalBefore = currentTick();
     tick();
     expect(currentTick(), globalBefore + 1);

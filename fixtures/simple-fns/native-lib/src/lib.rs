@@ -782,6 +782,31 @@ pub extern "C" fn counter_current_value(handle: u64) -> u32 {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn counter_apply_adder_with(handle: u64, adder: u64, left: u32, right: u32) -> u32 {
+    let Some(vtable) = *ADDER_VTABLE.lock().expect("adder vtable lock") else {
+        return 0;
+    };
+    let callback_handle = (vtable.uniffi_clone)(adder);
+    let mut out = 0_u32;
+    let mut status = RustCallStatus {
+        code: RUST_CALL_STATUS_SUCCESS,
+        error_buf: std::ptr::null_mut(),
+    };
+    (vtable.add)(callback_handle, left, right, &mut out, &mut status);
+    (vtable.uniffi_free)(callback_handle);
+    if status.code != RUST_CALL_STATUS_SUCCESS {
+        return 0;
+    }
+    let base = COUNTERS
+        .lock()
+        .expect("counter map lock")
+        .get(&handle)
+        .copied()
+        .unwrap_or_default() as u32;
+    base + out
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn counter_set_label(handle: u64, label: *const c_char) {
     if label.is_null() {
         return;
