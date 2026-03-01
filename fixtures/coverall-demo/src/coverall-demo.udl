@@ -1,0 +1,156 @@
+// Comprehensive fixture exercising all major UniFFI feature combinations.
+// Modelled after the upstream uniffi-rs coverall fixture.
+
+namespace coverall_demo {
+  /// Create a Patch with a specific color.
+  Patch create_patch(Color color);
+
+  /// Return the number of live Coveralls instances (tracking via constructor/destructor).
+  u64 get_num_alive();
+
+  /// Create a SimpleDict with sample values filled in.
+  SimpleDict create_some_dict();
+
+  /// Create a SimpleDict whose optional fields are all null.
+  SimpleDict create_none_dict();
+
+  /// Return an enum variant based on a numeric selector.
+  MaybeSimpleDict get_maybe_simple_dict(i8 index);
+
+  /// Round-trip a string; throws ComplexError on certain inputs.
+  [Throws=ComplexError]
+  string println(string value);
+
+  /// Divide a float by a text-parsed divisor; exercises error paths.
+  [Throws=ComplexError]
+  f64 divide_by_text(f64 value, string divisor);
+
+  /// Reverse arbitrary bytes (binary data round-trip).
+  bytes reverse_bytes(bytes input);
+
+  /// Create a Rust-implemented Getters for trait round-trip tests.
+  Getters make_rust_getters();
+
+  /// Exercise a foreign-implemented Getters.
+  [Throws=CoverallError]
+  void test_getters(Getters getters);
+
+  /// Walk up a NodeTrait tree, collecting ancestor names.
+  sequence<string> ancestor_names(NodeTrait node);
+};
+
+/// Simple three-variant flat enum.
+enum Color {
+  "Red",
+  "Blue",
+  "Green",
+};
+
+/// Enum wrapping a record — tests enum-with-associated-data.
+[Enum]
+interface MaybeSimpleDict {
+  Yeah(SimpleDict value);
+  Nah();
+};
+
+/// Primary test record with a rich set of field types.
+dictionary SimpleDict {
+  string text;
+  u64 maybe_count;
+  boolean flag;
+  Color color;
+  sequence<string> tags;
+  record<string, u64> counts;
+  string? maybe_text;
+  Patch? maybe_patch;
+};
+
+/// A simple object that wraps a Color.
+interface Patch {
+  constructor(Color color);
+  Color get_color();
+};
+
+/// Object with fallible constructor only — no default constructor.
+interface FalliblePatch {
+  [Throws=CoverallError]
+  constructor(Color color, boolean should_fail);
+  Color get_color();
+};
+
+/// Main object exercising self-references, state, errors, and Arc semantics.
+interface Coveralls {
+  constructor(string name);
+
+  [Throws=CoverallError, Name="fallible_new"]
+  constructor(string name, boolean should_fail);
+
+  string get_name();
+  void set_name(string name);
+
+  /// Take another Coveralls, creating a reference chain.
+  void take_other(Coveralls? other);
+  Coveralls? get_other();
+
+  /// Strong reference count (tests Self=ByArc on the Rust side).
+  u64 strong_count();
+
+  /// Clone into a new instance (tests object return from method).
+  Coveralls clone_me();
+
+  /// Method that always throws a simple error.
+  [Throws=CoverallError]
+  boolean maybe_throw(boolean should_throw);
+
+  /// Method that throws a complex (rich) error.
+  [Throws=ComplexError]
+  boolean maybe_throw_complex(i8 selector);
+
+  /// Reverse some bytes via a method (tests binary on object).
+  bytes reverse_bytes(bytes input);
+
+  /// Return a sequence of optional strings.
+  sequence<string?> get_tags();
+
+  /// Return a map with string keys and optional string values.
+  record<string, string?> get_metadata();
+};
+
+/// Thread-safe counter (tests atomic state and thread safety).
+interface ThreadsafeCounter {
+  constructor();
+  void increment();
+  u64 get_count();
+};
+
+/// Simple flat error (single tag discriminator).
+[Error]
+enum CoverallError {
+  "TooManyHoles",
+};
+
+/// Rich error with structured variant data.
+[Enum]
+interface ComplexError {
+  OsError(i16 code, i16 extended_code);
+  PermissionDenied(string reason);
+  UnknownError();
+};
+
+/// Callback interface exercising multiple return types and error paths.
+callback interface Getters {
+  boolean get_bool(boolean v, boolean arg2);
+  [Throws=CoverallError]
+  string get_string(string v, boolean arg2);
+  [Throws=ComplexError]
+  string? get_option(string v, boolean arg2);
+  sequence<i32> get_list(sequence<i32> v, boolean arg2);
+  void get_nothing(string v);
+};
+
+/// Callback interface for tree-like trait object graphs.
+callback interface NodeTrait {
+  string name();
+  void set_parent(NodeTrait? parent);
+  NodeTrait? get_parent();
+};

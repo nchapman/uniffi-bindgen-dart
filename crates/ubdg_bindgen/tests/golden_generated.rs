@@ -212,3 +212,16 @@ fn golden_type_limits_demo() {
     generate(&source, &out_dir, None);
     assert_matches_expected(&out_dir.join("type_limits_demo.dart"), &expected);
 }
+
+#[test]
+fn golden_coverall_demo() {
+    let root = repo_root();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let out_dir = temp.path().join("out");
+
+    let source = root.join("fixtures/coverall-demo/src/coverall-demo.udl");
+    let expected = root.join("fixtures/coverall-demo/expected/coverall_demo.dart");
+
+    generate(&source, &out_dir, None);
+    assert_matches_expected(&out_dir.join("coverall_demo.dart"), &expected);
+}
