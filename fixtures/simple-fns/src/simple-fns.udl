@@ -16,6 +16,10 @@ namespace simple_fns {
   string greet(string name);
   [Async]
   string async_greet(string name);
+  [Async]
+  u32 async_add(u32 left, u32 right);
+  [Async]
+  void async_tick();
   duration multiply_duration(duration value, u32 factor);
   i64 subtract_i64(i64 left, i64 right);
   string? maybe_greet(string? name);
@@ -70,6 +74,8 @@ interface Counter {
   string describe();
   [Async]
   string async_describe();
+  [Async]
+  u32 async_value();
   Person snapshot_person();
   Outcome snapshot_outcome();
   bytes snapshot_bytes();

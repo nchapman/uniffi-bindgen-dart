@@ -39,10 +39,16 @@ void main() {
     expect(contents, contains('String brokenGreet() {'));
     expect(contents, contains('String greet(String name) {'));
     expect(contents, contains('Future<String> asyncGreet(String name) {'));
+    expect(contents, contains('Future<int> asyncAdd(int left, int right) {'));
+    expect(contents, contains('Future<void> asyncTick() {'));
     expect(contents, contains('rust_future_poll_string'));
     expect(contents, contains('rust_future_cancel_string'));
     expect(contents, contains('rust_future_complete_string'));
     expect(contents, contains('rust_future_free_string'));
+    expect(contents, contains('rust_future_poll_u32'));
+    expect(contents, contains('rust_future_complete_u32'));
+    expect(contents, contains('rust_future_poll_void'));
+    expect(contents, contains('rust_future_complete_void'));
     expect(contents, contains('final class _RustCallStatus extends ffi.Struct {'));
     expect(
       contents,
@@ -115,6 +121,7 @@ void main() {
     expect(contents, contains('int chunksTotalLen(List<Uint8List> input) {'));
     expect(contents, contains('String describe() {'));
     expect(contents, contains('Future<String> asyncDescribe() {'));
+    expect(contents, contains('Future<int> asyncValue() {'));
     expect(contents, contains('Person snapshotPerson() {'));
     expect(contents, contains('Outcome snapshotOutcome() {'));
     expect(contents, contains('Uint8List snapshotBytes() {'));
@@ -195,6 +202,10 @@ void main() {
     );
     expect(bindings.greet('dart'), 'hello, dart');
     expect(await bindings.asyncGreet('dart'), 'async, dart');
+    expect(await bindings.asyncAdd(20, 22), 42);
+    final asyncTickBefore = bindings.currentTick();
+    await bindings.asyncTick();
+    expect(bindings.currentTick(), asyncTickBefore + 1);
     expect(bindings.freeCount(), 3);
     expect(bindings.checkedDivide(12, 3), 4);
     expect(
@@ -221,6 +232,7 @@ void main() {
     counter.setLabel('alpha');
     expect(counter.describe(), 'counter:5:alpha');
     expect(await counter.asyncDescribe(), 'async:counter:5:alpha');
+    expect(await counter.asyncValue(), 5);
     expect(counter.maybeLabel('tail'), 'counter:5:tail');
     expect(counter.maybeLabel(null), 'counter:5:none');
     counter.ingestPerson(const Person(name: 'Eve', age: 9));
@@ -343,7 +355,12 @@ void main() {
       const Duration(seconds: 6),
     );
     expect(greet('ffi'), 'hello, ffi');
-    expect(freeCount(), 2);
+    expect(await asyncGreet('ffi'), 'async, ffi');
+    expect(await asyncAdd(4, 8), 12);
+    final asyncGlobalBefore = currentTick();
+    await asyncTick();
+    expect(currentTick(), asyncGlobalBefore + 1);
+    expect(freeCount(), 3);
     expect(checkedDivide(20, 4), 5);
     expect(
       () => checkedDivide(7, 0),
@@ -359,13 +376,13 @@ void main() {
         ),
       ),
     );
-    expect(freeCount(), 5);
+    expect(freeCount(), 6);
     expect(maybeGreet('ffi'), 'maybe, ffi');
-    expect(freeCount(), 6);
+    expect(freeCount(), 7);
     expect(maybeGreet(null), isNull);
-    expect(freeCount(), 6);
+    expect(freeCount(), 7);
     expect(() => brokenGreet(), throwsA(isA<StateError>()));
-    expect(freeCount(), 6);
+    expect(freeCount(), 7);
     expect(isEven(10), isTrue);
     expect(cycleColor(Color.red), Color.green);
     final freeBeforeTopOutcome = freeCount();

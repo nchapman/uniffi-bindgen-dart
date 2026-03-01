@@ -38,7 +38,7 @@ A repeatable backend-development process that can be applied with minimal change
 
 ### In Progress
 - Phase 4: Enums/errors are in place; trait parity still pending.
-- Phase 5: Async API wrappers for `[Async]` landed; full Rust future ABI/callback parity pending.
+- Phase 5: Async Rust-future ABI now covers string, `void`, and integer fixture paths; callback interface parity still pending.
 - Phase 6: Advanced config/external types pending.
 - Phase 7+: Documentation hardening and release workflow completion pending.
 
@@ -55,6 +55,7 @@ A repeatable backend-development process that can be applied with minimal change
 - Object wrappers with explicit `close()` plus finalizer fallback.
 - Object constructors/methods with runtime marshalling across supported FFI-compatible types.
 - Runtime fixture/native library coverage for strings, bytes, records, enums, objects, and typed errors.
+- Async `[Async]` wrappers and Rust-future poll/cancel/complete/free lifecycle coverage across string, `void`, and `u32` fixture paths.
 
 ## Scope
 ### In Scope
@@ -216,7 +217,7 @@ Use this ledger as the execution checklist for full parity. This is the operatio
 | Enums (flat/data-carrying) | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | Dart sealed-style model conventions | complete for current fixture scope | complete for current fixture scope | `dart::tests::renders_record_and_enum_models`; golden `compound-demo`; runtime smoke assertions | Done | flat + data-carrying enums covered |
 | Objects/interfaces lifecycle | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | wrappers with `close()` + finalizer fallback | sync constructors/methods complete | sync lifecycle paths complete | `dart::tests::renders_object_classes_with_lifecycle_and_throws`; runtime smoke object calls | In progress | async/trait-related object parity pending |
 | Trait methods | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | trait mapping into idiomatic Dart APIs | pending | pending | add dedicated trait fixture + runtime tests | Not started | phase 4 parity gap |
-| Async futures | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | `Future<T>`-based idiomatic APIs | top-level/object API wrappers for `[Async]` added | rust-future poll/cancel/complete/free flow implemented for string-backed async paths | extend to non-string return types + dedicated futures fixture stress cases | In progress | async lifecycle is now runtime-driven (poll/wake/ready/cancel/free) for current supported async return shape |
+| Async futures | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | `Future<T>`-based idiomatic APIs | top-level/object API wrappers for `[Async]` with return-type driven rust-future symbol selection | rust-future poll/cancel/complete/free flow implemented for string + `void` + integer fixture paths | extend to remaining return-type families + dedicated futures fixture stress cases | In progress | async lifecycle is runtime-driven (poll/wake/ready/cancel/free); coverage expanded and validated in generator + runtime smoke tests |
 | Callback interfaces (sync/async) | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | callback APIs with Dart callable conventions | pending | pending | add callbacks fixture + runtime tests | Not started | phase 5 target |
 | Custom types | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | Dart conversion helpers | pending | pending | add custom-types fixture + tests | Not started | phase 6 target |
 | External/remote types | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | cross-package import/type mapping | pending | pending | add ext-types fixture + tests | Not started | phase 6 target |
@@ -430,7 +431,7 @@ These rules are part of the template and should not be skipped:
 | Release compatibility confusion | Consumer integration failures | Maintain explicit backend-to-UniFFI compatibility table |
 
 ## Immediate Next Steps (Dart Instance)
-1. Extend Rust-future ABI support from current string-backed async paths to broader return-type parity, then add callback interface generation/runtime coverage.
+1. Implement callback interface generation/runtime coverage, then extend async Rust-future parity to remaining return-type families (bytes/options/sequences/maps/custom/external) with dedicated futures stress fixtures.
 2. Add trait-related parity coverage and fixtures.
 3. Extend advanced config support (rename/exclude/custom/external/docstrings) with dedicated fixture tests.
 4. Keep `docs/supported-features.md` synchronized with every parity change.

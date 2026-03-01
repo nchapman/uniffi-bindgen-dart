@@ -11,11 +11,11 @@ static FREE_COUNT: AtomicU32 = AtomicU32::new(0);
 static BYTES_FREE_COUNT: AtomicU32 = AtomicU32::new(0);
 static BYTES_VEC_FREE_COUNT: AtomicU32 = AtomicU32::new(0);
 static NEXT_COUNTER_HANDLE: AtomicU32 = AtomicU32::new(1);
-static NEXT_STRING_FUTURE_HANDLE: AtomicU64 = AtomicU64::new(1);
+static NEXT_ASYNC_FUTURE_HANDLE: AtomicU64 = AtomicU64::new(1);
 static COUNTERS: LazyLock<Mutex<HashMap<u64, i32>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 static COUNTER_LABELS: LazyLock<Mutex<HashMap<u64, String>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
-static STRING_FUTURES: LazyLock<Mutex<HashMap<u64, StringFutureState>>> =
+static ASYNC_FUTURES: LazyLock<Mutex<HashMap<u64, AsyncFutureState>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
 const RUST_CALL_STATUS_SUCCESS: i8 = 0;
@@ -31,16 +31,23 @@ pub struct RustCallStatus {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum StringFuturePollState {
+enum AsyncFuturePollState {
     PendingWake,
     Ready,
 }
 
 #[derive(Clone, Debug)]
-struct StringFutureState {
-    poll_state: StringFuturePollState,
+enum AsyncFutureResult {
+    String(String),
+    U32(u32),
+    Void,
+}
+
+#[derive(Clone, Debug)]
+struct AsyncFutureState {
+    poll_state: AsyncFuturePollState,
     cancelled: bool,
-    result: String,
+    result: AsyncFutureResult,
 }
 
 #[repr(C)]
@@ -103,17 +110,69 @@ fn vec_into_rust_buffer_vec(mut items: Vec<RustBuffer>) -> RustBufferVec {
     out
 }
 
-fn enqueue_string_future(result: String) -> u64 {
-    let handle = NEXT_STRING_FUTURE_HANDLE.fetch_add(1, Ordering::Relaxed);
-    STRING_FUTURES.lock().expect("string futures lock").insert(
+fn enqueue_async_future(result: AsyncFutureResult) -> u64 {
+    let handle = NEXT_ASYNC_FUTURE_HANDLE.fetch_add(1, Ordering::Relaxed);
+    ASYNC_FUTURES.lock().expect("async futures lock").insert(
         handle,
-        StringFutureState {
-            poll_state: StringFuturePollState::PendingWake,
+        AsyncFutureState {
+            poll_state: AsyncFuturePollState::PendingWake,
             cancelled: false,
             result,
         },
     );
     handle
+}
+
+fn enqueue_string_future(result: String) -> u64 {
+    enqueue_async_future(AsyncFutureResult::String(result))
+}
+
+fn enqueue_u32_future(result: u32) -> u64 {
+    enqueue_async_future(AsyncFutureResult::U32(result))
+}
+
+fn enqueue_void_future() -> u64 {
+    enqueue_async_future(AsyncFutureResult::Void)
+}
+
+fn poll_async_future(handle: u64, callback: extern "C" fn(u64, i8), callback_data: u64) {
+    let mut futures = ASYNC_FUTURES.lock().expect("async futures lock");
+    let Some(state) = futures.get_mut(&handle) else {
+        callback(callback_data, RUST_FUTURE_POLL_READY);
+        return;
+    };
+    if state.cancelled {
+        callback(callback_data, RUST_FUTURE_POLL_READY);
+        return;
+    }
+
+    match state.poll_state {
+        AsyncFuturePollState::PendingWake => {
+            state.poll_state = AsyncFuturePollState::Ready;
+            callback(callback_data, RUST_FUTURE_POLL_WAKE);
+        }
+        AsyncFuturePollState::Ready => {
+            callback(callback_data, RUST_FUTURE_POLL_READY);
+        }
+    }
+}
+
+fn cancel_async_future(handle: u64) {
+    if let Some(state) = ASYNC_FUTURES
+        .lock()
+        .expect("async futures lock")
+        .get_mut(&handle)
+    {
+        state.cancelled = true;
+        state.poll_state = AsyncFuturePollState::Ready;
+    }
+}
+
+fn free_async_future(handle: u64) {
+    ASYNC_FUTURES
+        .lock()
+        .expect("async futures lock")
+        .remove(&handle);
 }
 
 fn write_out_status(
@@ -332,6 +391,17 @@ pub extern "C" fn async_greet(name: *const c_char) -> u64 {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn async_add(left: u32, right: u32) -> u64 {
+    enqueue_u32_future(left + right)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn async_tick() -> u64 {
+    TICK_COUNT.fetch_add(1, Ordering::Relaxed);
+    enqueue_void_future()
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn broken_greet() -> *mut c_char {
     std::ptr::null_mut()
 }
@@ -375,37 +445,12 @@ pub extern "C" fn rust_future_poll_string(
     callback: extern "C" fn(u64, i8),
     callback_data: u64,
 ) {
-    let mut futures = STRING_FUTURES.lock().expect("string futures lock");
-    let Some(state) = futures.get_mut(&handle) else {
-        callback(callback_data, RUST_FUTURE_POLL_READY);
-        return;
-    };
-    if state.cancelled {
-        callback(callback_data, RUST_FUTURE_POLL_READY);
-        return;
-    }
-
-    match state.poll_state {
-        StringFuturePollState::PendingWake => {
-            state.poll_state = StringFuturePollState::Ready;
-            callback(callback_data, RUST_FUTURE_POLL_WAKE);
-        }
-        StringFuturePollState::Ready => {
-            callback(callback_data, RUST_FUTURE_POLL_READY);
-        }
-    }
+    poll_async_future(handle, callback, callback_data);
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn rust_future_cancel_string(handle: u64) {
-    if let Some(state) = STRING_FUTURES
-        .lock()
-        .expect("string futures lock")
-        .get_mut(&handle)
-    {
-        state.cancelled = true;
-        state.poll_state = StringFuturePollState::Ready;
-    }
+    cancel_async_future(handle);
 }
 
 #[unsafe(no_mangle)]
@@ -413,7 +458,7 @@ pub extern "C" fn rust_future_complete_string(
     handle: u64,
     out_status: *mut RustCallStatus,
 ) -> *mut c_char {
-    let futures = STRING_FUTURES.lock().expect("string futures lock");
+    let futures = ASYNC_FUTURES.lock().expect("async futures lock");
     let Some(state) = futures.get(&handle) else {
         write_out_status(
             out_status,
@@ -431,17 +476,132 @@ pub extern "C" fn rust_future_complete_string(
     }
 
     write_out_status(out_status, RUST_CALL_STATUS_SUCCESS, std::ptr::null_mut());
-    CString::new(state.result.clone())
-        .expect("valid CString")
-        .into_raw()
+    match &state.result {
+        AsyncFutureResult::String(result) => CString::new(result.as_str())
+            .expect("valid CString")
+            .into_raw(),
+        _ => {
+            write_out_status(
+                out_status,
+                RUST_CALL_STATUS_UNEXPECTED_ERROR,
+                CString::new("invalid async result type for string")
+                    .expect("valid CString")
+                    .into_raw(),
+            );
+            std::ptr::null_mut()
+        }
+    }
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn rust_future_free_string(handle: u64) {
-    STRING_FUTURES
-        .lock()
-        .expect("string futures lock")
-        .remove(&handle);
+    free_async_future(handle);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_future_poll_u32(
+    handle: u64,
+    callback: extern "C" fn(u64, i8),
+    callback_data: u64,
+) {
+    poll_async_future(handle, callback, callback_data);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_future_cancel_u32(handle: u64) {
+    cancel_async_future(handle);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_future_complete_u32(handle: u64, out_status: *mut RustCallStatus) -> u32 {
+    let futures = ASYNC_FUTURES.lock().expect("async futures lock");
+    let Some(state) = futures.get(&handle) else {
+        write_out_status(
+            out_status,
+            RUST_CALL_STATUS_UNEXPECTED_ERROR,
+            CString::new("missing u32 future handle")
+                .expect("valid CString")
+                .into_raw(),
+        );
+        return 0;
+    };
+    if state.cancelled {
+        write_out_status(out_status, RUST_CALL_STATUS_CANCELLED, std::ptr::null_mut());
+        return 0;
+    }
+    match state.result {
+        AsyncFutureResult::U32(value) => {
+            write_out_status(out_status, RUST_CALL_STATUS_SUCCESS, std::ptr::null_mut());
+            value
+        }
+        _ => {
+            write_out_status(
+                out_status,
+                RUST_CALL_STATUS_UNEXPECTED_ERROR,
+                CString::new("invalid async result type for u32")
+                    .expect("valid CString")
+                    .into_raw(),
+            );
+            0
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_future_free_u32(handle: u64) {
+    free_async_future(handle);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_future_poll_void(
+    handle: u64,
+    callback: extern "C" fn(u64, i8),
+    callback_data: u64,
+) {
+    poll_async_future(handle, callback, callback_data);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_future_cancel_void(handle: u64) {
+    cancel_async_future(handle);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_future_complete_void(handle: u64, out_status: *mut RustCallStatus) {
+    let futures = ASYNC_FUTURES.lock().expect("async futures lock");
+    let Some(state) = futures.get(&handle) else {
+        write_out_status(
+            out_status,
+            RUST_CALL_STATUS_UNEXPECTED_ERROR,
+            CString::new("missing void future handle")
+                .expect("valid CString")
+                .into_raw(),
+        );
+        return;
+    };
+    if state.cancelled {
+        write_out_status(out_status, RUST_CALL_STATUS_CANCELLED, std::ptr::null_mut());
+        return;
+    }
+    match state.result {
+        AsyncFutureResult::Void => {
+            write_out_status(out_status, RUST_CALL_STATUS_SUCCESS, std::ptr::null_mut());
+        }
+        _ => {
+            write_out_status(
+                out_status,
+                RUST_CALL_STATUS_UNEXPECTED_ERROR,
+                CString::new("invalid async result type for void")
+                    .expect("valid CString")
+                    .into_raw(),
+            );
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_future_free_void(handle: u64) {
+    free_async_future(handle);
 }
 
 #[unsafe(no_mangle)]
@@ -696,6 +856,17 @@ pub extern "C" fn counter_async_describe(handle: u64) -> u64 {
         format!("async:counter:{value}:{label}")
     };
     enqueue_string_future(text)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_async_value(handle: u64) -> u64 {
+    let value = COUNTERS
+        .lock()
+        .expect("counter map lock")
+        .get(&handle)
+        .copied()
+        .unwrap_or_default();
+    enqueue_u32_future(value.max(0) as u32)
 }
 
 #[unsafe(no_mangle)]

@@ -1254,12 +1254,29 @@ fn render_bound_methods(
         }
 
         if is_runtime_async_rust_future_compatible_function(function, records, enums) {
+            let Some(async_spec) =
+                async_rust_future_spec(function.return_type.as_ref(), records, enums)
+            else {
+                continue;
+            };
             let start_native_sig = format!("ffi.Uint64 Function({})", native_args.join(", "));
             let start_dart_sig = format!("int Function({})", dart_ffi_args.join(", "));
             let poll_field = format!("{field_name}RustFuturePoll");
             let cancel_field = format!("{field_name}RustFutureCancel");
             let complete_field = format!("{field_name}RustFutureComplete");
             let free_field = format!("{field_name}RustFutureFree");
+            let complete_symbol = format!("rust_future_complete_{}", async_spec.suffix);
+            let poll_symbol = format!("rust_future_poll_{}", async_spec.suffix);
+            let cancel_symbol = format!("rust_future_cancel_{}", async_spec.suffix);
+            let free_symbol = format!("rust_future_free_{}", async_spec.suffix);
+            let complete_native_sig = format!(
+                "{} Function(ffi.Uint64 handle, ffi.Pointer<_RustCallStatus> outStatus)",
+                async_spec.complete_native_type
+            );
+            let complete_dart_sig = format!(
+                "{} Function(int handle, ffi.Pointer<_RustCallStatus> outStatus)",
+                async_spec.complete_dart_type
+            );
 
             out.push('\n');
             out.push_str(&format!(
@@ -1267,16 +1284,16 @@ fn render_bound_methods(
                 function.name
             ));
             out.push_str(&format!(
-                "  late final void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData) {poll_field} = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, ffi.Uint64 callbackData), void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData)>('rust_future_poll_string');\n"
+                "  late final void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData) {poll_field} = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, ffi.Uint64 callbackData), void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData)>('{poll_symbol}');\n"
             ));
             out.push_str(&format!(
-                "  late final void Function(int handle) {cancel_field} = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_cancel_string');\n"
+                "  late final void Function(int handle) {cancel_field} = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('{cancel_symbol}');\n"
             ));
             out.push_str(&format!(
-                "  late final ffi.Pointer<Utf8> Function(int handle, ffi.Pointer<_RustCallStatus> outStatus) {complete_field} = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle, ffi.Pointer<_RustCallStatus> outStatus), ffi.Pointer<Utf8> Function(int handle, ffi.Pointer<_RustCallStatus> outStatus)>('rust_future_complete_string');\n"
+                "  late final {complete_dart_sig} {complete_field} = _lib.lookupFunction<{complete_native_sig}, {complete_dart_sig}>('{complete_symbol}');\n"
             ));
             out.push_str(&format!(
-                "  late final void Function(int handle) {free_field} = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_free_string');\n"
+                "  late final void Function(int handle) {free_field} = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('{free_symbol}');\n"
             ));
             out.push('\n');
             out.push_str(&format!(
@@ -1336,57 +1353,101 @@ fn render_bound_methods(
                 "      final ffi.Pointer<_RustCallStatus> outStatusPtr = calloc<_RustCallStatus>();\n",
             );
             out.push_str("      try {\n");
-            out.push_str(&format!(
-                "        final ffi.Pointer<Utf8> resultPtr = {complete_field}(futureHandle, outStatusPtr);\n"
-            ));
+            if function.return_type.is_none() {
+                out.push_str(&format!(
+                    "        {complete_field}(futureHandle, outStatusPtr);\n"
+                ));
+            } else if let Some(ret_type) = function.return_type.as_ref() {
+                if is_runtime_string_type(ret_type)
+                    || is_runtime_optional_string_type(ret_type)
+                    || is_runtime_record_type(ret_type)
+                    || is_runtime_enum_type(ret_type, enums)
+                {
+                    out.push_str(&format!(
+                        "        final ffi.Pointer<Utf8> resultPtr = {complete_field}(futureHandle, outStatusPtr);\n"
+                    ));
+                } else {
+                    out.push_str(&format!(
+                        "        final {} resultValue = {complete_field}(futureHandle, outStatusPtr);\n",
+                        async_spec.complete_dart_type
+                    ));
+                }
+            } else {
+                out.push_str(&format!(
+                    "        final {} resultValue = {complete_field}(futureHandle, outStatusPtr);\n",
+                    async_spec.complete_dart_type
+                ));
+            }
             out.push_str("        final int statusCode = outStatusPtr.ref.code;\n");
             out.push_str("        if (statusCode == _rustCallStatusSuccess) {\n");
-            if is_runtime_string_type(function.return_type.as_ref().expect("checked async return"))
-            {
-                out.push_str("          if (resultPtr == ffi.nullptr) {\n");
-                out.push_str(&format!(
-                    "            throw StateError('Rust returned null for {}');\n",
-                    function.name
-                ));
-                out.push_str("          }\n");
-                out.push_str("          try {\n");
-                out.push_str("            return resultPtr.toDartString();\n");
-                out.push_str("          } finally {\n");
-                out.push_str("            _rustStringFree(resultPtr);\n");
-                out.push_str("          }\n");
-            } else if is_runtime_optional_string_type(
-                function.return_type.as_ref().expect("checked async return"),
-            ) {
-                out.push_str("          if (resultPtr == ffi.nullptr) {\n");
-                out.push_str("            return null;\n");
-                out.push_str("          }\n");
-                out.push_str("          try {\n");
-                out.push_str("            return resultPtr.toDartString();\n");
-                out.push_str("          } finally {\n");
-                out.push_str("            _rustStringFree(resultPtr);\n");
-                out.push_str("          }\n");
-            } else if is_runtime_record_type(
-                function.return_type.as_ref().expect("checked async return"),
-            ) {
-                let record_name = record_name_from_type(
-                    function.return_type.as_ref().expect("checked async return"),
-                )
-                .unwrap_or("Record");
-                out.push_str("          if (resultPtr == ffi.nullptr) {\n");
-                out.push_str(&format!(
-                    "            throw StateError('Rust returned null for {}');\n",
-                    function.name
-                ));
-                out.push_str("          }\n");
-                out.push_str("          try {\n");
-                out.push_str("            final String payload = resultPtr.toDartString();\n");
-                out.push_str(&format!(
-                    "            return {}.fromJson(jsonDecode(payload) as Map<String, dynamic>);\n",
-                    to_upper_camel(record_name)
-                ));
-                out.push_str("          } finally {\n");
-                out.push_str("            _rustStringFree(resultPtr);\n");
-                out.push_str("          }\n");
+            if let Some(ret_type) = function.return_type.as_ref() {
+                if is_runtime_string_type(ret_type) {
+                    out.push_str("          if (resultPtr == ffi.nullptr) {\n");
+                    out.push_str(&format!(
+                        "            throw StateError('Rust returned null for {}');\n",
+                        function.name
+                    ));
+                    out.push_str("          }\n");
+                    out.push_str("          try {\n");
+                    out.push_str("            return resultPtr.toDartString();\n");
+                    out.push_str("          } finally {\n");
+                    out.push_str("            _rustStringFree(resultPtr);\n");
+                    out.push_str("          }\n");
+                } else if is_runtime_optional_string_type(ret_type) {
+                    out.push_str("          if (resultPtr == ffi.nullptr) {\n");
+                    out.push_str("            return null;\n");
+                    out.push_str("          }\n");
+                    out.push_str("          try {\n");
+                    out.push_str("            return resultPtr.toDartString();\n");
+                    out.push_str("          } finally {\n");
+                    out.push_str("            _rustStringFree(resultPtr);\n");
+                    out.push_str("          }\n");
+                } else if is_runtime_record_type(ret_type) {
+                    let record_name = record_name_from_type(ret_type).unwrap_or("Record");
+                    out.push_str("          if (resultPtr == ffi.nullptr) {\n");
+                    out.push_str(&format!(
+                        "            throw StateError('Rust returned null for {}');\n",
+                        function.name
+                    ));
+                    out.push_str("          }\n");
+                    out.push_str("          try {\n");
+                    out.push_str("            final String payload = resultPtr.toDartString();\n");
+                    out.push_str(&format!(
+                        "            return {}.fromJson(jsonDecode(payload) as Map<String, dynamic>);\n",
+                        to_upper_camel(record_name)
+                    ));
+                    out.push_str("          } finally {\n");
+                    out.push_str("            _rustStringFree(resultPtr);\n");
+                    out.push_str("          }\n");
+                } else if is_runtime_enum_type(ret_type, enums) {
+                    let enum_name = enum_name_from_type(ret_type).unwrap_or("Enum");
+                    out.push_str("          if (resultPtr == ffi.nullptr) {\n");
+                    out.push_str(&format!(
+                        "            throw StateError('Rust returned null for {}');\n",
+                        function.name
+                    ));
+                    out.push_str("          }\n");
+                    out.push_str("          try {\n");
+                    out.push_str("            final String payload = resultPtr.toDartString();\n");
+                    out.push_str(&format!(
+                        "            return _decode{}(payload);\n",
+                        to_upper_camel(enum_name)
+                    ));
+                    out.push_str("          } finally {\n");
+                    out.push_str("            _rustStringFree(resultPtr);\n");
+                    out.push_str("          }\n");
+                } else if is_runtime_timestamp_type(ret_type) {
+                    out.push_str(
+                        "          return DateTime.fromMicrosecondsSinceEpoch(resultValue, isUtc: true);\n",
+                    );
+                } else if is_runtime_duration_type(ret_type) {
+                    out.push_str("          return Duration(microseconds: resultValue);\n");
+                } else {
+                    let decode = render_plain_ffi_decode_expr(ret_type, "resultValue");
+                    out.push_str(&format!("          return {decode};\n"));
+                }
+            } else {
+                out.push_str("          return;\n");
             }
             out.push_str("        }\n");
             out.push_str("        if (statusCode == _rustCallStatusCancelled) {\n");
@@ -1923,28 +1984,45 @@ fn render_bound_methods(
             };
 
             if is_runtime_async_rust_future_compatible_method(method, records, enums) {
+                let Some(async_spec) =
+                    async_rust_future_spec(method.return_type.as_ref(), records, enums)
+                else {
+                    continue;
+                };
                 let start_native_sig = format!("ffi.Uint64 Function({})", native_args.join(", "));
                 let start_dart_sig = format!("int Function({})", dart_ffi_args.join(", "));
                 let poll_field = format!("{method_field}RustFuturePoll");
                 let cancel_field = format!("{method_field}RustFutureCancel");
                 let complete_field = format!("{method_field}RustFutureComplete");
                 let free_field = format!("{method_field}RustFutureFree");
+                let complete_symbol = format!("rust_future_complete_{}", async_spec.suffix);
+                let poll_symbol = format!("rust_future_poll_{}", async_spec.suffix);
+                let cancel_symbol = format!("rust_future_cancel_{}", async_spec.suffix);
+                let free_symbol = format!("rust_future_free_{}", async_spec.suffix);
+                let complete_native_sig = format!(
+                    "{} Function(ffi.Uint64 handle, ffi.Pointer<_RustCallStatus> outStatus)",
+                    async_spec.complete_native_type
+                );
+                let complete_dart_sig = format!(
+                    "{} Function(int handle, ffi.Pointer<_RustCallStatus> outStatus)",
+                    async_spec.complete_dart_type
+                );
 
                 out.push('\n');
                 out.push_str(&format!(
                     "  late final {start_dart_sig} {method_field} = _lib.lookupFunction<{start_native_sig}, {start_dart_sig}>('{method_symbol}');\n",
                 ));
                 out.push_str(&format!(
-                    "  late final void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData) {poll_field} = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, ffi.Uint64 callbackData), void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData)>('rust_future_poll_string');\n"
+                    "  late final void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData) {poll_field} = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, ffi.Uint64 callbackData), void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData)>('{poll_symbol}');\n"
                 ));
                 out.push_str(&format!(
-                    "  late final void Function(int handle) {cancel_field} = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_cancel_string');\n"
+                    "  late final void Function(int handle) {cancel_field} = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('{cancel_symbol}');\n"
                 ));
                 out.push_str(&format!(
-                    "  late final ffi.Pointer<Utf8> Function(int handle, ffi.Pointer<_RustCallStatus> outStatus) {complete_field} = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle, ffi.Pointer<_RustCallStatus> outStatus), ffi.Pointer<Utf8> Function(int handle, ffi.Pointer<_RustCallStatus> outStatus)>('rust_future_complete_string');\n"
+                    "  late final {complete_dart_sig} {complete_field} = _lib.lookupFunction<{complete_native_sig}, {complete_dart_sig}>('{complete_symbol}');\n"
                 ));
                 out.push_str(&format!(
-                    "  late final void Function(int handle) {free_field} = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_free_string');\n"
+                    "  late final void Function(int handle) {free_field} = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('{free_symbol}');\n"
                 ));
                 out.push('\n');
                 out.push_str(&format!(
@@ -2004,12 +2082,46 @@ fn render_bound_methods(
                     "      final ffi.Pointer<_RustCallStatus> outStatusPtr = calloc<_RustCallStatus>();\n",
                 );
                 out.push_str("      try {\n");
-                out.push_str(&format!(
-                    "        final ffi.Pointer<Utf8> resultPtr = {complete_field}(futureHandle, outStatusPtr);\n"
-                ));
+                if method.return_type.is_none() {
+                    out.push_str(&format!(
+                        "        {complete_field}(futureHandle, outStatusPtr);\n"
+                    ));
+                } else if method.return_type.as_ref().is_some_and(|t| {
+                    is_runtime_string_type(t)
+                        || is_runtime_optional_string_type(t)
+                        || is_runtime_record_type(t)
+                        || is_runtime_enum_type(t, enums)
+                }) {
+                    out.push_str(&format!(
+                        "        final ffi.Pointer<Utf8> resultPtr = {complete_field}(futureHandle, outStatusPtr);\n"
+                    ));
+                } else {
+                    out.push_str(&format!(
+                        "        final {} resultValue = {complete_field}(futureHandle, outStatusPtr);\n",
+                        async_spec.complete_dart_type
+                    ));
+                }
                 out.push_str("        final int statusCode = outStatusPtr.ref.code;\n");
                 out.push_str("        if (statusCode == _rustCallStatusSuccess) {\n");
-                if method
+                if method.return_type.is_none() {
+                    out.push_str("          return;\n");
+                } else if method
+                    .return_type
+                    .as_ref()
+                    .is_some_and(is_runtime_string_type)
+                {
+                    out.push_str("          if (resultPtr == ffi.nullptr) {\n");
+                    out.push_str(&format!(
+                        "            throw StateError('Rust returned null for {}');\n",
+                        method_symbol
+                    ));
+                    out.push_str("          }\n");
+                    out.push_str("          try {\n");
+                    out.push_str("            return resultPtr.toDartString();\n");
+                    out.push_str("          } finally {\n");
+                    out.push_str("            _rustStringFree(resultPtr);\n");
+                    out.push_str("          }\n");
+                } else if method
                     .return_type
                     .as_ref()
                     .is_some_and(is_runtime_optional_string_type)
@@ -2017,19 +2129,79 @@ fn render_bound_methods(
                     out.push_str("          if (resultPtr == ffi.nullptr) {\n");
                     out.push_str("            return null;\n");
                     out.push_str("          }\n");
-                } else {
+                    out.push_str("          try {\n");
+                    out.push_str("            return resultPtr.toDartString();\n");
+                    out.push_str("          } finally {\n");
+                    out.push_str("            _rustStringFree(resultPtr);\n");
+                    out.push_str("          }\n");
+                } else if method
+                    .return_type
+                    .as_ref()
+                    .is_some_and(is_runtime_record_type)
+                {
+                    let record_name = method
+                        .return_type
+                        .as_ref()
+                        .and_then(record_name_from_type)
+                        .unwrap_or("Record");
                     out.push_str("          if (resultPtr == ffi.nullptr) {\n");
                     out.push_str(&format!(
                         "            throw StateError('Rust returned null for {}');\n",
                         method_symbol
                     ));
                     out.push_str("          }\n");
+                    out.push_str("          try {\n");
+                    out.push_str("            final String payload = resultPtr.toDartString();\n");
+                    out.push_str(&format!(
+                        "            return {}.fromJson(jsonDecode(payload) as Map<String, dynamic>);\n",
+                        to_upper_camel(record_name)
+                    ));
+                    out.push_str("          } finally {\n");
+                    out.push_str("            _rustStringFree(resultPtr);\n");
+                    out.push_str("          }\n");
+                } else if method
+                    .return_type
+                    .as_ref()
+                    .is_some_and(|t| is_runtime_enum_type(t, enums))
+                {
+                    let enum_name = method
+                        .return_type
+                        .as_ref()
+                        .and_then(enum_name_from_type)
+                        .unwrap_or("Enum");
+                    out.push_str("          if (resultPtr == ffi.nullptr) {\n");
+                    out.push_str(&format!(
+                        "            throw StateError('Rust returned null for {}');\n",
+                        method_symbol
+                    ));
+                    out.push_str("          }\n");
+                    out.push_str("          try {\n");
+                    out.push_str("            final String payload = resultPtr.toDartString();\n");
+                    out.push_str(&format!(
+                        "            return _decode{}(payload);\n",
+                        to_upper_camel(enum_name)
+                    ));
+                    out.push_str("          } finally {\n");
+                    out.push_str("            _rustStringFree(resultPtr);\n");
+                    out.push_str("          }\n");
+                } else if method
+                    .return_type
+                    .as_ref()
+                    .is_some_and(is_runtime_timestamp_type)
+                {
+                    out.push_str(
+                        "          return DateTime.fromMicrosecondsSinceEpoch(resultValue, isUtc: true);\n",
+                    );
+                } else if method
+                    .return_type
+                    .as_ref()
+                    .is_some_and(is_runtime_duration_type)
+                {
+                    out.push_str("          return Duration(microseconds: resultValue);\n");
+                } else if let Some(ret_type) = method.return_type.as_ref() {
+                    let decode = render_plain_ffi_decode_expr(ret_type, "resultValue");
+                    out.push_str(&format!("          return {decode};\n"));
                 }
-                out.push_str("          try {\n");
-                out.push_str("            return resultPtr.toDartString();\n");
-                out.push_str("          } finally {\n");
-                out.push_str("            _rustStringFree(resultPtr);\n");
-                out.push_str("          }\n");
                 out.push_str("        }\n");
                 out.push_str("        if (statusCode == _rustCallStatusCancelled) {\n");
                 out.push_str(&format!(
@@ -2326,7 +2498,11 @@ fn render_object_classes(
             out.push_str(&format!(
                 "  static {signature_return} {static_name}({args}) {{\n"
             ));
-            out.push_str(&format!("    return {invoke_expr};\n"));
+            if ctor.is_async {
+                out.push_str(&format!("    return Future(() => {invoke_expr});\n"));
+            } else {
+                out.push_str(&format!("    return {invoke_expr};\n"));
+            }
             out.push_str("  }\n\n");
         }
 
@@ -2382,7 +2558,15 @@ fn render_object_classes(
             } else {
                 format!("_handle, {arg_names}")
             };
-            if method.return_type.is_some() || method.is_async {
+            if method.is_async {
+                if is_runtime_async_rust_future_compatible_method(method, records, enums) {
+                    out.push_str(&format!("    return _ffi.{invoke_name}({invoke_args});\n"));
+                } else {
+                    out.push_str(&format!(
+                        "    return Future(() => _ffi.{invoke_name}({invoke_args}));\n"
+                    ));
+                }
+            } else if method.return_type.is_some() {
                 out.push_str(&format!("    return _ffi.{invoke_name}({invoke_args});\n"));
             } else {
                 out.push_str(&format!("    _ffi.{invoke_name}({invoke_args});\n"));
@@ -2463,7 +2647,15 @@ fn render_function_stubs(
 
         out.push_str(&format!("{signature_return_type} {fn_name}({args}) {{\n"));
         if is_runtime_ffi_compatible_function(f, records, enums) {
-            if f.return_type.is_some() || f.is_async {
+            if f.is_async {
+                if is_runtime_async_rust_future_compatible_function(f, records, enums) {
+                    out.push_str(&format!("  return _bindings().{fn_name}({arg_names});\n"));
+                } else {
+                    out.push_str(&format!(
+                        "  return Future(() => _bindings().{fn_name}({arg_names}));\n"
+                    ));
+                }
+            } else if f.return_type.is_some() {
                 out.push_str(&format!("  return _bindings().{fn_name}({arg_names});\n"));
             } else {
                 out.push_str(&format!("  _bindings().{fn_name}({arg_names});\n"));
@@ -2494,6 +2686,107 @@ fn has_runtime_async_rust_future_support(
         })
 }
 
+struct AsyncRustFutureSpec {
+    suffix: &'static str,
+    complete_native_type: &'static str,
+    complete_dart_type: &'static str,
+}
+
+fn async_rust_future_spec(
+    return_type: Option<&Type>,
+    _records: &[UdlRecord],
+    enums: &[UdlEnum],
+) -> Option<AsyncRustFutureSpec> {
+    match return_type {
+        None => Some(AsyncRustFutureSpec {
+            suffix: "void",
+            complete_native_type: "ffi.Void",
+            complete_dart_type: "void",
+        }),
+        Some(type_) if is_runtime_string_type(type_) => Some(AsyncRustFutureSpec {
+            suffix: "string",
+            complete_native_type: "ffi.Pointer<Utf8>",
+            complete_dart_type: "ffi.Pointer<Utf8>",
+        }),
+        Some(type_) if is_runtime_optional_string_type(type_) => Some(AsyncRustFutureSpec {
+            suffix: "string",
+            complete_native_type: "ffi.Pointer<Utf8>",
+            complete_dart_type: "ffi.Pointer<Utf8>",
+        }),
+        Some(type_) if is_runtime_record_type(type_) => Some(AsyncRustFutureSpec {
+            suffix: "string",
+            complete_native_type: "ffi.Pointer<Utf8>",
+            complete_dart_type: "ffi.Pointer<Utf8>",
+        }),
+        Some(type_) if is_runtime_enum_type(type_, enums) => Some(AsyncRustFutureSpec {
+            suffix: "string",
+            complete_native_type: "ffi.Pointer<Utf8>",
+            complete_dart_type: "ffi.Pointer<Utf8>",
+        }),
+        Some(Type::UInt8) => Some(AsyncRustFutureSpec {
+            suffix: "u8",
+            complete_native_type: "ffi.Uint8",
+            complete_dart_type: "int",
+        }),
+        Some(Type::Int8) => Some(AsyncRustFutureSpec {
+            suffix: "i8",
+            complete_native_type: "ffi.Int8",
+            complete_dart_type: "int",
+        }),
+        Some(Type::UInt16) => Some(AsyncRustFutureSpec {
+            suffix: "u16",
+            complete_native_type: "ffi.Uint16",
+            complete_dart_type: "int",
+        }),
+        Some(Type::Int16) => Some(AsyncRustFutureSpec {
+            suffix: "i16",
+            complete_native_type: "ffi.Int16",
+            complete_dart_type: "int",
+        }),
+        Some(Type::UInt32) => Some(AsyncRustFutureSpec {
+            suffix: "u32",
+            complete_native_type: "ffi.Uint32",
+            complete_dart_type: "int",
+        }),
+        Some(Type::Int32) => Some(AsyncRustFutureSpec {
+            suffix: "i32",
+            complete_native_type: "ffi.Int32",
+            complete_dart_type: "int",
+        }),
+        Some(Type::UInt64) => Some(AsyncRustFutureSpec {
+            suffix: "u64",
+            complete_native_type: "ffi.Uint64",
+            complete_dart_type: "int",
+        }),
+        Some(Type::Int64) => Some(AsyncRustFutureSpec {
+            suffix: "i64",
+            complete_native_type: "ffi.Int64",
+            complete_dart_type: "int",
+        }),
+        Some(Type::Float32) => Some(AsyncRustFutureSpec {
+            suffix: "f32",
+            complete_native_type: "ffi.Float",
+            complete_dart_type: "double",
+        }),
+        Some(Type::Float64) => Some(AsyncRustFutureSpec {
+            suffix: "f64",
+            complete_native_type: "ffi.Double",
+            complete_dart_type: "double",
+        }),
+        Some(Type::Timestamp) => Some(AsyncRustFutureSpec {
+            suffix: "i64",
+            complete_native_type: "ffi.Int64",
+            complete_dart_type: "int",
+        }),
+        Some(Type::Duration) => Some(AsyncRustFutureSpec {
+            suffix: "i64",
+            complete_native_type: "ffi.Int64",
+            complete_dart_type: "int",
+        }),
+        _ => None,
+    }
+}
+
 fn is_runtime_async_rust_future_compatible_function(
     function: &UdlFunction,
     records: &[UdlRecord],
@@ -2502,10 +2795,7 @@ fn is_runtime_async_rust_future_compatible_function(
     function.is_async
         && function.throws_type.is_none()
         && is_runtime_ffi_compatible_function(function, records, enums)
-        && function
-            .return_type
-            .as_ref()
-            .is_some_and(is_runtime_async_complete_string_type)
+        && async_rust_future_spec(function.return_type.as_ref(), records, enums).is_some()
 }
 
 fn is_runtime_async_rust_future_compatible_method(
@@ -2515,18 +2805,11 @@ fn is_runtime_async_rust_future_compatible_method(
 ) -> bool {
     method.is_async
         && method.throws_type.is_none()
-        && method
-            .return_type
-            .as_ref()
-            .is_some_and(is_runtime_async_complete_string_type)
+        && async_rust_future_spec(method.return_type.as_ref(), records, enums).is_some()
         && method
             .args
             .iter()
             .all(|a| is_runtime_ffi_compatible_type(&a.type_, records, enums))
-}
-
-fn is_runtime_async_complete_string_type(type_: &Type) -> bool {
-    is_runtime_string_type(type_) || is_runtime_optional_string_type(type_)
 }
 
 fn is_runtime_ffi_compatible_function(
@@ -3043,12 +3326,18 @@ namespace demo {
 namespace async_demo {
   [Async]
   string greet_async(string name);
+  [Async]
+  u32 add_async(u32 left, u32 right);
+  [Async]
+  void tick_async();
 };
 
 interface Counter {
   constructor(u32 initial);
   [Async]
   string async_describe();
+  [Async]
+  u32 async_value();
 };
 "#,
         )
@@ -3067,12 +3356,19 @@ interface Counter {
         let content = fs::read_to_string(out_dir.join("async_demo.dart")).expect("read generated");
         assert!(content.contains("Future<String> greetAsync(String name) {"));
         assert!(content.contains("return _bindings().greetAsync(name);"));
+        assert!(content.contains("Future<int> addAsync(int left, int right) {"));
+        assert!(content.contains("Future<void> tickAsync() {"));
         assert!(content.contains("rust_future_poll_string"));
         assert!(content.contains("rust_future_complete_string"));
+        assert!(content.contains("rust_future_poll_u32"));
+        assert!(content.contains("rust_future_complete_u32"));
+        assert!(content.contains("rust_future_poll_void"));
+        assert!(content.contains("rust_future_complete_void"));
         assert!(content.contains("rust_future_free_string"));
         assert!(content.contains("final class _RustCallStatus extends ffi.Struct {"));
         assert!(content.contains("Future<String> asyncDescribe() {"));
         assert!(content.contains("return _ffi.counterInvokeAsyncDescribe(_handle);"));
+        assert!(content.contains("Future<int> asyncValue() {"));
     }
 
     #[test]

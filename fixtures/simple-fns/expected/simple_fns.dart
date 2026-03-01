@@ -280,6 +280,64 @@ class SimpleFnsBindings {
       return _addU64(left, right);
   }
 
+  late final int Function(int left, int right) _asyncAdd = _lib.lookupFunction<ffi.Uint64 Function(ffi.Uint32 left, ffi.Uint32 right), int Function(int left, int right)>('async_add');
+  late final void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData) _asyncAddRustFuturePoll = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, ffi.Uint64 callbackData), void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData)>('rust_future_poll_u32');
+  late final void Function(int handle) _asyncAddRustFutureCancel = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_cancel_u32');
+  late final int Function(int handle, ffi.Pointer<_RustCallStatus> outStatus) _asyncAddRustFutureComplete = _lib.lookupFunction<ffi.Uint32 Function(ffi.Uint64 handle, ffi.Pointer<_RustCallStatus> outStatus), int Function(int handle, ffi.Pointer<_RustCallStatus> outStatus)>('rust_future_complete_u32');
+  late final void Function(int handle) _asyncAddRustFutureFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_free_u32');
+
+  Future<int> asyncAdd(int left, int right) async {
+    final int futureHandle;
+    futureHandle = _asyncAdd(left, right);
+    final StreamController<int> pollEvents = StreamController<int>.broadcast();
+    final callback = ffi.NativeCallable<ffi.Void Function(ffi.Uint64, ffi.Int8)>.listener((int _, int pollResult) {
+      pollEvents.add(pollResult);
+    });
+    try {
+      _asyncAddRustFuturePoll(futureHandle, callback.nativeFunction, 0);
+      while (true) {
+        final int pollResult = await pollEvents.stream.first;
+        if (pollResult == _rustFuturePollReady) {
+          break;
+        }
+        if (pollResult == _rustFuturePollWake) {
+          _asyncAddRustFuturePoll(futureHandle, callback.nativeFunction, 0);
+          continue;
+        }
+        throw StateError('Rust future poll returned invalid status for async_add: $pollResult');
+      }
+      final ffi.Pointer<_RustCallStatus> outStatusPtr = calloc<_RustCallStatus>();
+      try {
+        final int resultValue = _asyncAddRustFutureComplete(futureHandle, outStatusPtr);
+        final int statusCode = outStatusPtr.ref.code;
+        if (statusCode == _rustCallStatusSuccess) {
+          return resultValue;
+        }
+        if (statusCode == _rustCallStatusCancelled) {
+          throw StateError('Rust future was cancelled for async_add');
+        }
+        final ffi.Pointer<Utf8> errorPtr = outStatusPtr.ref.errorBuf;
+        if (errorPtr != ffi.nullptr) {
+          try {
+            throw StateError(errorPtr.toDartString());
+          } finally {
+            _rustStringFree(errorPtr);
+          }
+        }
+        throw StateError('Rust future failed for async_add with status code: $statusCode');
+      } finally {
+        calloc.free(outStatusPtr);
+      }
+    } catch (_) {
+      _asyncAddRustFutureCancel(futureHandle);
+      rethrow;
+    } finally {
+      await pollEvents.close();
+      callback.close();
+      _asyncAddRustFutureFree(futureHandle);
+    }
+  }
+
   late final int Function(ffi.Pointer<Utf8> name) _asyncGreet = _lib.lookupFunction<ffi.Uint64 Function(ffi.Pointer<Utf8> name), int Function(ffi.Pointer<Utf8> name)>('async_greet');
   late final void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData) _asyncGreetRustFuturePoll = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, ffi.Uint64 callbackData), void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData)>('rust_future_poll_string');
   late final void Function(int handle) _asyncGreetRustFutureCancel = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_cancel_string');
@@ -347,6 +405,64 @@ class SimpleFnsBindings {
       await pollEvents.close();
       callback.close();
       _asyncGreetRustFutureFree(futureHandle);
+    }
+  }
+
+  late final int Function() _asyncTick = _lib.lookupFunction<ffi.Uint64 Function(), int Function()>('async_tick');
+  late final void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData) _asyncTickRustFuturePoll = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, ffi.Uint64 callbackData), void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData)>('rust_future_poll_void');
+  late final void Function(int handle) _asyncTickRustFutureCancel = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_cancel_void');
+  late final void Function(int handle, ffi.Pointer<_RustCallStatus> outStatus) _asyncTickRustFutureComplete = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<_RustCallStatus> outStatus), void Function(int handle, ffi.Pointer<_RustCallStatus> outStatus)>('rust_future_complete_void');
+  late final void Function(int handle) _asyncTickRustFutureFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_free_void');
+
+  Future<void> asyncTick() async {
+    final int futureHandle;
+    futureHandle = _asyncTick();
+    final StreamController<int> pollEvents = StreamController<int>.broadcast();
+    final callback = ffi.NativeCallable<ffi.Void Function(ffi.Uint64, ffi.Int8)>.listener((int _, int pollResult) {
+      pollEvents.add(pollResult);
+    });
+    try {
+      _asyncTickRustFuturePoll(futureHandle, callback.nativeFunction, 0);
+      while (true) {
+        final int pollResult = await pollEvents.stream.first;
+        if (pollResult == _rustFuturePollReady) {
+          break;
+        }
+        if (pollResult == _rustFuturePollWake) {
+          _asyncTickRustFuturePoll(futureHandle, callback.nativeFunction, 0);
+          continue;
+        }
+        throw StateError('Rust future poll returned invalid status for async_tick: $pollResult');
+      }
+      final ffi.Pointer<_RustCallStatus> outStatusPtr = calloc<_RustCallStatus>();
+      try {
+        _asyncTickRustFutureComplete(futureHandle, outStatusPtr);
+        final int statusCode = outStatusPtr.ref.code;
+        if (statusCode == _rustCallStatusSuccess) {
+          return;
+        }
+        if (statusCode == _rustCallStatusCancelled) {
+          throw StateError('Rust future was cancelled for async_tick');
+        }
+        final ffi.Pointer<Utf8> errorPtr = outStatusPtr.ref.errorBuf;
+        if (errorPtr != ffi.nullptr) {
+          try {
+            throw StateError(errorPtr.toDartString());
+          } finally {
+            _rustStringFree(errorPtr);
+          }
+        }
+        throw StateError('Rust future failed for async_tick with status code: $statusCode');
+      } finally {
+        calloc.free(outStatusPtr);
+      }
+    } catch (_) {
+      _asyncTickRustFutureCancel(futureHandle);
+      rethrow;
+    } finally {
+      await pollEvents.close();
+      callback.close();
+      _asyncTickRustFutureFree(futureHandle);
     }
   }
 
@@ -811,6 +927,64 @@ class SimpleFnsBindings {
     }
   }
 
+  late final int Function(int handle) _counterAsyncValue = _lib.lookupFunction<ffi.Uint64 Function(ffi.Uint64 handle), int Function(int handle)>('counter_async_value');
+  late final void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData) _counterAsyncValueRustFuturePoll = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, ffi.Uint64 callbackData), void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData)>('rust_future_poll_u32');
+  late final void Function(int handle) _counterAsyncValueRustFutureCancel = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_cancel_u32');
+  late final int Function(int handle, ffi.Pointer<_RustCallStatus> outStatus) _counterAsyncValueRustFutureComplete = _lib.lookupFunction<ffi.Uint32 Function(ffi.Uint64 handle, ffi.Pointer<_RustCallStatus> outStatus), int Function(int handle, ffi.Pointer<_RustCallStatus> outStatus)>('rust_future_complete_u32');
+  late final void Function(int handle) _counterAsyncValueRustFutureFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_free_u32');
+
+  Future<int> counterInvokeAsyncValue(int handle) async {
+    final int futureHandle;
+    futureHandle = _counterAsyncValue(handle);
+    final StreamController<int> pollEvents = StreamController<int>.broadcast();
+    final callback = ffi.NativeCallable<ffi.Void Function(ffi.Uint64, ffi.Int8)>.listener((int _, int pollResult) {
+      pollEvents.add(pollResult);
+    });
+    try {
+      _counterAsyncValueRustFuturePoll(futureHandle, callback.nativeFunction, 0);
+      while (true) {
+        final int pollResult = await pollEvents.stream.first;
+        if (pollResult == _rustFuturePollReady) {
+          break;
+        }
+        if (pollResult == _rustFuturePollWake) {
+          _counterAsyncValueRustFuturePoll(futureHandle, callback.nativeFunction, 0);
+          continue;
+        }
+        throw StateError('Rust future poll returned invalid status for counter_async_value: $pollResult');
+      }
+      final ffi.Pointer<_RustCallStatus> outStatusPtr = calloc<_RustCallStatus>();
+      try {
+        final int resultValue = _counterAsyncValueRustFutureComplete(futureHandle, outStatusPtr);
+        final int statusCode = outStatusPtr.ref.code;
+        if (statusCode == _rustCallStatusSuccess) {
+          return resultValue;
+        }
+        if (statusCode == _rustCallStatusCancelled) {
+          throw StateError('Rust future was cancelled for counter_async_value');
+        }
+        final ffi.Pointer<Utf8> errorPtr = outStatusPtr.ref.errorBuf;
+        if (errorPtr != ffi.nullptr) {
+          try {
+            throw StateError(errorPtr.toDartString());
+          } finally {
+            _rustStringFree(errorPtr);
+          }
+        }
+        throw StateError('Rust future failed for counter_async_value with status code: $statusCode');
+      } finally {
+        calloc.free(outStatusPtr);
+      }
+    } catch (_) {
+      _counterAsyncValueRustFutureCancel(futureHandle);
+      rethrow;
+    } finally {
+      await pollEvents.close();
+      callback.close();
+      _counterAsyncValueRustFutureFree(futureHandle);
+    }
+  }
+
   late final int Function(int handle, _RustBuffer input) _counterBytesLen = _lib.lookupFunction<ffi.Uint32 Function(ffi.Uint64 handle, _RustBuffer input), int Function(int handle, _RustBuffer input)>('counter_bytes_len');
 
   int counterInvokeBytesLen(int handle, Uint8List input) {
@@ -1122,6 +1296,11 @@ final class Counter {
     return _ffi.counterInvokeAsyncDescribe(_handle);
   }
 
+  Future<int> asyncValue() {
+    _ensureOpen();
+    return _ffi.counterInvokeAsyncValue(_handle);
+  }
+
   int bytesLen(Uint8List input) {
     _ensureOpen();
     return _ffi.counterInvokeBytesLen(_handle, input);
@@ -1218,8 +1397,16 @@ int addU64(int left, int right) {
   return _bindings().addU64(left, right);
 }
 
+Future<int> asyncAdd(int left, int right) {
+  return _bindings().asyncAdd(left, right);
+}
+
 Future<String> asyncGreet(String name) {
   return _bindings().asyncGreet(name);
+}
+
+Future<void> asyncTick() {
+  return _bindings().asyncTick();
 }
 
 String brokenGreet() {
