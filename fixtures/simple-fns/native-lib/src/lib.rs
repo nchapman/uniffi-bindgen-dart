@@ -849,6 +849,46 @@ pub extern "C" fn async_label_echo(input: *const c_char) -> u64 {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn count_add(left: u32, right: u32) -> u32 {
+    left + right
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn async_count_add(left: u32, right: u32) -> u64 {
+    enqueue_u32_future(left + right)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn blob_echo(input: RustBuffer) -> RustBuffer {
+    vec_into_rust_buffer(rust_buffer_to_vec(input))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn async_blob_echo(input: RustBuffer) -> u64 {
+    enqueue_bytes_future(rust_buffer_to_vec(input))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn blob_maybe_echo(input: RustBufferOpt) -> RustBufferOpt {
+    if input.is_some == 0 {
+        return empty_rust_buffer_opt();
+    }
+    RustBufferOpt {
+        is_some: 1,
+        value: vec_into_rust_buffer(rust_buffer_to_vec(input.value)),
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn async_blob_maybe_echo(input: RustBufferOpt) -> u64 {
+    if input.is_some == 0 {
+        enqueue_bytes_opt_future(None)
+    } else {
+        enqueue_bytes_opt_future(Some(rust_buffer_to_vec(input.value)))
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn async_fail_string() -> u64 {
     enqueue_async_future(AsyncFutureResult::Failed(
         "forced async failure".to_string(),
@@ -1890,6 +1930,60 @@ pub extern "C" fn counter_async_label_echo(handle: u64, input: *const c_char) ->
         .copied()
         .unwrap_or_default();
     enqueue_string_future(format!("counter:{value}:{label}"))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_count_plus(handle: u64, amount: u32) -> u32 {
+    let value = COUNTERS
+        .lock()
+        .expect("counter map lock")
+        .get(&handle)
+        .copied()
+        .unwrap_or_default()
+        .max(0) as u32;
+    value + amount
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_async_count_plus(handle: u64, amount: u32) -> u64 {
+    let value = COUNTERS
+        .lock()
+        .expect("counter map lock")
+        .get(&handle)
+        .copied()
+        .unwrap_or_default()
+        .max(0) as u32;
+    enqueue_u32_future(value + amount)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_blob_echo(_handle: u64, input: RustBuffer) -> RustBuffer {
+    vec_into_rust_buffer(rust_buffer_to_vec(input))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_async_blob_echo(_handle: u64, input: RustBuffer) -> u64 {
+    enqueue_bytes_future(rust_buffer_to_vec(input))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_blob_maybe_echo(_handle: u64, input: RustBufferOpt) -> RustBufferOpt {
+    if input.is_some == 0 {
+        return empty_rust_buffer_opt();
+    }
+    RustBufferOpt {
+        is_some: 1,
+        value: vec_into_rust_buffer(rust_buffer_to_vec(input.value)),
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_async_blob_maybe_echo(_handle: u64, input: RustBufferOpt) -> u64 {
+    if input.is_some == 0 {
+        enqueue_bytes_opt_future(None)
+    } else {
+        enqueue_bytes_opt_future(Some(rust_buffer_to_vec(input.value)))
+    }
 }
 
 #[unsafe(no_mangle)]

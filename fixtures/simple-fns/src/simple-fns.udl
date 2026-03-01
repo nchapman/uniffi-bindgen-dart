@@ -1,5 +1,9 @@
 [Custom]
 typedef string Label;
+[Custom]
+typedef u32 Count;
+[Custom]
+typedef bytes Blob;
 
 namespace simple_fns {
   u32 add(u32 left, u32 right);
@@ -35,6 +39,15 @@ namespace simple_fns {
   record<string, u32> async_counts(record<string, u32> items);
   [Async]
   Label async_label_echo(Label input);
+  Count count_add(Count left, Count right);
+  [Async]
+  Count async_count_add(Count left, Count right);
+  Blob blob_echo(Blob input);
+  [Async]
+  Blob async_blob_echo(Blob input);
+  Blob? blob_maybe_echo(Blob? input);
+  [Async]
+  Blob? async_blob_maybe_echo(Blob? input);
   [Async]
   string async_fail_string();
   [Async]
@@ -145,6 +158,15 @@ interface Counter {
   record<string, u32> async_counts(record<string, u32> items);
   [Async]
   Label async_label_echo(Label input);
+  Count count_plus(Count amount);
+  [Async]
+  Count async_count_plus(Count amount);
+  Blob blob_echo(Blob input);
+  [Async]
+  Blob async_blob_echo(Blob input);
+  Blob? blob_maybe_echo(Blob? input);
+  [Async]
+  Blob? async_blob_maybe_echo(Blob? input);
   [Throws=MathError]
   i32 divide_by(i32 divisor);
   [Throws=MathError]

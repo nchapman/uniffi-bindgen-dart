@@ -141,6 +141,12 @@ void main() {
     expect(contents, contains('Future<void> asyncTick() {'));
     expect(contents, contains('Future<Map<String, int>> asyncCounts(Map<String, int> items) {'));
     expect(contents, contains('Future<String> asyncLabelEcho(String input) {'));
+    expect(contents, contains('int countAdd(int left, int right) {'));
+    expect(contents, contains('Future<int> asyncCountAdd(int left, int right) {'));
+    expect(contents, contains('Uint8List blobEcho(Uint8List input) {'));
+    expect(contents, contains('Future<Uint8List> asyncBlobEcho(Uint8List input) {'));
+    expect(contents, contains('Uint8List? blobMaybeEcho(Uint8List? input) {'));
+    expect(contents, contains('Future<Uint8List?> asyncBlobMaybeEcho(Uint8List? input) {'));
     expect(contents, contains('Future<String> asyncFailString() {'));
     expect(contents, contains('Future<String> asyncNeverString() {'));
     expect(contents, contains('int asyncCancelCount() {'));
@@ -275,6 +281,12 @@ void main() {
     expect(contents, contains('Future<Uint8List> asyncSnapshotBytes() {'));
     expect(contents, contains('Future<Map<String, int>> asyncCounts(Map<String, int> items) {'));
     expect(contents, contains('Future<String> asyncLabelEcho(String input) {'));
+    expect(contents, contains('int countPlus(int amount) {'));
+    expect(contents, contains('Future<int> asyncCountPlus(int amount) {'));
+    expect(contents, contains('Uint8List blobEcho(Uint8List input) {'));
+    expect(contents, contains('Future<Uint8List> asyncBlobEcho(Uint8List input) {'));
+    expect(contents, contains('Uint8List? blobMaybeEcho(Uint8List? input) {'));
+    expect(contents, contains('Future<Uint8List?> asyncBlobMaybeEcho(Uint8List? input) {'));
     expect(contents, contains('Person snapshotPerson() {'));
     expect(contents, contains('Outcome snapshotOutcome() {'));
     expect(contents, contains('Uint8List snapshotBytes() {'));
@@ -472,6 +484,16 @@ void main() {
     expect(asyncCountsResult['beta'], 3);
     expect(asyncCountsResult['total'], 5);
     expect(await bindings.asyncLabelEcho('dart'), 'label:dart');
+    expect(bindings.countAdd(9, 4), 13);
+    expect(await bindings.asyncCountAdd(7, 8), 15);
+    final customBlobBytesBefore = bindings.bytesFreeCount();
+    expect(bindings.blobEcho(Uint8List.fromList([6, 7])), Uint8List.fromList([6, 7]));
+    expect(await bindings.asyncBlobEcho(Uint8List.fromList([8, 9])), Uint8List.fromList([8, 9]));
+    expect(bindings.blobMaybeEcho(Uint8List.fromList([1])), Uint8List.fromList([1]));
+    expect(bindings.blobMaybeEcho(null), isNull);
+    expect(await bindings.asyncBlobMaybeEcho(Uint8List.fromList([2])), Uint8List.fromList([2]));
+    expect(await bindings.asyncBlobMaybeEcho(null), isNull);
+    expect(bindings.bytesFreeCount(), customBlobBytesBefore + 4);
     final cancelBeforeFail = bindings.asyncCancelCount();
     final freeBeforeFail = bindings.asyncFreeCount();
     await expectLater(bindings.asyncFailString(), throwsA(isA<StateError>()));
@@ -541,6 +563,16 @@ void main() {
     expect(counterCounts['counter'], 5);
     expect(counterCounts['total'], 8);
     expect(await counter.asyncLabelEcho('tail'), 'counter:5:tail');
+    expect(counter.countPlus(4), 9);
+    expect(await counter.asyncCountPlus(4), 9);
+    final counterBlobBytesBefore = bindings.bytesFreeCount();
+    expect(counter.blobEcho(Uint8List.fromList([4, 4])), Uint8List.fromList([4, 4]));
+    expect(await counter.asyncBlobEcho(Uint8List.fromList([5, 5])), Uint8List.fromList([5, 5]));
+    expect(counter.blobMaybeEcho(Uint8List.fromList([6])), Uint8List.fromList([6]));
+    expect(counter.blobMaybeEcho(null), isNull);
+    expect(await counter.asyncBlobMaybeEcho(Uint8List.fromList([7])), Uint8List.fromList([7]));
+    expect(await counter.asyncBlobMaybeEcho(null), isNull);
+    expect(bindings.bytesFreeCount(), counterBlobBytesBefore + 4);
     expect(counter.maybeLabel('tail'), 'counter:5:tail');
     expect(counter.maybeLabel(null), 'counter:5:none');
     counter.ingestPerson(const Person(name: 'Eve', age: 9));
@@ -755,6 +787,16 @@ void main() {
     expect(asyncTopCounts['n'], 1);
     expect(asyncTopCounts['total'], 5);
     expect(await asyncLabelEcho('ffi'), 'label:ffi');
+    expect(countAdd(10, 11), 21);
+    expect(await asyncCountAdd(10, 1), 11);
+    final topBlobBytesBefore = bytesFreeCount();
+    expect(blobEcho(Uint8List.fromList([9, 1])), Uint8List.fromList([9, 1]));
+    expect(await asyncBlobEcho(Uint8List.fromList([2, 3])), Uint8List.fromList([2, 3]));
+    expect(blobMaybeEcho(Uint8List.fromList([4])), Uint8List.fromList([4]));
+    expect(blobMaybeEcho(null), isNull);
+    expect(await asyncBlobMaybeEcho(Uint8List.fromList([5])), Uint8List.fromList([5]));
+    expect(await asyncBlobMaybeEcho(null), isNull);
+    expect(bytesFreeCount(), topBlobBytesBefore + 4);
     final topCancelBeforeFail = asyncCancelCount();
     final topFreeBeforeFail = asyncFreeCount();
     await expectLater(asyncFailString(), throwsA(isA<StateError>()));
@@ -816,6 +858,16 @@ void main() {
     expect(topCounterCounts['counter'], 3);
     expect(topCounterCounts['total'], 5);
     expect(await topCounter.asyncLabelEcho('ok'), 'counter:3:ok');
+    expect(topCounter.countPlus(7), 10);
+    expect(await topCounter.asyncCountPlus(7), 10);
+    final topCounterBlobBytesBefore = bytesFreeCount();
+    expect(topCounter.blobEcho(Uint8List.fromList([1, 3])), Uint8List.fromList([1, 3]));
+    expect(await topCounter.asyncBlobEcho(Uint8List.fromList([2, 4])), Uint8List.fromList([2, 4]));
+    expect(topCounter.blobMaybeEcho(Uint8List.fromList([6])), Uint8List.fromList([6]));
+    expect(topCounter.blobMaybeEcho(null), isNull);
+    expect(await topCounter.asyncBlobMaybeEcho(Uint8List.fromList([8])), Uint8List.fromList([8]));
+    expect(await topCounter.asyncBlobMaybeEcho(null), isNull);
+    expect(bytesFreeCount(), topCounterBlobBytesBefore + 4);
     expect(
       () => topCounter.checkedApplyAdderWith(const _TestAdder(2), 2, 0),
       throwsA(isA<MathErrorExceptionDivisionByZero>()),

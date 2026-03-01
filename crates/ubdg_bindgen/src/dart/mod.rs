@@ -3438,6 +3438,79 @@ fn render_bound_methods(
                     out.push_str("    } finally {\n");
                     out.push_str("      _rustBytesFree(resultBuf);\n");
                     out.push_str("    }\n");
+                } else if is_runtime_optional_bytes_type(ret) {
+                    out.push_str(&format!(
+                        "    final _RustBufferOpt resultOpt = {call_expr};\n"
+                    ));
+                    out.push_str("    if (resultOpt.isSome == 0) {\n");
+                    out.push_str("      return null;\n");
+                    out.push_str("    }\n");
+                    out.push_str("    final _RustBuffer resultBuf = resultOpt.value;\n");
+                    out.push_str("    final ffi.Pointer<ffi.Uint8> resultData = resultBuf.data;\n");
+                    out.push_str("    final int resultLen = resultBuf.len;\n");
+                    out.push_str("    if (resultData == ffi.nullptr) {\n");
+                    out.push_str("      if (resultLen == 0) {\n");
+                    out.push_str("        _rustBytesFree(resultBuf);\n");
+                    out.push_str("        return Uint8List(0);\n");
+                    out.push_str("      }\n");
+                    out.push_str(&format!(
+                        "      throw StateError('Rust returned invalid optional buffer for {}');\n",
+                        method_symbol
+                    ));
+                    out.push_str("    }\n");
+                    out.push_str("    try {\n");
+                    out.push_str(
+                        "      return Uint8List.fromList(resultData.asTypedList(resultLen));\n",
+                    );
+                    out.push_str("    } finally {\n");
+                    out.push_str("      _rustBytesFree(resultBuf);\n");
+                    out.push_str("    }\n");
+                } else if is_runtime_sequence_bytes_type(ret) {
+                    out.push_str(&format!(
+                        "    final _RustBufferVec resultVec = {call_expr};\n"
+                    ));
+                    out.push_str(
+                        "    final ffi.Pointer<_RustBuffer> resultData = resultVec.data;\n",
+                    );
+                    out.push_str("    final int resultLen = resultVec.len;\n");
+                    out.push_str("    if (resultData == ffi.nullptr) {\n");
+                    out.push_str("      if (resultLen == 0) {\n");
+                    out.push_str("        _rustBytesVecFree(resultVec);\n");
+                    out.push_str("        return <Uint8List>[];\n");
+                    out.push_str("      }\n");
+                    out.push_str(&format!(
+                        "      throw StateError('Rust returned invalid byte vector for {}');\n",
+                        method_symbol
+                    ));
+                    out.push_str("    }\n");
+                    out.push_str("    try {\n");
+                    out.push_str("      final out = <Uint8List>[];\n");
+                    out.push_str("      for (var i = 0; i < resultLen; i++) {\n");
+                    out.push_str("        final _RustBuffer item = (resultData + i).ref;\n");
+                    out.push_str("        final ffi.Pointer<ffi.Uint8> itemData = item.data;\n");
+                    out.push_str("        final int itemLen = item.len;\n");
+                    out.push_str("        if (itemData == ffi.nullptr) {\n");
+                    out.push_str("          if (itemLen == 0) {\n");
+                    out.push_str("            out.add(Uint8List(0));\n");
+                    out.push_str("            continue;\n");
+                    out.push_str("          }\n");
+                    out.push_str(&format!(
+                        "          throw StateError('Rust returned invalid nested buffer for {}');\n",
+                        method_symbol
+                    ));
+                    out.push_str("        }\n");
+                    out.push_str("        try {\n");
+                    out.push_str(
+                        "          out.add(Uint8List.fromList(itemData.asTypedList(itemLen)));\n",
+                    );
+                    out.push_str("        } finally {\n");
+                    out.push_str("          _rustBytesFree(item);\n");
+                    out.push_str("        }\n");
+                    out.push_str("      }\n");
+                    out.push_str("      return out;\n");
+                    out.push_str("    } finally {\n");
+                    out.push_str("      _rustBytesVecFree(resultVec);\n");
+                    out.push_str("    }\n");
                 } else {
                     let decode = render_plain_ffi_decode_expr(ret, &call_expr);
                     out.push_str(&format!("    return {decode};\n"));
@@ -4926,6 +4999,10 @@ namespace demo {
             r#"
 [Custom]
 typedef string Label;
+[Custom]
+typedef u32 Count;
+[Custom]
+typedef bytes Blob;
 
 namespace async_demo {
   [Async]
@@ -4944,6 +5021,12 @@ namespace async_demo {
   record<string, u32> summarize_async(record<string, u32> values);
   [Async]
   Label label_echo_async(Label input);
+  [Async]
+  Count count_echo_async(Count input);
+  [Async]
+  Blob blob_echo_async(Blob input);
+  [Async]
+  Blob? blob_echo_maybe_async(Blob? input);
 };
 
 interface Counter {
@@ -4958,6 +5041,12 @@ interface Counter {
   record<string, u32> async_counts(record<string, u32> items);
   [Async]
   Label async_label_echo(Label input);
+  [Async]
+  Count async_count();
+  [Async]
+  Blob async_blob();
+  [Async]
+  Blob? async_blob_maybe(Blob? input);
 };
 "#,
         )
@@ -4986,6 +5075,9 @@ interface Counter {
             content.contains("Future<Map<String, int>> summarizeAsync(Map<String, int> values) {")
         );
         assert!(content.contains("Future<String> labelEchoAsync(String input) {"));
+        assert!(content.contains("Future<int> countEchoAsync(int input) {"));
+        assert!(content.contains("Future<Uint8List> blobEchoAsync(Uint8List input) {"));
+        assert!(content.contains("Future<Uint8List?> blobEchoMaybeAsync(Uint8List? input) {"));
         assert!(content.contains("rust_future_poll_string"));
         assert!(content.contains("rust_future_complete_string"));
         assert!(content.contains("rust_future_poll_u32"));
@@ -5006,6 +5098,9 @@ interface Counter {
         assert!(content.contains("Future<Uint8List> asyncSnapshotBytes() {"));
         assert!(content.contains("Future<Map<String, int>> asyncCounts(Map<String, int> items) {"));
         assert!(content.contains("Future<String> asyncLabelEcho(String input) {"));
+        assert!(content.contains("Future<int> asyncCount() {"));
+        assert!(content.contains("Future<Uint8List> asyncBlob() {"));
+        assert!(content.contains("Future<Uint8List?> asyncBlobMaybe(Uint8List? input) {"));
         assert!(content.contains("return _ffi.counterInvokeAsyncSnapshotBytes(_handle);"));
     }
 
