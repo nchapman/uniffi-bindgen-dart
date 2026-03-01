@@ -44,6 +44,8 @@ void main() {
     expect(contents, contains("libraryName = 'uniffi_simple_fns';"));
     expect(contents, contains('int add(int left, int right) {'));
     expect(contents, contains('int applyAdder(Adder adder, int left, int right) {'));
+    expect(contents, contains('Future<int> asyncApplyAdder(Adder adder, int left, int right) {'));
+    expect(contents, contains('int checkedApplyAdder(Adder adder, int left, int right) {'));
     expect(contents, contains('int applyFormatter(Formatter formatter, String? prefix, Person person, Outcome outcome) {'));
     expect(contents, contains('Person echoPerson(Person input) {'));
     expect(contents, contains('Outcome evolveOutcome(Outcome input) {'));
@@ -145,9 +147,19 @@ void main() {
     expect(contents, contains('static Counter withPerson(Person seed) {'));
     expect(contents, contains('void addValue(int amount) {'));
     expect(contents, contains('int applyAdderWith(Adder adder, int left, int right) {'));
+    expect(contents, contains('Future<int> asyncApplyAdderWith(Adder adder, int left, int right) {'));
+    expect(contents, contains('int checkedApplyAdderWith(Adder adder, int left, int right) {'));
     expect(
       contents,
       contains('int counterInvokeApplyAdderWith(int handle, Adder adder, int left, int right) {'),
+    );
+    expect(
+      contents,
+      contains('Future<int> counterInvokeAsyncApplyAdderWith(int handle, Adder adder, int left, int right) async {'),
+    );
+    expect(
+      contents,
+      contains('int counterInvokeCheckedApplyAdderWith(int handle, Adder adder, int left, int right) {'),
     );
     expect(contents, contains('int currentValue() {'));
     expect(contents, contains('void setLabel(String label) {'));
@@ -192,6 +204,22 @@ void main() {
     expect(bindings.bytesVecFreeCount(), 0);
     expect(bindings.add(20, 22), 42);
     expect(bindings.applyAdder(const _TestAdder(5), 20, 22), 48);
+    expect(await bindings.asyncApplyAdder(const _TestAdder(3), 20, 22), 47);
+    expect(bindings.checkedApplyAdder(const _TestAdder(1), 2, 3), 6);
+    expect(
+      () => bindings.checkedApplyAdder(const _TestAdder(1), 2, 0),
+      throwsA(isA<MathErrorExceptionDivisionByZero>()),
+    );
+    expect(
+      () => bindings.checkedApplyAdder(const _TestAdder(1), 0, 3),
+      throwsA(
+        isA<MathErrorExceptionNegativeInput>().having(
+          (e) => e.value,
+          'value',
+          -1,
+        ),
+      ),
+    );
     expect(
       bindings.applyFormatter(
         const _TestFormatter(),
@@ -254,7 +282,7 @@ void main() {
     final asyncTickBefore = bindings.currentTick();
     await bindings.asyncTick();
     expect(bindings.currentTick(), asyncTickBefore + 1);
-    expect(bindings.freeCount(), 3);
+    expect(bindings.freeCount(), 6);
     expect(bindings.checkedDivide(12, 3), 4);
     expect(
       () => bindings.checkedDivide(10, 0),
@@ -270,12 +298,28 @@ void main() {
         ),
       ),
     );
-    expect(bindings.freeCount(), 6);
+    expect(bindings.freeCount(), 9);
     final counter = bindings.counterCreateNew(10);
     expect(counter.currentValue(), 10);
     counter.addValue(5);
     expect(counter.currentValue(), 15);
     expect(counter.applyAdderWith(const _TestAdder(1), 2, 3), 21);
+    expect(await counter.asyncApplyAdderWith(const _TestAdder(1), 2, 3), 21);
+    expect(counter.checkedApplyAdderWith(const _TestAdder(1), 2, 3), 21);
+    expect(
+      () => counter.checkedApplyAdderWith(const _TestAdder(1), 2, 0),
+      throwsA(isA<MathErrorExceptionDivisionByZero>()),
+    );
+    expect(
+      () => counter.checkedApplyAdderWith(const _TestAdder(1), 0, 3),
+      throwsA(
+        isA<MathErrorExceptionNegativeInput>().having(
+          (e) => e.value,
+          'value',
+          -1,
+        ),
+      ),
+    );
     expect(counter.divideBy(3), 5);
     expect(counter.currentValue(), 5);
     counter.setLabel('alpha');
@@ -372,6 +416,22 @@ void main() {
     expect(bytesVecFreeCount(), 0);
     expect(add(1, 2), 3);
     expect(applyAdder(const _TestAdder(2), 3, 4), 10);
+    expect(await asyncApplyAdder(const _TestAdder(1), 3, 4), 10);
+    expect(checkedApplyAdder(const _TestAdder(1), 3, 4), 8);
+    expect(
+      () => checkedApplyAdder(const _TestAdder(1), 3, 0),
+      throwsA(isA<MathErrorExceptionDivisionByZero>()),
+    );
+    expect(
+      () => checkedApplyAdder(const _TestAdder(1), 0, 4),
+      throwsA(
+        isA<MathErrorExceptionNegativeInput>().having(
+          (e) => e.value,
+          'value',
+          -1,
+        ),
+      ),
+    );
     expect(
       applyFormatter(
         const _TestFormatter(),
@@ -419,7 +479,7 @@ void main() {
     final asyncGlobalBefore = currentTick();
     await asyncTick();
     expect(currentTick(), asyncGlobalBefore + 1);
-    expect(freeCount(), 3);
+    expect(freeCount(), 6);
     expect(checkedDivide(20, 4), 5);
     expect(
       () => checkedDivide(7, 0),
@@ -435,13 +495,13 @@ void main() {
         ),
       ),
     );
-    expect(freeCount(), 6);
+    expect(freeCount(), 9);
     expect(maybeGreet('ffi'), 'maybe, ffi');
-    expect(freeCount(), 7);
+    expect(freeCount(), 10);
     expect(maybeGreet(null), isNull);
-    expect(freeCount(), 7);
+    expect(freeCount(), 10);
     expect(() => brokenGreet(), throwsA(isA<StateError>()));
-    expect(freeCount(), 7);
+    expect(freeCount(), 10);
     expect(isEven(10), isTrue);
     expect(cycleColor(Color.red), Color.green);
     final freeBeforeTopOutcome = freeCount();
@@ -456,6 +516,12 @@ void main() {
     expect(scale32(0.5, 6.0), closeTo(3.0, 0.0001));
     final topCounter = Counter.create(3);
     expect(topCounter.applyAdderWith(const _TestAdder(2), 2, 3), 10);
+    expect(await topCounter.asyncApplyAdderWith(const _TestAdder(2), 2, 3), 10);
+    expect(topCounter.checkedApplyAdderWith(const _TestAdder(2), 2, 3), 10);
+    expect(
+      () => topCounter.checkedApplyAdderWith(const _TestAdder(2), 2, 0),
+      throwsA(isA<MathErrorExceptionDivisionByZero>()),
+    );
     topCounter.close();
     final globalBefore = currentTick();
     tick();

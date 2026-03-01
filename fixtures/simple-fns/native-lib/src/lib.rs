@@ -223,11 +223,8 @@ pub extern "C" fn adder_callback_init(vtable: *const AdderVTable) {
     *ADDER_VTABLE.lock().expect("adder vtable lock") = Some(value);
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn apply_adder(adder: u64, left: u32, right: u32) -> u32 {
-    let Some(vtable) = *ADDER_VTABLE.lock().expect("adder vtable lock") else {
-        return 0;
-    };
+fn invoke_adder_callback(adder: u64, left: u32, right: u32) -> Option<u32> {
+    let vtable = (*ADDER_VTABLE.lock().expect("adder vtable lock"))?;
     let callback_handle = (vtable.uniffi_clone)(adder);
     let mut out = 0_u32;
     let mut status = RustCallStatus {
@@ -237,10 +234,46 @@ pub extern "C" fn apply_adder(adder: u64, left: u32, right: u32) -> u32 {
     (vtable.add)(callback_handle, left, right, &mut out, &mut status);
     (vtable.uniffi_free)(callback_handle);
     if status.code == RUST_CALL_STATUS_SUCCESS {
-        out + 1
+        Some(out)
     } else {
-        0
+        None
     }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn apply_adder(adder: u64, left: u32, right: u32) -> u32 {
+    invoke_adder_callback(adder, left, right).map(|out| out + 1).unwrap_or(0)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn async_apply_adder(adder: u64, left: u32, right: u32) -> u64 {
+    let result = invoke_adder_callback(adder, left, right).map(|out| out + 2).unwrap_or(0);
+    enqueue_u32_future(result)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn checked_apply_adder(adder: u64, left: u32, right: u32) -> *mut c_char {
+    let envelope = if right == 0 {
+        serde_json::json!({
+            "err": {
+                "tag": "divisionByZero"
+            }
+        })
+    } else if left == 0 {
+        serde_json::json!({
+            "err": {
+                "tag": "negativeInput",
+                "value": -1
+            }
+        })
+    } else {
+        serde_json::json!({
+            "ok": invoke_adder_callback(adder, left, right).unwrap_or(0)
+        })
+    };
+    CString::new(envelope.to_string())
+        .expect("valid CString")
+        .into_raw()
 }
 
 #[unsafe(no_mangle)]
@@ -783,20 +816,7 @@ pub extern "C" fn counter_current_value(handle: u64) -> u32 {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn counter_apply_adder_with(handle: u64, adder: u64, left: u32, right: u32) -> u32 {
-    let Some(vtable) = *ADDER_VTABLE.lock().expect("adder vtable lock") else {
-        return 0;
-    };
-    let callback_handle = (vtable.uniffi_clone)(adder);
-    let mut out = 0_u32;
-    let mut status = RustCallStatus {
-        code: RUST_CALL_STATUS_SUCCESS,
-        error_buf: std::ptr::null_mut(),
-    };
-    (vtable.add)(callback_handle, left, right, &mut out, &mut status);
-    (vtable.uniffi_free)(callback_handle);
-    if status.code != RUST_CALL_STATUS_SUCCESS {
-        return 0;
-    }
+    let out = invoke_adder_callback(adder, left, right).unwrap_or(0);
     let base = COUNTERS
         .lock()
         .expect("counter map lock")
@@ -804,6 +824,36 @@ pub extern "C" fn counter_apply_adder_with(handle: u64, adder: u64, left: u32, r
         .copied()
         .unwrap_or_default() as u32;
     base + out
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_async_apply_adder_with(handle: u64, adder: u64, left: u32, right: u32) -> u64 {
+    enqueue_u32_future(counter_apply_adder_with(handle, adder, left, right))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_checked_apply_adder_with(
+    handle: u64,
+    adder: u64,
+    left: u32,
+    right: u32,
+) -> *mut c_char {
+    let envelope = if right == 0 {
+        serde_json::json!({
+            "err": { "tag": "divisionByZero" }
+        })
+    } else if left == 0 {
+        serde_json::json!({
+            "err": { "tag": "negativeInput", "value": -1 }
+        })
+    } else {
+        serde_json::json!({
+            "ok": counter_apply_adder_with(handle, adder, left, right)
+        })
+    };
+    CString::new(envelope.to_string())
+        .expect("valid CString")
+        .into_raw()
 }
 
 #[unsafe(no_mangle)]

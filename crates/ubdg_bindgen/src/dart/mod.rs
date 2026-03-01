@@ -379,8 +379,13 @@ fn render_dart_scaffold(
 ) -> String {
     let needs_callback_runtime =
         has_runtime_callback_support(functions, objects, callback_interfaces, records, enums);
-    let needs_async_rust_future =
-        has_runtime_async_rust_future_support(functions, objects, records, enums);
+    let needs_async_rust_future = has_runtime_async_rust_future_support(
+        functions,
+        objects,
+        callback_interfaces,
+        records,
+        enums,
+    );
     let needs_rust_call_status = needs_async_rust_future || needs_callback_runtime;
     let needs_typed_data = functions.iter().any(UdlFunction::uses_bytes)
         || objects.iter().any(|o| {
@@ -1308,13 +1313,23 @@ fn render_bound_methods(
         records,
         enums,
     );
-    let needs_async_rust_future =
-        has_runtime_async_rust_future_support(functions, objects, records, enums);
+    let needs_async_rust_future = has_runtime_async_rust_future_support(
+        functions,
+        objects,
+        callback_interfaces,
+        records,
+        enums,
+    );
     let needs_string_free = needs_async_rust_future
         || functions.iter().any(|f| {
             is_runtime_ffi_compatible_function(f, records, enums)
                 && (f.returns_runtime_string()
-                    || is_runtime_throwing_ffi_compatible_function(f, records, enums)
+                    || is_runtime_throwing_ffi_compatible_function(
+                        f,
+                        callback_interfaces,
+                        records,
+                        enums,
+                    )
                     || f.return_type
                         .as_ref()
                         .is_some_and(|t| is_runtime_record_or_enum_string_type(t, enums)))
@@ -1363,15 +1378,17 @@ fn render_bound_methods(
 
     for function in functions {
         let is_runtime_supported = is_runtime_ffi_compatible_function(function, records, enums);
-        let is_callback_supported =
+        let is_sync_callback_supported =
             is_runtime_callback_compatible_function(function, callback_interfaces, records, enums);
-        if !is_runtime_supported && !is_callback_supported {
+        let has_callback_args =
+            has_runtime_callback_args_in_args(&function.args, callback_interfaces, records, enums);
+        if !is_runtime_supported && !is_sync_callback_supported && !has_callback_args {
             continue;
         }
 
         let method_name = safe_dart_identifier(&to_lower_camel(&function.name));
         let field_name = format!("_{}", method_name);
-        if is_callback_supported {
+        if is_sync_callback_supported {
             let return_type = function
                 .return_type
                 .as_ref()
@@ -1475,7 +1492,12 @@ fn render_bound_methods(
             .as_ref()
             .map(map_uniffi_type_to_dart)
             .unwrap_or_else(|| "void".to_string());
-        let is_throwing = is_runtime_throwing_ffi_compatible_function(function, records, enums);
+        let is_throwing = is_runtime_throwing_ffi_compatible_function(
+            function,
+            callback_interfaces,
+            records,
+            enums,
+        );
         let native_return = function
             .return_type
             .as_ref()
@@ -1528,6 +1550,27 @@ fn render_bound_methods(
 
         for arg in &function.args {
             let arg_name = safe_dart_identifier(&to_lower_camel(&arg.name));
+            dart_args.push(format!(
+                "{} {}",
+                map_uniffi_type_to_dart(&arg.type_),
+                arg_name
+            ));
+            if let Some(callback_name) = callback_interface_name_from_type(&arg.type_) {
+                let init_done_field = callback_init_done_field_name(callback_name);
+                let bridge_name = callback_bridge_class_name(callback_name);
+                let handle_name = format!("{arg_name}Handle");
+                native_args.push(format!("ffi.Uint64 {arg_name}"));
+                dart_ffi_args.push(format!("int {arg_name}"));
+                pre_call.push(format!("    {init_done_field};\n"));
+                pre_call.push(format!(
+                    "    final int {handle_name} = {bridge_name}.instance.register({arg_name});\n"
+                ));
+                post_call.push(format!(
+                    "    {bridge_name}.instance.release({handle_name});\n"
+                ));
+                call_args.push(handle_name);
+                continue;
+            }
             let Some(native_type) = map_runtime_native_ffi_type(&arg.type_, records, enums) else {
                 signature_compatible = false;
                 break;
@@ -1538,11 +1581,6 @@ fn render_bound_methods(
             };
             native_args.push(format!("{native_type} {arg_name}"));
             dart_ffi_args.push(format!("{dart_ffi_type} {arg_name}"));
-            dart_args.push(format!(
-                "{} {}",
-                map_uniffi_type_to_dart(&arg.type_),
-                arg_name
-            ));
             if is_runtime_string_type(&arg.type_) {
                 let native_name = format!("{arg_name}Native");
                 pre_call.push(format!(
@@ -1686,7 +1724,12 @@ fn render_bound_methods(
             continue;
         }
 
-        if is_runtime_async_rust_future_compatible_function(function, records, enums) {
+        if is_runtime_async_rust_future_compatible_function(
+            function,
+            callback_interfaces,
+            records,
+            enums,
+        ) {
             let Some(async_spec) =
                 async_rust_future_spec(function.return_type.as_ref(), records, enums)
             else {
@@ -2334,8 +2377,12 @@ fn render_bound_methods(
         }
 
         for method in &object.methods {
-            let is_callback_supported =
-                is_runtime_callback_compatible_method(method, callback_interfaces, records, enums);
+            let has_callback_args = has_runtime_callback_args_in_args(
+                &method.args,
+                callback_interfaces,
+                records,
+                enums,
+            );
             let supported_return = method
                 .return_type
                 .as_ref()
@@ -2345,7 +2392,7 @@ fn render_bound_methods(
                 .args
                 .iter()
                 .all(|a| is_runtime_ffi_compatible_type(&a.type_, records, enums));
-            if !is_callback_supported && (!supported_return || !supports_runtime_args) {
+            if !has_callback_args && (!supported_return || !supports_runtime_args) {
                 continue;
             }
             let method_camel = to_upper_camel(&method.name);
@@ -2367,7 +2414,7 @@ fn render_bound_methods(
                     "{} {arg_name}",
                     map_uniffi_type_to_dart(&arg.type_)
                 ));
-                if is_callback_supported {
+                if has_callback_args {
                     if let Some(callback_name) = callback_interface_name_from_type(&arg.type_) {
                         let init_done_field = callback_init_done_field_name(callback_name);
                         let bridge_name = callback_bridge_class_name(callback_name);
@@ -2456,7 +2503,12 @@ fn render_bound_methods(
                     .to_string()
             };
 
-            if is_runtime_async_rust_future_compatible_method(method, records, enums) {
+            if is_runtime_async_rust_future_compatible_method(
+                method,
+                callback_interfaces,
+                records,
+                enums,
+            ) {
                 let Some(async_spec) =
                     async_rust_future_spec(method.return_type.as_ref(), records, enums)
                 else {
@@ -2981,8 +3033,12 @@ fn render_object_classes(
         }
 
         for method in &object.methods {
-            let is_callback_supported =
-                is_runtime_callback_compatible_method(method, callback_interfaces, records, enums);
+            let has_callback_args = has_runtime_callback_args_in_args(
+                &method.args,
+                callback_interfaces,
+                records,
+                enums,
+            );
             let supported_return = method
                 .return_type
                 .as_ref()
@@ -2992,7 +3048,7 @@ fn render_object_classes(
                 .args
                 .iter()
                 .all(|a| is_runtime_ffi_compatible_type(&a.type_, records, enums));
-            if !is_callback_supported && (!supported_return || !supports_runtime_args) {
+            if !has_callback_args && (!supported_return || !supports_runtime_args) {
                 continue;
             }
             let method_name = safe_dart_identifier(&to_lower_camel(&method.name));
@@ -3034,7 +3090,12 @@ fn render_object_classes(
                 format!("_handle, {arg_names}")
             };
             if method.is_async {
-                if is_runtime_async_rust_future_compatible_method(method, records, enums) {
+                if is_runtime_async_rust_future_compatible_method(
+                    method,
+                    callback_interfaces,
+                    records,
+                    enums,
+                ) {
                     out.push_str(&format!("    return _ffi.{invoke_name}({invoke_args});\n"));
                 } else {
                     out.push_str(&format!(
@@ -3070,6 +3131,7 @@ fn render_function_stubs(
     let has_runtime_functions = functions.iter().any(|f| {
         is_runtime_ffi_compatible_function(f, records, enums)
             || is_runtime_callback_compatible_function(f, callback_interfaces, records, enums)
+            || has_runtime_callback_args_in_args(&f.args, callback_interfaces, records, enums)
     }) || !objects.is_empty();
     out.push('\n');
     if has_runtime_functions {
@@ -3122,9 +3184,15 @@ fn render_function_stubs(
         out.push_str(&format!("{signature_return_type} {fn_name}({args}) {{\n"));
         if is_runtime_ffi_compatible_function(f, records, enums)
             || is_runtime_callback_compatible_function(f, callback_interfaces, records, enums)
+            || has_runtime_callback_args_in_args(&f.args, callback_interfaces, records, enums)
         {
             if f.is_async {
-                if is_runtime_async_rust_future_compatible_function(f, records, enums) {
+                if is_runtime_async_rust_future_compatible_function(
+                    f,
+                    callback_interfaces,
+                    records,
+                    enums,
+                ) {
                     out.push_str(&format!("  return _bindings().{fn_name}({arg_names});\n"));
                 } else {
                     out.push_str(&format!(
@@ -3155,10 +3223,10 @@ fn has_runtime_callback_support(
 ) -> bool {
     functions
         .iter()
-        .any(|f| is_runtime_callback_compatible_function(f, callback_interfaces, records, enums))
+        .any(|f| has_runtime_callback_args_in_args(&f.args, callback_interfaces, records, enums))
         || objects.iter().any(|o| {
             o.methods.iter().any(|m| {
-                is_runtime_callback_compatible_method(m, callback_interfaces, records, enums)
+                has_runtime_callback_args_in_args(&m.args, callback_interfaces, records, enums)
             })
         })
 }
@@ -3180,65 +3248,7 @@ fn is_runtime_callback_compatible_function(
     if !return_supported {
         return false;
     }
-    let mut saw_callback = false;
-    for arg in &function.args {
-        if let Some(callback_name) = callback_interface_name_from_type(&arg.type_) {
-            saw_callback = true;
-            let Some(callback_interface) = callback_interfaces
-                .iter()
-                .find(|cb| cb.name == callback_name)
-            else {
-                return false;
-            };
-            if !is_runtime_callback_interface_compatible(callback_interface, records, enums) {
-                return false;
-            }
-            continue;
-        }
-        if !is_runtime_ffi_compatible_type(&arg.type_, records, enums) {
-            return false;
-        }
-    }
-    saw_callback
-}
-
-fn is_runtime_callback_compatible_method(
-    method: &UdlObjectMethod,
-    callback_interfaces: &[UdlCallbackInterface],
-    records: &[UdlRecord],
-    enums: &[UdlEnum],
-) -> bool {
-    if method.is_async || method.throws_type.is_some() {
-        return false;
-    }
-    let return_supported = method
-        .return_type
-        .as_ref()
-        .map(is_runtime_callback_function_return_compatible_type)
-        .unwrap_or(true);
-    if !return_supported {
-        return false;
-    }
-    let mut saw_callback = false;
-    for arg in &method.args {
-        if let Some(callback_name) = callback_interface_name_from_type(&arg.type_) {
-            saw_callback = true;
-            let Some(callback_interface) = callback_interfaces
-                .iter()
-                .find(|cb| cb.name == callback_name)
-            else {
-                return false;
-            };
-            if !is_runtime_callback_interface_compatible(callback_interface, records, enums) {
-                return false;
-            }
-            continue;
-        }
-        if !is_runtime_ffi_compatible_type(&arg.type_, records, enums) {
-            return false;
-        }
-    }
-    saw_callback
+    has_runtime_callback_args_in_args(&function.args, callback_interfaces, records, enums)
 }
 
 fn callback_interfaces_used_for_runtime<'a>(
@@ -3252,9 +3262,9 @@ fn callback_interfaces_used_for_runtime<'a>(
         .iter()
         .filter(|callback_interface| {
             is_runtime_callback_interface_compatible(callback_interface, records, enums)
-                && functions.iter().any(|function| {
-                    is_runtime_callback_compatible_function(
-                        function,
+                && (functions.iter().any(|function| {
+                    has_runtime_callback_args_in_args(
+                        &function.args,
                         callback_interfaces,
                         records,
                         enums,
@@ -3262,11 +3272,10 @@ fn callback_interfaces_used_for_runtime<'a>(
                         callback_interface_name_from_type(&arg.type_)
                             .is_some_and(|name| name == callback_interface.name)
                     })
-                })
-                || objects.iter().any(|object| {
+                }) || objects.iter().any(|object| {
                     object.methods.iter().any(|method| {
-                        is_runtime_callback_compatible_method(
-                            method,
+                        has_runtime_callback_args_in_args(
+                            &method.args,
                             callback_interfaces,
                             records,
                             enums,
@@ -3275,9 +3284,44 @@ fn callback_interfaces_used_for_runtime<'a>(
                                 .is_some_and(|name| name == callback_interface.name)
                         })
                     })
-                })
+                }))
         })
         .collect()
+}
+
+fn runtime_args_compatible_with_optional_callbacks(
+    args: &[UdlArg],
+    callback_interfaces: &[UdlCallbackInterface],
+    records: &[UdlRecord],
+    enums: &[UdlEnum],
+) -> Option<bool> {
+    let mut saw_callback = false;
+    for arg in args {
+        if let Some(callback_name) = callback_interface_name_from_type(&arg.type_) {
+            saw_callback = true;
+            let callback_interface = callback_interfaces
+                .iter()
+                .find(|cb| cb.name == callback_name)?;
+            if !is_runtime_callback_interface_compatible(callback_interface, records, enums) {
+                return None;
+            }
+            continue;
+        }
+        if !is_runtime_ffi_compatible_type(&arg.type_, records, enums) {
+            return None;
+        }
+    }
+    Some(saw_callback)
+}
+
+fn has_runtime_callback_args_in_args(
+    args: &[UdlArg],
+    callback_interfaces: &[UdlCallbackInterface],
+    records: &[UdlRecord],
+    enums: &[UdlEnum],
+) -> bool {
+    runtime_args_compatible_with_optional_callbacks(args, callback_interfaces, records, enums)
+        .unwrap_or(false)
 }
 
 fn callback_interface_name_from_type(type_: &Type) -> Option<&str> {
@@ -3448,17 +3492,17 @@ fn render_callback_return_encode_expr(
 fn has_runtime_async_rust_future_support(
     functions: &[UdlFunction],
     objects: &[UdlObject],
+    callback_interfaces: &[UdlCallbackInterface],
     records: &[UdlRecord],
     enums: &[UdlEnum],
 ) -> bool {
-    functions
-        .iter()
-        .any(|f| is_runtime_async_rust_future_compatible_function(f, records, enums))
-        || objects.iter().any(|o| {
-            o.methods
-                .iter()
-                .any(|m| is_runtime_async_rust_future_compatible_method(m, records, enums))
+    functions.iter().any(|f| {
+        is_runtime_async_rust_future_compatible_function(f, callback_interfaces, records, enums)
+    }) || objects.iter().any(|o| {
+        o.methods.iter().any(|m| {
+            is_runtime_async_rust_future_compatible_method(m, callback_interfaces, records, enums)
         })
+    })
 }
 
 struct AsyncRustFutureSpec {
@@ -3564,27 +3608,43 @@ fn async_rust_future_spec(
 
 fn is_runtime_async_rust_future_compatible_function(
     function: &UdlFunction,
+    callback_interfaces: &[UdlCallbackInterface],
     records: &[UdlRecord],
     enums: &[UdlEnum],
 ) -> bool {
     function.is_async
         && function.throws_type.is_none()
-        && is_runtime_ffi_compatible_function(function, records, enums)
+        && function
+            .return_type
+            .as_ref()
+            .map(|t| is_runtime_ffi_compatible_type(t, records, enums))
+            .unwrap_or(true)
+        && runtime_args_compatible_with_optional_callbacks(
+            &function.args,
+            callback_interfaces,
+            records,
+            enums,
+        )
+        .is_some()
         && async_rust_future_spec(function.return_type.as_ref(), records, enums).is_some()
 }
 
 fn is_runtime_async_rust_future_compatible_method(
     method: &UdlObjectMethod,
+    callback_interfaces: &[UdlCallbackInterface],
     records: &[UdlRecord],
     enums: &[UdlEnum],
 ) -> bool {
     method.is_async
         && method.throws_type.is_none()
         && async_rust_future_spec(method.return_type.as_ref(), records, enums).is_some()
-        && method
-            .args
-            .iter()
-            .all(|a| is_runtime_ffi_compatible_type(&a.type_, records, enums))
+        && runtime_args_compatible_with_optional_callbacks(
+            &method.args,
+            callback_interfaces,
+            records,
+            enums,
+        )
+        .is_some()
 }
 
 fn is_runtime_ffi_compatible_function(
@@ -3613,10 +3673,30 @@ fn is_runtime_ffi_compatible_function(
 
 fn is_runtime_throwing_ffi_compatible_function(
     function: &UdlFunction,
+    callback_interfaces: &[UdlCallbackInterface],
     records: &[UdlRecord],
     enums: &[UdlEnum],
 ) -> bool {
-    function.throws_type.is_some() && is_runtime_ffi_compatible_function(function, records, enums)
+    function
+        .throws_type
+        .as_ref()
+        .map(|t| {
+            is_runtime_ffi_compatible_type(t, records, enums)
+                && is_runtime_error_enum_type(t, enums)
+        })
+        .unwrap_or(false)
+        && function
+            .return_type
+            .as_ref()
+            .map(|t| is_runtime_ffi_compatible_type(t, records, enums))
+            .unwrap_or(true)
+        && runtime_args_compatible_with_optional_callbacks(
+            &function.args,
+            callback_interfaces,
+            records,
+            enums,
+        )
+        .is_some()
 }
 
 fn is_runtime_ffi_compatible_type(type_: &Type, records: &[UdlRecord], enums: &[UdlEnum]) -> bool {
@@ -4156,6 +4236,10 @@ interface Counter {
             r#"
 namespace callbacks {
   u32 apply_adder(Adder adder, u32 left, u32 right);
+  [Async]
+  u32 apply_adder_async(Adder adder, u32 left, u32 right);
+  [Throws=MathError]
+  u32 checked_apply_adder(Adder adder, u32 left, u32 right);
   u32 apply_formatter(Formatter formatter, string? prefix, Person person, Outcome outcome);
 };
 
@@ -4181,6 +4265,15 @@ interface Outcome {
 interface Counter {
   constructor();
   u32 apply_adder_with(Adder adder, u32 left, u32 right);
+  [Async]
+  u32 apply_adder_async_with(Adder adder, u32 left, u32 right);
+  [Throws=MathError]
+  u32 checked_apply_adder_with(Adder adder, u32 left, u32 right);
+};
+
+[Error]
+interface MathError {
+  DivisionByZero();
 };
 "#,
         )
@@ -4204,7 +4297,11 @@ interface Counter {
         assert!(content.contains("lookupFunction<ffi.Void Function(ffi.Pointer<_AdderVTable>)"));
         assert!(content.contains("'adder_callback_init'"));
         assert!(content.contains("int applyAdder(Adder adder, int left, int right) {"));
+        assert!(content.contains("Future<int> applyAdderAsync(Adder adder, int left, int right) {"));
+        assert!(content.contains("int checkedApplyAdder(Adder adder, int left, int right) {"));
         assert!(content.contains("return _bindings().applyAdder(adder, left, right);"));
+        assert!(content.contains("return _bindings().applyAdderAsync(adder, left, right);"));
+        assert!(content.contains("return _bindings().checkedApplyAdder(adder, left, right);"));
         assert!(content.contains("abstract interface class Formatter {"));
         assert!(content.contains("String format(String? prefix, Person person, Outcome outcome);"));
         assert!(content.contains("'formatter_callback_init'"));
@@ -4216,6 +4313,16 @@ interface Counter {
             "int counterInvokeApplyAdderWith(int handle, Adder adder, int left, int right) {"
         ));
         assert!(content.contains("int applyAdderWith(Adder adder, int left, int right) {"));
+        assert!(content.contains(
+            "Future<int> counterInvokeApplyAdderAsyncWith(int handle, Adder adder, int left, int right) async {"
+        ));
+        assert!(content.contains(
+            "int counterInvokeCheckedApplyAdderWith(int handle, Adder adder, int left, int right) {"
+        ));
+        assert!(
+            content.contains("Future<int> applyAdderAsyncWith(Adder adder, int left, int right) {")
+        );
+        assert!(content.contains("int checkedApplyAdderWith(Adder adder, int left, int right) {"));
     }
 
     #[test]

@@ -1,6 +1,10 @@
 namespace simple_fns {
   u32 add(u32 left, u32 right);
   u32 apply_adder(Adder adder, u32 left, u32 right);
+  [Async]
+  u32 async_apply_adder(Adder adder, u32 left, u32 right);
+  [Throws=MathError]
+  u32 checked_apply_adder(Adder adder, u32 left, u32 right);
   u32 apply_formatter(Formatter formatter, string? prefix, Person person, Outcome outcome);
   Person echo_person(Person input);
   Outcome evolve_outcome(Outcome input);
@@ -73,6 +77,10 @@ interface Counter {
   [Name=with_person]
   constructor(Person seed);
   u32 apply_adder_with(Adder adder, u32 left, u32 right);
+  [Async]
+  u32 async_apply_adder_with(Adder adder, u32 left, u32 right);
+  [Throws=MathError]
+  u32 checked_apply_adder_with(Adder adder, u32 left, u32 right);
   void add_value(u32 amount);
   u32 current_value();
   void set_label(string label);

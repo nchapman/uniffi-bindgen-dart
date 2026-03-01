@@ -568,6 +568,70 @@ class SimpleFnsBindings {
     }
   }
 
+  late final int Function(int adder, int left, int right) _asyncApplyAdder = _lib.lookupFunction<ffi.Uint64 Function(ffi.Uint64 adder, ffi.Uint32 left, ffi.Uint32 right), int Function(int adder, int left, int right)>('async_apply_adder');
+  late final void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData) _asyncApplyAdderRustFuturePoll = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, ffi.Uint64 callbackData), void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData)>('rust_future_poll_u32');
+  late final void Function(int handle) _asyncApplyAdderRustFutureCancel = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_cancel_u32');
+  late final int Function(int handle, ffi.Pointer<_RustCallStatus> outStatus) _asyncApplyAdderRustFutureComplete = _lib.lookupFunction<ffi.Uint32 Function(ffi.Uint64 handle, ffi.Pointer<_RustCallStatus> outStatus), int Function(int handle, ffi.Pointer<_RustCallStatus> outStatus)>('rust_future_complete_u32');
+  late final void Function(int handle) _asyncApplyAdderRustFutureFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_free_u32');
+
+  Future<int> asyncApplyAdder(Adder adder, int left, int right) async {
+    _adderCallbackInitDone;
+    final int adderHandle = _AdderCallbackBridge.instance.register(adder);
+    final int futureHandle;
+    try {
+      futureHandle = _asyncApplyAdder(adderHandle, left, right);
+    } finally {
+    _AdderCallbackBridge.instance.release(adderHandle);
+    }
+    final StreamController<int> pollEvents = StreamController<int>.broadcast();
+    final callback = ffi.NativeCallable<ffi.Void Function(ffi.Uint64, ffi.Int8)>.listener((int _, int pollResult) {
+      pollEvents.add(pollResult);
+    });
+    try {
+      _asyncApplyAdderRustFuturePoll(futureHandle, callback.nativeFunction, 0);
+      while (true) {
+        final int pollResult = await pollEvents.stream.first;
+        if (pollResult == _rustFuturePollReady) {
+          break;
+        }
+        if (pollResult == _rustFuturePollWake) {
+          _asyncApplyAdderRustFuturePoll(futureHandle, callback.nativeFunction, 0);
+          continue;
+        }
+        throw StateError('Rust future poll returned invalid status for async_apply_adder: $pollResult');
+      }
+      final ffi.Pointer<_RustCallStatus> outStatusPtr = calloc<_RustCallStatus>();
+      try {
+        final int resultValue = _asyncApplyAdderRustFutureComplete(futureHandle, outStatusPtr);
+        final int statusCode = outStatusPtr.ref.code;
+        if (statusCode == _rustCallStatusSuccess) {
+          return resultValue;
+        }
+        if (statusCode == _rustCallStatusCancelled) {
+          throw StateError('Rust future was cancelled for async_apply_adder');
+        }
+        final ffi.Pointer<Utf8> errorPtr = outStatusPtr.ref.errorBuf;
+        if (errorPtr != ffi.nullptr) {
+          try {
+            throw StateError(errorPtr.toDartString());
+          } finally {
+            _rustStringFree(errorPtr);
+          }
+        }
+        throw StateError('Rust future failed for async_apply_adder with status code: $statusCode');
+      } finally {
+        calloc.free(outStatusPtr);
+      }
+    } catch (_) {
+      _asyncApplyAdderRustFutureCancel(futureHandle);
+      rethrow;
+    } finally {
+      await pollEvents.close();
+      callback.close();
+      _asyncApplyAdderRustFutureFree(futureHandle);
+    }
+  }
+
   late final int Function(ffi.Pointer<Utf8> name) _asyncGreet = _lib.lookupFunction<ffi.Uint64 Function(ffi.Pointer<Utf8> name), int Function(ffi.Pointer<Utf8> name)>('async_greet');
   late final void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData) _asyncGreetRustFuturePoll = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, ffi.Uint64 callbackData), void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData)>('rust_future_poll_string');
   late final void Function(int handle) _asyncGreetRustFutureCancel = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_cancel_string');
@@ -865,6 +929,37 @@ class SimpleFnsBindings {
       return _bytesVecFreeCount();
   }
 
+  late final ffi.Pointer<Utf8> Function(int adder, int left, int right) _checkedApplyAdder = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 adder, ffi.Uint32 left, ffi.Uint32 right), ffi.Pointer<Utf8> Function(int adder, int left, int right)>('checked_apply_adder');
+
+  int checkedApplyAdder(Adder adder, int left, int right) {
+    _adderCallbackInitDone;
+    final int adderHandle = _AdderCallbackBridge.instance.register(adder);
+    try {
+      final ffi.Pointer<Utf8> resultPtr = _checkedApplyAdder(adderHandle, left, right);
+      if (resultPtr == ffi.nullptr) {
+        throw StateError('Rust returned null for checked_apply_adder');
+      }
+      final String payload;
+      try {
+        payload = resultPtr.toDartString();
+      } finally {
+        _rustStringFree(resultPtr);
+      }
+      final Map<String, dynamic> envelope = jsonDecode(payload) as Map<String, dynamic>;
+      final Object? errRaw = envelope['err'];
+      if (errRaw != null) {
+        throw _decodeMathErrorException(errRaw);
+      }
+      if (!envelope.containsKey('ok')) {
+        throw StateError('Rust returned malformed result for checked_apply_adder');
+      }
+      final Object? okRaw = envelope['ok'];
+      return (okRaw as num).toInt();
+    } finally {
+    _AdderCallbackBridge.instance.release(adderHandle);
+    }
+  }
+
   late final ffi.Pointer<Utf8> Function(int left, int right) _checkedDivide = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Int32 left, ffi.Int32 right), ffi.Pointer<Utf8> Function(int left, int right)>('checked_divide');
 
   int checkedDivide(int left, int right) {
@@ -1104,6 +1199,70 @@ class SimpleFnsBindings {
     }
   }
 
+  late final int Function(int handle, int adder, int left, int right) _counterAsyncApplyAdderWith = _lib.lookupFunction<ffi.Uint64 Function(ffi.Uint64 handle, ffi.Uint64 adder, ffi.Uint32 left, ffi.Uint32 right), int Function(int handle, int adder, int left, int right)>('counter_async_apply_adder_with');
+  late final void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData) _counterAsyncApplyAdderWithRustFuturePoll = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, ffi.Uint64 callbackData), void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData)>('rust_future_poll_u32');
+  late final void Function(int handle) _counterAsyncApplyAdderWithRustFutureCancel = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_cancel_u32');
+  late final int Function(int handle, ffi.Pointer<_RustCallStatus> outStatus) _counterAsyncApplyAdderWithRustFutureComplete = _lib.lookupFunction<ffi.Uint32 Function(ffi.Uint64 handle, ffi.Pointer<_RustCallStatus> outStatus), int Function(int handle, ffi.Pointer<_RustCallStatus> outStatus)>('rust_future_complete_u32');
+  late final void Function(int handle) _counterAsyncApplyAdderWithRustFutureFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_free_u32');
+
+  Future<int> counterInvokeAsyncApplyAdderWith(int handle, Adder adder, int left, int right) async {
+    _adderCallbackInitDone;
+    final int adderHandle = _AdderCallbackBridge.instance.register(adder);
+    final int futureHandle;
+    try {
+      futureHandle = _counterAsyncApplyAdderWith(handle, adderHandle, left, right);
+    } finally {
+    _AdderCallbackBridge.instance.release(adderHandle);
+    }
+    final StreamController<int> pollEvents = StreamController<int>.broadcast();
+    final callback = ffi.NativeCallable<ffi.Void Function(ffi.Uint64, ffi.Int8)>.listener((int _, int pollResult) {
+      pollEvents.add(pollResult);
+    });
+    try {
+      _counterAsyncApplyAdderWithRustFuturePoll(futureHandle, callback.nativeFunction, 0);
+      while (true) {
+        final int pollResult = await pollEvents.stream.first;
+        if (pollResult == _rustFuturePollReady) {
+          break;
+        }
+        if (pollResult == _rustFuturePollWake) {
+          _counterAsyncApplyAdderWithRustFuturePoll(futureHandle, callback.nativeFunction, 0);
+          continue;
+        }
+        throw StateError('Rust future poll returned invalid status for counter_async_apply_adder_with: $pollResult');
+      }
+      final ffi.Pointer<_RustCallStatus> outStatusPtr = calloc<_RustCallStatus>();
+      try {
+        final int resultValue = _counterAsyncApplyAdderWithRustFutureComplete(futureHandle, outStatusPtr);
+        final int statusCode = outStatusPtr.ref.code;
+        if (statusCode == _rustCallStatusSuccess) {
+          return resultValue;
+        }
+        if (statusCode == _rustCallStatusCancelled) {
+          throw StateError('Rust future was cancelled for counter_async_apply_adder_with');
+        }
+        final ffi.Pointer<Utf8> errorPtr = outStatusPtr.ref.errorBuf;
+        if (errorPtr != ffi.nullptr) {
+          try {
+            throw StateError(errorPtr.toDartString());
+          } finally {
+            _rustStringFree(errorPtr);
+          }
+        }
+        throw StateError('Rust future failed for counter_async_apply_adder_with with status code: $statusCode');
+      } finally {
+        calloc.free(outStatusPtr);
+      }
+    } catch (_) {
+      _counterAsyncApplyAdderWithRustFutureCancel(futureHandle);
+      rethrow;
+    } finally {
+      await pollEvents.close();
+      callback.close();
+      _counterAsyncApplyAdderWithRustFutureFree(futureHandle);
+    }
+  }
+
   late final int Function(int handle) _counterAsyncDescribe = _lib.lookupFunction<ffi.Uint64 Function(ffi.Uint64 handle), int Function(int handle)>('counter_async_describe');
   late final void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData) _counterAsyncDescribeRustFuturePoll = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, ffi.Uint64 callbackData), void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData)>('rust_future_poll_string');
   late final void Function(int handle) _counterAsyncDescribeRustFutureCancel = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_cancel_string');
@@ -1243,6 +1402,34 @@ class SimpleFnsBindings {
     } finally {
     if (inputData != ffi.nullptr) calloc.free(inputData);
     calloc.free(inputBufferPtr);
+    }
+  }
+
+  late final ffi.Pointer<Utf8> Function(int handle, int adder, int left, int right) _counterCheckedApplyAdderWith = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle, ffi.Uint64 adder, ffi.Uint32 left, ffi.Uint32 right), ffi.Pointer<Utf8> Function(int handle, int adder, int left, int right)>('counter_checked_apply_adder_with');
+
+  int counterInvokeCheckedApplyAdderWith(int handle, Adder adder, int left, int right) {
+    _adderCallbackInitDone;
+    final int adderHandle = _AdderCallbackBridge.instance.register(adder);
+    try {
+    final ffi.Pointer<Utf8> resultPtr = _counterCheckedApplyAdderWith(handle, adderHandle, left, right);
+    if (resultPtr == ffi.nullptr) {
+      throw StateError('Rust returned null for counter_checked_apply_adder_with');
+    }
+    final String payload;
+    try {
+      payload = resultPtr.toDartString();
+    } finally {
+      _rustStringFree(resultPtr);
+    }
+    final Map<String, dynamic> envelope = jsonDecode(payload) as Map<String, dynamic>;
+    final Object? errRaw = envelope['err'];
+    if (errRaw != null) {
+      throw _decodeMathErrorException(errRaw);
+    }
+    final Object? okRaw = envelope['ok'];
+    return (okRaw as num).toInt();
+    } finally {
+    _AdderCallbackBridge.instance.release(adderHandle);
     }
   }
 
@@ -1538,6 +1725,11 @@ final class Counter {
     return _ffi.counterInvokeApplyAdderWith(_handle, adder, left, right);
   }
 
+  Future<int> asyncApplyAdderWith(Adder adder, int left, int right) {
+    _ensureOpen();
+    return _ffi.counterInvokeAsyncApplyAdderWith(_handle, adder, left, right);
+  }
+
   Future<String> asyncDescribe() {
     _ensureOpen();
     return _ffi.counterInvokeAsyncDescribe(_handle);
@@ -1551,6 +1743,11 @@ final class Counter {
   int bytesLen(Uint8List input) {
     _ensureOpen();
     return _ffi.counterInvokeBytesLen(_handle, input);
+  }
+
+  int checkedApplyAdderWith(Adder adder, int left, int right) {
+    _ensureOpen();
+    return _ffi.counterInvokeCheckedApplyAdderWith(_handle, adder, left, right);
   }
 
   int chunksTotalLen(List<Uint8List> input) {
@@ -1656,6 +1853,10 @@ Future<int> asyncAdd(int left, int right) {
   return _bindings().asyncAdd(left, right);
 }
 
+Future<int> asyncApplyAdder(Adder adder, int left, int right) {
+  return _bindings().asyncApplyAdder(adder, left, right);
+}
+
 Future<String> asyncGreet(String name) {
   return _bindings().asyncGreet(name);
 }
@@ -1686,6 +1887,10 @@ Uint8List? bytesMaybeEcho(Uint8List? input) {
 
 int bytesVecFreeCount() {
   return _bindings().bytesVecFreeCount();
+}
+
+int checkedApplyAdder(Adder adder, int left, int right) {
+  return _bindings().checkedApplyAdder(adder, left, right);
 }
 
 int checkedDivide(int left, int right) {
