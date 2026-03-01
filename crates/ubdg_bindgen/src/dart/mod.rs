@@ -4481,6 +4481,12 @@ namespace callbacks {
   u32 apply_formatter(Formatter formatter, string? prefix, Person person, Outcome outcome);
   [Async]
   string apply_formatter_async(Formatter formatter, string? prefix, Person person, Outcome outcome);
+  [Async]
+  u32 apply_formatter_optional_len_async(Formatter formatter, string? prefix, Person person, Outcome outcome);
+  [Async]
+  u32 apply_formatter_person_len_async(Formatter formatter, string? prefix, Person person, Outcome outcome);
+  [Async]
+  u32 apply_formatter_outcome_len_async(Formatter formatter, string? prefix, Person person, Outcome outcome);
 };
 
 callback interface Adder {
@@ -4495,6 +4501,12 @@ callback interface Formatter {
   string format(string? prefix, Person person, Outcome outcome);
   [Async]
   string format_async(string? prefix, Person person, Outcome outcome);
+  [Async]
+  string? format_async_optional(string? prefix, Person person, Outcome outcome);
+  [Async]
+  Person format_async_person(string? prefix, Person person, Outcome outcome);
+  [Async]
+  Outcome format_async_outcome(string? prefix, Person person, Outcome outcome);
 };
 
 dictionary Person {
@@ -4558,9 +4570,24 @@ interface MathError {
         assert!(content.contains(
             "Future<String> formatAsync(String? prefix, Person person, Outcome outcome);"
         ));
+        assert!(content.contains(
+            "Future<String?> formatAsyncOptional(String? prefix, Person person, Outcome outcome);"
+        ));
+        assert!(content.contains(
+            "Future<Person> formatAsyncPerson(String? prefix, Person person, Outcome outcome);"
+        ));
+        assert!(content.contains(
+            "Future<Outcome> formatAsyncOutcome(String? prefix, Person person, Outcome outcome);"
+        ));
         assert!(
             content.contains("final class _FormatterFormatAsyncAsyncResult extends ffi.Struct {")
         );
+        assert!(content
+            .contains("final class _FormatterFormatAsyncOptionalAsyncResult extends ffi.Struct {"));
+        assert!(content
+            .contains("final class _FormatterFormatAsyncPersonAsyncResult extends ffi.Struct {"));
+        assert!(content
+            .contains("final class _FormatterFormatAsyncOutcomeAsyncResult extends ffi.Struct {"));
         assert!(content.contains("'formatter_callback_init'"));
         assert!(content.contains("final class _FormatterVTable extends ffi.Struct {"));
         assert!(content.contains("final class _FormatterCallbackBridge {"));
@@ -4568,6 +4595,15 @@ interface MathError {
             .contains("int applyFormatter(Formatter formatter, String? prefix, Person person, Outcome outcome) {"));
         assert!(content.contains(
             "Future<String> applyFormatterAsync(Formatter formatter, String? prefix, Person person, Outcome outcome) {"
+        ));
+        assert!(content.contains(
+            "Future<int> applyFormatterOptionalLenAsync(Formatter formatter, String? prefix, Person person, Outcome outcome) {"
+        ));
+        assert!(content.contains(
+            "Future<int> applyFormatterPersonLenAsync(Formatter formatter, String? prefix, Person person, Outcome outcome) {"
+        ));
+        assert!(content.contains(
+            "Future<int> applyFormatterOutcomeLenAsync(Formatter formatter, String? prefix, Person person, Outcome outcome) {"
         ));
         assert!(content.contains(
             "int counterInvokeApplyAdderWith(int handle, Adder adder, int left, int right) {"

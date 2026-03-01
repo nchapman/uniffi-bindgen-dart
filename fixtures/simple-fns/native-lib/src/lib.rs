@@ -89,6 +89,33 @@ pub struct FormatterVTable {
         u64,
         *mut ForeignFutureDroppedCallbackStruct,
     ),
+    pub format_async_optional: extern "C" fn(
+        u64,
+        *const c_char,
+        *const c_char,
+        *const c_char,
+        extern "C" fn(u64, ForeignFutureResultString),
+        u64,
+        *mut ForeignFutureDroppedCallbackStruct,
+    ),
+    pub format_async_person: extern "C" fn(
+        u64,
+        *const c_char,
+        *const c_char,
+        *const c_char,
+        extern "C" fn(u64, ForeignFutureResultString),
+        u64,
+        *mut ForeignFutureDroppedCallbackStruct,
+    ),
+    pub format_async_outcome: extern "C" fn(
+        u64,
+        *const c_char,
+        *const c_char,
+        *const c_char,
+        extern "C" fn(u64, ForeignFutureResultString),
+        u64,
+        *mut ForeignFutureDroppedCallbackStruct,
+    ),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -476,6 +503,46 @@ extern "C" fn complete_async_formatter(callback_data: u64, result: ForeignFuture
     state.poll_state = AsyncFuturePollState::PendingWake;
 }
 
+extern "C" fn complete_async_formatter_len(callback_data: u64, result: ForeignFutureResultString) {
+    if !result.call_status.error_buf.is_null() {
+        unsafe {
+            let _ = CString::from_raw(result.call_status.error_buf);
+        }
+    }
+    let mut futures = ASYNC_FUTURES.lock().expect("async futures lock");
+    let Some(state) = futures.get_mut(&callback_data) else {
+        if !result.return_value.is_null() {
+            unsafe {
+                let _ = CString::from_raw(result.return_value);
+            }
+        }
+        return;
+    };
+    if result.call_status.code == RUST_CALL_STATUS_SUCCESS {
+        let len = if result.return_value.is_null() {
+            0
+        } else {
+            let value = unsafe { CStr::from_ptr(result.return_value) }
+                .to_string_lossy()
+                .into_owned();
+            unsafe {
+                let _ = CString::from_raw(result.return_value);
+            }
+            value.len() as u32
+        };
+        state.result = AsyncFutureResult::U32(len);
+    } else {
+        if !result.return_value.is_null() {
+            unsafe {
+                let _ = CString::from_raw(result.return_value);
+            }
+        }
+        state.result = AsyncFutureResult::Failed("async formatter callback failed".to_string());
+    }
+    state.ready = true;
+    state.poll_state = AsyncFuturePollState::PendingWake;
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn apply_formatter(
     formatter: u64,
@@ -541,6 +608,93 @@ pub extern "C" fn async_apply_formatter(
         person,
         outcome,
         complete_async_formatter,
+        handle,
+        &mut dropped,
+    );
+    (vtable.uniffi_free)(callback_handle);
+    handle
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn async_apply_formatter_optional_len(
+    formatter: u64,
+    prefix: *const c_char,
+    person: *const c_char,
+    outcome: *const c_char,
+) -> u64 {
+    let Some(vtable) = *FORMATTER_VTABLE.lock().expect("formatter vtable lock") else {
+        return enqueue_u32_future(0);
+    };
+    let handle = enqueue_pending_u32_future();
+    let callback_handle = (vtable.uniffi_clone)(formatter);
+    let mut dropped = ForeignFutureDroppedCallbackStruct {
+        handle: 0,
+        callback: None,
+    };
+    (vtable.format_async_optional)(
+        callback_handle,
+        prefix,
+        person,
+        outcome,
+        complete_async_formatter_len,
+        handle,
+        &mut dropped,
+    );
+    (vtable.uniffi_free)(callback_handle);
+    handle
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn async_apply_formatter_person_len(
+    formatter: u64,
+    prefix: *const c_char,
+    person: *const c_char,
+    outcome: *const c_char,
+) -> u64 {
+    let Some(vtable) = *FORMATTER_VTABLE.lock().expect("formatter vtable lock") else {
+        return enqueue_u32_future(0);
+    };
+    let handle = enqueue_pending_u32_future();
+    let callback_handle = (vtable.uniffi_clone)(formatter);
+    let mut dropped = ForeignFutureDroppedCallbackStruct {
+        handle: 0,
+        callback: None,
+    };
+    (vtable.format_async_person)(
+        callback_handle,
+        prefix,
+        person,
+        outcome,
+        complete_async_formatter_len,
+        handle,
+        &mut dropped,
+    );
+    (vtable.uniffi_free)(callback_handle);
+    handle
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn async_apply_formatter_outcome_len(
+    formatter: u64,
+    prefix: *const c_char,
+    person: *const c_char,
+    outcome: *const c_char,
+) -> u64 {
+    let Some(vtable) = *FORMATTER_VTABLE.lock().expect("formatter vtable lock") else {
+        return enqueue_u32_future(0);
+    };
+    let handle = enqueue_pending_u32_future();
+    let callback_handle = (vtable.uniffi_clone)(formatter);
+    let mut dropped = ForeignFutureDroppedCallbackStruct {
+        handle: 0,
+        callback: None,
+    };
+    (vtable.format_async_outcome)(
+        callback_handle,
+        prefix,
+        person,
+        outcome,
+        complete_async_formatter_len,
         handle,
         &mut dropped,
     );

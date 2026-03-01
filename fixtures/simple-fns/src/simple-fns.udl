@@ -8,6 +8,12 @@ namespace simple_fns {
   u32 apply_formatter(Formatter formatter, string? prefix, Person person, Outcome outcome);
   [Async]
   string async_apply_formatter(Formatter formatter, string? prefix, Person person, Outcome outcome);
+  [Async]
+  u32 async_apply_formatter_optional_len(Formatter formatter, string? prefix, Person person, Outcome outcome);
+  [Async]
+  u32 async_apply_formatter_person_len(Formatter formatter, string? prefix, Person person, Outcome outcome);
+  [Async]
+  u32 async_apply_formatter_outcome_len(Formatter formatter, string? prefix, Person person, Outcome outcome);
   Person echo_person(Person input);
   Outcome evolve_outcome(Outcome input);
   timestamp add_seconds(timestamp when, i64 seconds);
@@ -55,6 +61,12 @@ callback interface Formatter {
   string format(string? prefix, Person person, Outcome outcome);
   [Async]
   string format_async(string? prefix, Person person, Outcome outcome);
+  [Async]
+  string? format_async_optional(string? prefix, Person person, Outcome outcome);
+  [Async]
+  Person format_async_person(string? prefix, Person person, Outcome outcome);
+  [Async]
+  Outcome format_async_outcome(string? prefix, Person person, Outcome outcome);
 };
 
 dictionary Person {

@@ -48,6 +48,49 @@ final class _TestFormatter implements Formatter {
     };
     return 'async:$prefixPart:${person.name}:${person.age}:$outcomeTag';
   }
+
+  @override
+  Future<String?> formatAsyncOptional(
+    String? prefix,
+    Person person,
+    Outcome outcome,
+  ) async {
+    if (prefix == null) {
+      return null;
+    }
+    final String outcomeTag = switch (outcome) {
+      OutcomeSuccess() => 'success',
+      OutcomeFailure() => 'failure',
+    };
+    return 'optional:$prefix:${person.name}:${person.age}:$outcomeTag';
+  }
+
+  @override
+  Future<Person> formatAsyncPerson(
+    String? prefix,
+    Person person,
+    Outcome outcome,
+  ) async {
+    final String prefixPart = prefix ?? 'none';
+    return Person(name: '$prefixPart-${person.name}', age: person.age + 1);
+  }
+
+  @override
+  Future<Outcome> formatAsyncOutcome(
+    String? prefix,
+    Person person,
+    Outcome outcome,
+  ) async {
+    return switch (outcome) {
+      OutcomeSuccess(message: final message) => OutcomeFailure(
+        code: message.length,
+        reason: prefix ?? 'none',
+      ),
+      OutcomeFailure(code: final code, reason: final reason) => OutcomeSuccess(
+        message: '$code:$reason:${person.name}',
+      ),
+    };
+  }
 }
 
 void main() {
@@ -72,6 +115,9 @@ void main() {
     expect(contents, contains('int checkedApplyAdder(Adder adder, int left, int right) {'));
     expect(contents, contains('int applyFormatter(Formatter formatter, String? prefix, Person person, Outcome outcome) {'));
     expect(contents, contains('Future<String> asyncApplyFormatter(Formatter formatter, String? prefix, Person person, Outcome outcome) {'));
+    expect(contents, contains('Future<int> asyncApplyFormatterOptionalLen(Formatter formatter, String? prefix, Person person, Outcome outcome) {'));
+    expect(contents, contains('Future<int> asyncApplyFormatterPersonLen(Formatter formatter, String? prefix, Person person, Outcome outcome) {'));
+    expect(contents, contains('Future<int> asyncApplyFormatterOutcomeLen(Formatter formatter, String? prefix, Person person, Outcome outcome) {'));
     expect(contents, contains('Person echoPerson(Person input) {'));
     expect(contents, contains('Outcome evolveOutcome(Outcome input) {'));
     expect(contents, contains('DateTime addSeconds(DateTime when_, int seconds) {'));
@@ -125,7 +171,13 @@ void main() {
     expect(contents, contains('abstract interface class Formatter {'));
     expect(contents, contains('String format(String? prefix, Person person, Outcome outcome);'));
     expect(contents, contains('Future<String> formatAsync(String? prefix, Person person, Outcome outcome);'));
+    expect(contents, contains('Future<String?> formatAsyncOptional(String? prefix, Person person, Outcome outcome);'));
+    expect(contents, contains('Future<Person> formatAsyncPerson(String? prefix, Person person, Outcome outcome);'));
+    expect(contents, contains('Future<Outcome> formatAsyncOutcome(String? prefix, Person person, Outcome outcome);'));
     expect(contents, contains('final class _FormatterFormatAsyncAsyncResult extends ffi.Struct {'));
+    expect(contents, contains('final class _FormatterFormatAsyncOptionalAsyncResult extends ffi.Struct {'));
+    expect(contents, contains('final class _FormatterFormatAsyncPersonAsyncResult extends ffi.Struct {'));
+    expect(contents, contains('final class _FormatterFormatAsyncOutcomeAsyncResult extends ffi.Struct {'));
     expect(contents, contains("'formatter_callback_init'"));
     expect(contents, contains('final class _FormatterVTable extends ffi.Struct {'));
     expect(contents, contains('final class _FormatterCallbackBridge {'));
@@ -268,6 +320,42 @@ void main() {
         const OutcomeSuccess(message: 'go'),
       ),
       'async:prefix:Ada:33:success',
+    );
+    expect(
+      await bindings.asyncApplyFormatterOptionalLen(
+        const _TestFormatter(),
+        null,
+        const Person(name: 'Ada', age: 33),
+        const OutcomeSuccess(message: 'go'),
+      ),
+      0,
+    );
+    expect(
+      await bindings.asyncApplyFormatterOptionalLen(
+        const _TestFormatter(),
+        'prefix',
+        const Person(name: 'Ada', age: 33),
+        const OutcomeSuccess(message: 'go'),
+      ),
+      greaterThan(0),
+    );
+    expect(
+      await bindings.asyncApplyFormatterPersonLen(
+        const _TestFormatter(),
+        'prefix',
+        const Person(name: 'Ada', age: 33),
+        const OutcomeSuccess(message: 'go'),
+      ),
+      greaterThan(0),
+    );
+    expect(
+      await bindings.asyncApplyFormatterOutcomeLen(
+        const _TestFormatter(),
+        'prefix',
+        const Person(name: 'Ada', age: 33),
+        const OutcomeSuccess(message: 'go'),
+      ),
+      greaterThan(0),
     );
     final echoed = bindings.echoPerson(const Person(name: 'Ada', age: 33));
     expect(echoed.name, 'Ada');
@@ -489,6 +577,33 @@ void main() {
         const OutcomeFailure(code: 7, reason: 'bad'),
       ),
       'async:none:Lin:10:failure',
+    );
+    expect(
+      await asyncApplyFormatterOptionalLen(
+        const _TestFormatter(),
+        null,
+        const Person(name: 'Lin', age: 10),
+        const OutcomeFailure(code: 7, reason: 'bad'),
+      ),
+      0,
+    );
+    expect(
+      await asyncApplyFormatterPersonLen(
+        const _TestFormatter(),
+        'px',
+        const Person(name: 'Lin', age: 10),
+        const OutcomeFailure(code: 7, reason: 'bad'),
+      ),
+      greaterThan(0),
+    );
+    expect(
+      await asyncApplyFormatterOutcomeLen(
+        const _TestFormatter(),
+        'px',
+        const Person(name: 'Lin', age: 10),
+        const OutcomeFailure(code: 7, reason: 'bad'),
+      ),
+      greaterThan(0),
     );
     final echoedTop = echoPerson(const Person(name: 'Lin', age: 10));
     expect(echoedTop.name, 'Lin');
