@@ -523,21 +523,12 @@ void main() {
       contains(
           "throw UnsupportedError('runtime invocation for this UniFFI ABI (RustCallStatus out-arg) is not implemented yet (methodoutcome_checked_value)');"),
     );
-    expect(
-      contents,
-      contains(
-          "throw UnsupportedError('runtime invocation for this UniFFI ABI (RustCallStatus out-arg) is not implemented yet (method_point_new)');"),
-    );
-    expect(
-      contents,
-      contains(
-          "throw UnsupportedError('runtime invocation for this UniFFI ABI (RustCallStatus out-arg) is not implemented yet (method_state_busy)');"),
-    );
-    expect(
-      contents,
-      contains(
-          "throw UnsupportedError('runtime invocation for this UniFFI ABI (RustCallStatus out-arg) is not implemented yet (method_outcome_ok)');"),
-    );
+    expect(contents,
+        contains('uniffi_ffibuffer_uniffi_record_enum_methods_fn_func_method_point_new'));
+    expect(contents,
+        contains('uniffi_ffibuffer_uniffi_record_enum_methods_fn_func_method_state_busy'));
+    expect(contents,
+        contains('uniffi_ffibuffer_uniffi_record_enum_methods_fn_func_method_outcome_ok'));
     expect(contents, contains('class RecordEnumMethodsFfi {'));
   });
 
@@ -564,10 +555,34 @@ void main() {
     expect((decodedOk as rem.MethodOutcomeOk).value, 7);
   });
 
-  test('record/enum runtime methods fail fast with unsupported ABI error', () {
-    final point = rem.MethodPoint(x: 6, y: 3);
+  test('record/enum runtime methods call ffibuffer fallback exports', () {
+    final libPath = Platform.environment['UBDG_RECORD_ENUM_METHODS_LIB'];
     expect(
-      () => point.checksum(),
+      libPath,
+      isNotNull,
+      reason:
+          'UBDG_RECORD_ENUM_METHODS_LIB must point to the compiled record-enum-methods fixture library',
+    );
+    rem.configureDefaultBindings(libraryPath: libPath);
+    addTearDown(rem.resetDefaultBindings);
+
+    final point = rem.methodPointNew(6, 3);
+    expect(point.x, 6);
+    expect(point.y, 3);
+    expect(point.checksum(), 189);
+    expect(point.asState(), rem.MethodState.busy);
+
+    final busy = rem.methodStateBusy();
+    expect(busy, rem.MethodState.busy);
+    expect(busy.weight(), 9);
+
+    final outcome = rem.methodOutcomeOk(11);
+    expect(outcome, isA<rem.MethodOutcomeOk>());
+    expect((outcome as rem.MethodOutcomeOk).value, 11);
+    expect(outcome.score(), 11);
+
+    expect(
+      () => point.checkedDivide(3),
       throwsA(
         isA<UnsupportedError>().having(
           (e) => e.message,
