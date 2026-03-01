@@ -12,7 +12,7 @@ Legend:
 |---|---|---|
 | Top-level functions | Implemented | includes primitives, temporal, bytes, records/enums, and typed throws envelope paths |
 | Objects/interfaces | Partial | sync constructors/methods + lifecycle (`close`/finalizer) implemented; async wrappers for `[Async]` methods now generated; trait parity pending |
-| Trait methods | Planned | pending full parity coverage |
+| Trait methods | Partial | object-level `Display`/`Debug`/`Hash` traits map to idiomatic Dart `toString()`/`hashCode`; broader parity (`Eq`/`Ord` and additional fixture coverage) pending |
 | Records | Implemented | model generation + JSON codecs + `copyWith` |
 | Enums | Implemented | flat + data-carrying codecs |
 | Errors (`[Error]` + `[Throws]`) | Partial | typed Dart exception mapping for supported runtime-compatible paths |

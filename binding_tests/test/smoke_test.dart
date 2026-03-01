@@ -261,6 +261,10 @@ void main() {
     expect(contents, contains('int divideBy(int divisor) {'));
     expect(contents, contains('Outcome riskyOutcome(int divisor) {'));
     expect(contents, contains('void close() {'));
+    expect(contents, contains('String toString() {'));
+    expect(contents, contains('int get hashCode {'));
+    expect(contents, contains('return _ffi.counterInvokeUniffiTraitDisplay(_handle);'));
+    expect(contents, contains('return _ffi.counterInvokeUniffiTraitHash(_handle);'));
     expect(contents, contains('final class OutcomeSuccess extends Outcome {'));
     expect(contents, contains('final class OutcomeFailure extends Outcome {'));
     expect(contents, contains('String _encodeColor(Color value) {'));
@@ -452,6 +456,8 @@ void main() {
     expect(counter.currentValue(), 5);
     counter.setLabel('alpha');
     expect(counter.describe(), 'counter:5:alpha');
+    expect(counter.toString(), 'counter:5:alpha');
+    expect(counter.hashCode, isNot(0));
     expect(await counter.asyncDescribe(), 'async:counter:5:alpha');
     expect(await counter.asyncValue(), 5);
     expect(counter.maybeLabel('tail'), 'counter:5:tail');
@@ -680,6 +686,8 @@ void main() {
     expect(scale32(0.5, 6.0), closeTo(3.0, 0.0001));
     final topCounter = Counter.create(3);
     expect(topCounter.applyAdderWith(const _TestAdder(2), 2, 3), 10);
+    expect(topCounter.toString(), 'counter:3');
+    expect(topCounter.hashCode, isNot(0));
     expect(await topCounter.asyncApplyAdderWith(const _TestAdder(2), 2, 3), 10);
     expect(topCounter.checkedApplyAdderWith(const _TestAdder(2), 2, 3), 10);
     expect(

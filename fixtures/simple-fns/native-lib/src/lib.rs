@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
+use std::hash::{Hash, Hasher};
 use std::os::raw::c_char;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::{LazyLock, Mutex};
@@ -1436,8 +1437,7 @@ pub extern "C" fn counter_chunks_total_len(_handle: u64, input: RustBufferVec) -
         .sum()
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn counter_describe(handle: u64) -> *mut c_char {
+fn counter_display_text(handle: u64) -> String {
     let value = COUNTERS
         .lock()
         .expect("counter map lock")
@@ -1450,12 +1450,33 @@ pub extern "C" fn counter_describe(handle: u64) -> *mut c_char {
         .get(&handle)
         .cloned()
         .unwrap_or_default();
-    let text = if label.is_empty() {
+    if label.is_empty() {
         format!("counter:{value}")
     } else {
         format!("counter:{value}:{label}")
-    };
-    CString::new(text).expect("valid CString").into_raw()
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_describe(handle: u64) -> *mut c_char {
+    CString::new(counter_display_text(handle))
+        .expect("valid CString")
+        .into_raw()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_uniffi_trait_display(handle: u64) -> *mut c_char {
+    CString::new(counter_display_text(handle))
+        .expect("valid CString")
+        .into_raw()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_uniffi_trait_hash(handle: u64) -> u64 {
+    let text = counter_display_text(handle);
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    text.hash(&mut hasher);
+    hasher.finish()
 }
 
 #[unsafe(no_mangle)]

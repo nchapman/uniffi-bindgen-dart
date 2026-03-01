@@ -121,6 +121,7 @@ struct UdlObject {
     name: String,
     constructors: Vec<UdlObjectConstructor>,
     methods: Vec<UdlObjectMethod>,
+    trait_methods: UdlObjectTraitMethods,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -138,6 +139,13 @@ struct UdlObjectMethod {
     return_type: Option<Type>,
     throws_type: Option<Type>,
     args: Vec<UdlArg>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+struct UdlObjectTraitMethods {
+    display: Option<String>,
+    debug: Option<String>,
+    hash: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -234,6 +242,7 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
     let module_path = crate_name.unwrap_or("crate_name");
     let ci = ComponentInterface::from_webidl(&udl, module_path)
         .with_context(|| format!("failed to parse UDL: {}", source.display()))?;
+    let udl_interface_traits = parse_udl_interface_traits(&udl);
 
     let functions = ci
         .function_definitions()
@@ -292,26 +301,8 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
     let objects = ci
         .object_definitions()
         .iter()
-        .map(|obj| UdlObject {
-            name: obj.name().to_string(),
-            constructors: obj
-                .constructors()
-                .into_iter()
-                .map(|ctor| UdlObjectConstructor {
-                    name: ctor.name().to_string(),
-                    is_async: ctor.is_async(),
-                    args: ctor
-                        .arguments()
-                        .into_iter()
-                        .map(|a| UdlArg {
-                            name: a.name().to_string(),
-                            type_: a.as_type(),
-                        })
-                        .collect(),
-                    throws_type: ctor.throws_type().cloned(),
-                })
-                .collect(),
-            methods: obj
+        .map(|obj| {
+            let mut methods = obj
                 .methods()
                 .into_iter()
                 .map(|m| UdlObjectMethod {
@@ -328,7 +319,75 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
                         })
                         .collect(),
                 })
-                .collect(),
+                .collect::<Vec<_>>();
+            let mut trait_methods = UdlObjectTraitMethods::default();
+            for method in &methods {
+                match uniffi_trait_method_kind(&method.name) {
+                    Some("display") => trait_methods.display = Some(method.name.clone()),
+                    Some("debug") => trait_methods.debug = Some(method.name.clone()),
+                    Some("hash") => trait_methods.hash = Some(method.name.clone()),
+                    _ => {}
+                }
+            }
+            let traits_for_object = udl_interface_traits
+                .get(obj.name())
+                .cloned()
+                .unwrap_or_default();
+            if traits_for_object.iter().any(|t| t == "Display") && trait_methods.display.is_none() {
+                trait_methods.display = Some("uniffi_trait_display".to_string());
+                methods.push(UdlObjectMethod {
+                    name: "uniffi_trait_display".to_string(),
+                    is_async: false,
+                    return_type: Some(Type::String),
+                    throws_type: None,
+                    args: Vec::new(),
+                });
+            }
+            if traits_for_object.iter().any(|t| t == "Debug") && trait_methods.debug.is_none() {
+                trait_methods.debug = Some("uniffi_trait_debug".to_string());
+                methods.push(UdlObjectMethod {
+                    name: "uniffi_trait_debug".to_string(),
+                    is_async: false,
+                    return_type: Some(Type::String),
+                    throws_type: None,
+                    args: Vec::new(),
+                });
+            }
+            if traits_for_object.iter().any(|t| t == "Hash") && trait_methods.hash.is_none() {
+                trait_methods.hash = Some("uniffi_trait_hash".to_string());
+                methods.push(UdlObjectMethod {
+                    name: "uniffi_trait_hash".to_string(),
+                    is_async: false,
+                    return_type: Some(Type::UInt64),
+                    throws_type: None,
+                    args: Vec::new(),
+                });
+            }
+            methods.sort_by(|a, b| a.name.cmp(&b.name));
+            methods.dedup_by(|a, b| a.name == b.name);
+
+            UdlObject {
+                name: obj.name().to_string(),
+                constructors: obj
+                    .constructors()
+                    .into_iter()
+                    .map(|ctor| UdlObjectConstructor {
+                        name: ctor.name().to_string(),
+                        is_async: ctor.is_async(),
+                        args: ctor
+                            .arguments()
+                            .into_iter()
+                            .map(|a| UdlArg {
+                                name: a.name().to_string(),
+                                type_: a.as_type(),
+                            })
+                            .collect(),
+                        throws_type: ctor.throws_type().cloned(),
+                    })
+                    .collect(),
+                methods,
+                trait_methods,
+            }
         })
         .collect::<Vec<_>>();
     let callback_interfaces = ci
@@ -364,6 +423,81 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
         records,
         enums,
     })
+}
+
+fn parse_udl_interface_traits(udl: &str) -> std::collections::HashMap<String, Vec<String>> {
+    let mut out = std::collections::HashMap::new();
+    let mut pending_traits: Option<Vec<String>> = None;
+
+    for raw_line in udl.lines() {
+        let line = raw_line.trim();
+        if line.is_empty() {
+            continue;
+        }
+
+        if line.starts_with('[') {
+            if let Some(traits) = parse_traits_from_attribute_line(line) {
+                pending_traits = Some(traits);
+            }
+            if let Some(interface_name) = parse_interface_name_from_line(line) {
+                if let Some(traits) = pending_traits.take() {
+                    out.insert(interface_name, traits);
+                }
+            }
+            continue;
+        }
+
+        if let Some(interface_name) = parse_interface_name_from_line(line) {
+            if let Some(traits) = pending_traits.take() {
+                out.insert(interface_name, traits);
+            }
+            continue;
+        }
+
+        if line.starts_with("dictionary ")
+            || line.starts_with("enum ")
+            || line.starts_with("namespace ")
+            || line.starts_with("callback interface ")
+        {
+            pending_traits = None;
+        }
+    }
+
+    out
+}
+
+fn parse_traits_from_attribute_line(line: &str) -> Option<Vec<String>> {
+    let marker = "Traits=(";
+    let start = line.find(marker)?;
+    let tail = &line[start + marker.len()..];
+    let end = tail.find(')')?;
+    let inner = &tail[..end];
+    let traits = inner
+        .split(',')
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .map(ToString::to_string)
+        .collect::<Vec<_>>();
+    if traits.is_empty() {
+        None
+    } else {
+        Some(traits)
+    }
+}
+
+fn parse_interface_name_from_line(line: &str) -> Option<String> {
+    let marker = "interface ";
+    let start = line.find(marker)?;
+    let rest = &line[start + marker.len()..];
+    let name = rest
+        .chars()
+        .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+        .collect::<String>();
+    if name.is_empty() {
+        None
+    } else {
+        Some(name)
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -3183,6 +3317,9 @@ fn render_object_classes(
         }
 
         for method in &object.methods {
+            if is_uniffi_trait_method_name(&method.name) {
+                continue;
+            }
             let has_callback_args = has_runtime_callback_args_in_args(
                 &method.args,
                 callback_interfaces,
@@ -3257,6 +3394,31 @@ fn render_object_classes(
             } else {
                 out.push_str(&format!("    _ffi.{invoke_name}({invoke_args});\n"));
             }
+            out.push_str("  }\n\n");
+        }
+
+        if let Some(display_method) = object
+            .trait_methods
+            .display
+            .as_deref()
+            .or(object.trait_methods.debug.as_deref())
+        {
+            let invoke_name = format!("{}Invoke{}", object_lower, to_upper_camel(display_method));
+            out.push_str("  @override\n");
+            out.push_str("  String toString() {\n");
+            out.push_str("    if (_closed) {\n");
+            out.push_str(&format!("      return '{object_name}(closed)';\n"));
+            out.push_str("    }\n");
+            out.push_str(&format!("    return _ffi.{invoke_name}(_handle);\n"));
+            out.push_str("  }\n\n");
+        }
+
+        if let Some(hash_method) = object.trait_methods.hash.as_deref() {
+            let invoke_name = format!("{}Invoke{}", object_lower, to_upper_camel(hash_method));
+            out.push_str("  @override\n");
+            out.push_str("  int get hashCode {\n");
+            out.push_str("    _ensureOpen();\n");
+            out.push_str(&format!("    return _ffi.{invoke_name}(_handle);\n"));
             out.push_str("  }\n\n");
         }
         out.push_str("}\n");
@@ -4217,6 +4379,22 @@ fn safe_dart_identifier(input: &str) -> String {
     }
 }
 
+fn uniffi_trait_method_kind(name: &str) -> Option<&'static str> {
+    let normalized = name.replace('_', "").to_ascii_lowercase();
+    match normalized.as_str() {
+        "uniffitraitdisplay" => Some("display"),
+        "uniffitraitdebug" => Some("debug"),
+        "uniffitraithash" => Some("hash"),
+        "uniffitraiteq" => Some("eq"),
+        "uniffitraitne" => Some("ne"),
+        _ => None,
+    }
+}
+
+fn is_uniffi_trait_method_name(name: &str) -> bool {
+    uniffi_trait_method_kind(name).is_some()
+}
+
 fn is_dart_keyword(input: &str) -> bool {
     matches!(
         input,
@@ -4520,6 +4698,7 @@ interface Outcome {
   Failure(i32 code, string reason);
 };
 
+[Traits=(Display, Hash)]
 interface Counter {
   constructor();
   u32 apply_adder_with(Adder adder, u32 left, u32 right);
@@ -4940,6 +5119,7 @@ interface Outcome {
   Failure(i32 code, string reason);
 };
 
+[Traits=(Display, Hash)]
 interface Counter {
   constructor(u32 initial);
   [Name=with_person]
@@ -4996,6 +5176,12 @@ interface Counter {
         assert!(content.contains("Uint8List snapshotBytes() {"));
         assert!(content.contains("int divideBy(int divisor) {"));
         assert!(content.contains("Outcome riskyOutcome(int divisor) {"));
+        assert!(content.contains("String toString() {"));
+        assert!(content.contains("int get hashCode {"));
+        assert!(content.contains("return _ffi.counterInvokeUniffiTraitDisplay(_handle);"));
+        assert!(content.contains("return _ffi.counterInvokeUniffiTraitHash(_handle);"));
+        assert!(!content.contains("uniffiTraitDisplay() {"));
+        assert!(!content.contains("uniffiTraitHash() {"));
         assert!(content.contains("late final void Function(int handle) _counterFree ="));
         assert!(content.contains("Counter counterCreateNew(int initial) {"));
         assert!(content.contains("int counterInvokeCurrentValue(int handle) {"));

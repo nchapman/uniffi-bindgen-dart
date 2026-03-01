@@ -37,7 +37,7 @@ A repeatable backend-development process that can be applied with minimal change
 - Phase 3: Object Model and Lifetimes (sync object lifecycle paths)
 
 ### In Progress
-- Phase 4: Enums/errors are in place; trait parity still pending.
+- Phase 4: Enums/errors are in place; trait parity started with object-level `Display`/`Debug`/`Hash` mapping.
 - Phase 5: Async Rust-future ABI now covers string, `void`, and integer fixture paths; callback support now covers sync/async/throwing top-level functions and object methods, including callback-interface methods with async/throws for primitive + string/optional string/record/enum return families with runtime fixture validation.
 - Phase 6: Advanced config/external types pending.
 - Phase 7+: Documentation hardening and release workflow completion pending.
@@ -57,6 +57,7 @@ A repeatable backend-development process that can be applied with minimal change
 - Runtime fixture/native library coverage for strings, bytes, records, enums, objects, and typed errors.
 - Async `[Async]` wrappers and Rust-future poll/cancel/complete/free lifecycle coverage across string, `void`, and `u32` fixture paths.
 - Callback interface bridge support for sync/async/throwing top-level and object-method function-argument callbacks, including callback-interface method-level async/throws paths for primitive + string/optional string/record/enum return families, with fixture/runtime verification.
+- Trait helper mapping for UDL `[Traits=(...)]` object interfaces now generates idiomatic Dart `toString()` and `hashCode` via UniFFI trait-method exports (`Display`/`Debug`/`Hash`), with generator + runtime fixture coverage.
 
 ## Scope
 ### In Scope
@@ -217,7 +218,7 @@ Use this ledger as the execution checklist for full parity. This is the operatio
 | Records (defaults/mutability) | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | Dart model classes + `copyWith` + codecs | complete for current fixture scope | complete for current fixture scope | `dart::tests::renders_record_and_enum_models`; golden `model-types-demo`; runtime smoke assertions | Done | mutability controls remain to expand with dedicated fixtures |
 | Enums (flat/data-carrying) | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | Dart sealed-style model conventions | complete for current fixture scope | complete for current fixture scope | `dart::tests::renders_record_and_enum_models`; golden `compound-demo`; runtime smoke assertions | Done | flat + data-carrying enums covered |
 | Objects/interfaces lifecycle | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | wrappers with `close()` + finalizer fallback | sync constructors/methods complete | sync lifecycle paths complete | `dart::tests::renders_object_classes_with_lifecycle_and_throws`; runtime smoke object calls | In progress | async/trait-related object parity pending |
-| Trait methods | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | trait mapping into idiomatic Dart APIs | pending | pending | add dedicated trait fixture + runtime tests | Not started | phase 4 parity gap |
+| Trait methods | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | trait mapping into idiomatic Dart APIs | UDL `[Traits=(...)]` parsing + object trait-method synthesis for `Display`/`Debug`/`Hash`; object class generation emits idiomatic `toString()` and `hashCode` overrides | fixture native library exports `counter_uniffi_trait_display` / `counter_uniffi_trait_hash` and runtime assertions validate behavior | `dart::tests::renders_object_classes_with_lifecycle_and_throws`; golden `simple-fns`; `binding_tests/test/smoke_test.dart` trait assertions | In progress | `Eq`/`Ord` trait parity and broader fixture coverage still pending |
 | Async futures | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | `Future<T>`-based idiomatic APIs | top-level/object API wrappers for `[Async]` with return-type driven rust-future symbol selection | rust-future poll/cancel/complete/free flow implemented for string + `void` + integer fixture paths | extend to remaining return-type families + dedicated futures fixture stress cases | In progress | async lifecycle is runtime-driven (poll/wake/ready/cancel/free); coverage expanded and validated in generator + runtime smoke tests |
 | Callback interfaces (sync/async) | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | callback APIs with Dart callable conventions | callback interface model + vtable bridge generation for top-level functions and object methods across sync/async/throwing function-argument paths, plus callback-interface method-level async/throws generation for primitive + string/optional string/record/enum return families | fixture native library supports callback-vtable init + callback invocation lifecycle (`clone`/`free` + method dispatch) across adder + formatter callback paths for top-level and object methods, including async future and throws envelope flows with callback args and callback-interface async method completion callbacks | `dart::tests::renders_runtime_callback_interface_bindings`; golden `simple-fns`; `binding_tests/test/smoke_test.dart` callback runtime assertions | In progress | callback argument parity is green across sync/async/throws for top-level + object methods; runtime fixture coverage is green for async string/optional string/record/enum callback methods |
 | Custom types | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | Dart conversion helpers | pending | pending | add custom-types fixture + tests | Not started | phase 6 target |
@@ -432,7 +433,7 @@ These rules are part of the template and should not be skipped:
 | Release compatibility confusion | Consumer integration failures | Maintain explicit backend-to-UniFFI compatibility table |
 
 ## Immediate Next Steps (Dart Instance)
-1. Add trait-related parity coverage and fixtures.
+1. Extend trait parity beyond `Display`/`Debug`/`Hash` (notably `Eq`/`Ord`) with dedicated fixtures and runtime assertions.
 2. Extend async Rust-future parity to remaining return-type families (bytes/options/sequences/maps/custom/external) with dedicated futures stress fixtures.
 3. Keep `docs/supported-features.md` synchronized with every parity change.
 4. Add CI jobs for clippy strict mode and artifact-split runtime binding tests (Linux + macOS).

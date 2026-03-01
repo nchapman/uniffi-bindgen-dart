@@ -2237,6 +2237,26 @@ class SimpleFnsBindings {
       _rustStringFree(resultPtr);
     }
   }
+
+  late final ffi.Pointer<Utf8> Function(int handle) _counterUniffiTraitDisplay = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle), ffi.Pointer<Utf8> Function(int handle)>('counter_uniffi_trait_display');
+
+  String counterInvokeUniffiTraitDisplay(int handle) {
+    final ffi.Pointer<Utf8> resultPtr = _counterUniffiTraitDisplay(handle);
+    if (resultPtr == ffi.nullptr) {
+      throw StateError('Rust returned null for counter_uniffi_trait_display');
+    }
+    try {
+      return resultPtr.toDartString();
+    } finally {
+      _rustStringFree(resultPtr);
+    }
+  }
+
+  late final int Function(int handle) _counterUniffiTraitHash = _lib.lookupFunction<ffi.Uint64 Function(ffi.Uint64 handle), int Function(int handle)>('counter_uniffi_trait_hash');
+
+  int counterInvokeUniffiTraitHash(int handle) {
+    return _counterUniffiTraitHash(handle);
+  }
 }
 
 final class _CounterFinalizerToken {
@@ -2381,6 +2401,20 @@ final class Counter {
   Person snapshotPerson() {
     _ensureOpen();
     return _ffi.counterInvokeSnapshotPerson(_handle);
+  }
+
+  @override
+  String toString() {
+    if (_closed) {
+      return 'Counter(closed)';
+    }
+    return _ffi.counterInvokeUniffiTraitDisplay(_handle);
+  }
+
+  @override
+  int get hashCode {
+    _ensureOpen();
+    return _ffi.counterInvokeUniffiTraitHash(_handle);
   }
 
 }
