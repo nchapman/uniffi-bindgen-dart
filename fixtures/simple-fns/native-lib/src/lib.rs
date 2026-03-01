@@ -18,6 +18,7 @@ static COUNTER_LABELS: LazyLock<Mutex<HashMap<u64, String>>> =
 static ASYNC_FUTURES: LazyLock<Mutex<HashMap<u64, AsyncFutureState>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 static ADDER_VTABLE: LazyLock<Mutex<Option<AdderVTable>>> = LazyLock::new(|| Mutex::new(None));
+static FORMATTER_VTABLE: LazyLock<Mutex<Option<FormatterVTable>>> = LazyLock::new(|| Mutex::new(None));
 
 const RUST_CALL_STATUS_SUCCESS: i8 = 0;
 const RUST_CALL_STATUS_UNEXPECTED_ERROR: i8 = 2;
@@ -37,6 +38,15 @@ pub struct AdderVTable {
     pub uniffi_free: extern "C" fn(u64),
     pub uniffi_clone: extern "C" fn(u64) -> u64,
     pub add: extern "C" fn(u64, u32, u32, *mut u32, *mut RustCallStatus),
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct FormatterVTable {
+    pub uniffi_free: extern "C" fn(u64),
+    pub uniffi_clone: extern "C" fn(u64) -> u64,
+    pub format:
+        extern "C" fn(u64, *const c_char, *const c_char, *const c_char, *mut *mut c_char, *mut RustCallStatus),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -231,6 +241,53 @@ pub extern "C" fn apply_adder(adder: u64, left: u32, right: u32) -> u32 {
     } else {
         0
     }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn formatter_callback_init(vtable: *const FormatterVTable) {
+    if vtable.is_null() {
+        return;
+    }
+    let value = unsafe { *vtable };
+    *FORMATTER_VTABLE.lock().expect("formatter vtable lock") = Some(value);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn apply_formatter(
+    formatter: u64,
+    prefix: *const c_char,
+    person: *const c_char,
+    outcome: *const c_char,
+) -> u32 {
+    let Some(vtable) = *FORMATTER_VTABLE.lock().expect("formatter vtable lock") else {
+        return 0;
+    };
+    let callback_handle = (vtable.uniffi_clone)(formatter);
+    let mut out: *mut c_char = std::ptr::null_mut();
+    let mut status = RustCallStatus {
+        code: RUST_CALL_STATUS_SUCCESS,
+        error_buf: std::ptr::null_mut(),
+    };
+    (vtable.format)(
+        callback_handle,
+        prefix,
+        person,
+        outcome,
+        &mut out,
+        &mut status,
+    );
+    (vtable.uniffi_free)(callback_handle);
+    if status.code != RUST_CALL_STATUS_SUCCESS {
+        return 0;
+    }
+    if out.is_null() {
+        return 0;
+    }
+    let value = unsafe { CStr::from_ptr(out) }.to_string_lossy().into_owned();
+    unsafe {
+        let _ = CString::from_raw(out);
+    }
+    value.len() as u32
 }
 
 #[unsafe(no_mangle)]

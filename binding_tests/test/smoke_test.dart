@@ -12,6 +12,20 @@ final class _TestAdder implements Adder {
   int add(int left, int right) => left + right + offset;
 }
 
+final class _TestFormatter implements Formatter {
+  const _TestFormatter();
+
+  @override
+  String format(String? prefix, Person person, Outcome outcome) {
+    final String prefixPart = prefix ?? 'none';
+    final String outcomeTag = switch (outcome) {
+      OutcomeSuccess() => 'success',
+      OutcomeFailure() => 'failure',
+    };
+    return '$prefixPart:${person.name}:${person.age}:$outcomeTag';
+  }
+}
+
 void main() {
   test('binding test scaffold is wired', () {
     expect(true, isTrue);
@@ -30,6 +44,7 @@ void main() {
     expect(contents, contains("libraryName = 'uniffi_simple_fns';"));
     expect(contents, contains('int add(int left, int right) {'));
     expect(contents, contains('int applyAdder(Adder adder, int left, int right) {'));
+    expect(contents, contains('int applyFormatter(Formatter formatter, String? prefix, Person person, Outcome outcome) {'));
     expect(contents, contains('Person echoPerson(Person input) {'));
     expect(contents, contains('Outcome evolveOutcome(Outcome input) {'));
     expect(contents, contains('DateTime addSeconds(DateTime when_, int seconds) {'));
@@ -76,6 +91,11 @@ void main() {
     expect(contents, contains("'adder_callback_init'"));
     expect(contents, contains('final class _AdderVTable extends ffi.Struct {'));
     expect(contents, contains('final class _AdderCallbackBridge {'));
+    expect(contents, contains('abstract interface class Formatter {'));
+    expect(contents, contains('String format(String? prefix, Person person, Outcome outcome);'));
+    expect(contents, contains("'formatter_callback_init'"));
+    expect(contents, contains('final class _FormatterVTable extends ffi.Struct {'));
+    expect(contents, contains('final class _FormatterCallbackBridge {'));
     expect(contents, contains('late final int Function(int left, int right) _addU64 ='));
     expect(contents, contains('late final bool Function(int value) _isEven ='));
     expect(contents, contains('final class _RustBuffer extends ffi.Struct {'));
@@ -167,6 +187,15 @@ void main() {
     expect(bindings.bytesVecFreeCount(), 0);
     expect(bindings.add(20, 22), 42);
     expect(bindings.applyAdder(const _TestAdder(5), 20, 22), 48);
+    expect(
+      bindings.applyFormatter(
+        const _TestFormatter(),
+        'prefix',
+        const Person(name: 'Ada', age: 33),
+        const OutcomeSuccess(message: 'go'),
+      ),
+      'prefix:Ada:33:success'.length,
+    );
     final echoed = bindings.echoPerson(const Person(name: 'Ada', age: 33));
     expect(echoed.name, 'Ada');
     expect(echoed.age, 33);
@@ -337,6 +366,15 @@ void main() {
     expect(bytesVecFreeCount(), 0);
     expect(add(1, 2), 3);
     expect(applyAdder(const _TestAdder(2), 3, 4), 10);
+    expect(
+      applyFormatter(
+        const _TestFormatter(),
+        null,
+        const Person(name: 'Lin', age: 10),
+        const OutcomeFailure(code: 7, reason: 'bad'),
+      ),
+      'none:Lin:10:failure'.length,
+    );
     final echoedTop = echoPerson(const Person(name: 'Lin', age: 10));
     expect(echoedTop.name, 'Lin');
     expect(echoedTop.age, 10);

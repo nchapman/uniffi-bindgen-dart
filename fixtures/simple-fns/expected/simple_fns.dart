@@ -239,6 +239,10 @@ abstract interface class Adder {
   int add(int left, int right);
 }
 
+abstract interface class Formatter {
+  String format(String? prefix, Person person, Outcome outcome);
+}
+
 final class _AdderVTable extends ffi.Struct {
   external ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 handle)>> uniffiFree;
 
@@ -327,6 +331,94 @@ final class _AdderCallbackBridge {
   }
 }
 
+final class _FormatterVTable extends ffi.Struct {
+  external ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 handle)>> uniffiFree;
+
+  external ffi.Pointer<ffi.NativeFunction<ffi.Uint64 Function(ffi.Uint64 handle)>> uniffiClone;
+
+  external ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<Utf8> prefix, ffi.Pointer<Utf8> person, ffi.Pointer<Utf8> outcome, ffi.Pointer<ffi.Pointer<Utf8>> outReturn, ffi.Pointer<_RustCallStatus> outStatus)>> format;
+
+}
+
+final class _FormatterCallbackBridge {
+  _FormatterCallbackBridge._();
+  static final _FormatterCallbackBridge instance = _FormatterCallbackBridge._();
+
+  final Map<int, Formatter> _callbacks = <int, Formatter>{};
+  final Map<int, int> _refCounts = <int, int>{};
+  int _nextHandle = 1;
+
+  int register(Formatter callback) {
+    final int handle = _nextHandle++;
+    _callbacks[handle] = callback;
+    _refCounts[handle] = 1;
+    return handle;
+  }
+
+  void release(int handle) {
+    final int? refs = _refCounts[handle];
+    if (refs == null) {
+      return;
+    }
+    if (refs <= 1) {
+      _refCounts.remove(handle);
+      _callbacks.remove(handle);
+      return;
+    }
+    _refCounts[handle] = refs - 1;
+  }
+
+  int cloneHandle(int handle) {
+    final int? refs = _refCounts[handle];
+    if (refs == null) {
+      return handle;
+    }
+    _refCounts[handle] = refs + 1;
+    return handle;
+  }
+
+  Formatter? lookup(int handle) => _callbacks[handle];
+
+  static final ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle)> _freeNative = ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle)>.isolateLocal((int handle) {
+    instance.release(handle);
+  });
+
+  static final ffi.NativeCallable<ffi.Uint64 Function(ffi.Uint64 handle)> _cloneNative = ffi.NativeCallable<ffi.Uint64 Function(ffi.Uint64 handle)>.isolateLocal((int handle) {
+    return instance.cloneHandle(handle);
+  }, exceptionalReturn: 0);
+
+  static final ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<Utf8> prefix, ffi.Pointer<Utf8> person, ffi.Pointer<Utf8> outcome, ffi.Pointer<ffi.Pointer<Utf8>> outReturn, ffi.Pointer<_RustCallStatus> outStatus)> _formatNative = ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<Utf8> prefix, ffi.Pointer<Utf8> person, ffi.Pointer<Utf8> outcome, ffi.Pointer<ffi.Pointer<Utf8>> outReturn, ffi.Pointer<_RustCallStatus> outStatus)>.isolateLocal((int handle, ffi.Pointer<Utf8> prefix, ffi.Pointer<Utf8> person, ffi.Pointer<Utf8> outcome, ffi.Pointer<ffi.Pointer<Utf8>> outReturn, ffi.Pointer<_RustCallStatus> outStatus) {
+    final Formatter? callback = instance.lookup(handle);
+    if (callback == null) {
+      outStatus.ref
+        ..code = _rustCallStatusUnexpectedError
+        ..errorBuf = ffi.nullptr;
+      return;
+    }
+    try {
+      final result = callback.format(prefix == ffi.nullptr ? null : prefix.toDartString(), person == ffi.nullptr ? (throw StateError('Rust passed null record callback arg')) : Person.fromJson(jsonDecode(person.toDartString()) as Map<String, dynamic>), outcome == ffi.nullptr ? (throw StateError('Rust passed null enum callback arg')) : _decodeOutcome(outcome.toDartString()));
+      outReturn.value = result.toNativeUtf8();
+      outStatus.ref
+        ..code = _rustCallStatusSuccess
+        ..errorBuf = ffi.nullptr;
+    } catch (_) {
+      outStatus.ref
+        ..code = _rustCallStatusUnexpectedError
+        ..errorBuf = ffi.nullptr;
+    }
+  });
+
+  static ffi.Pointer<_FormatterVTable> createVTable() {
+    final ffi.Pointer<_FormatterVTable> vtablePtr = calloc<_FormatterVTable>();
+    vtablePtr.ref
+      ..uniffiFree = _freeNative.nativeFunction
+      ..uniffiClone = _cloneNative.nativeFunction
+      ..format = _formatNative.nativeFunction
+    ;
+    return vtablePtr;
+  }
+}
+
 class SimpleFnsBindings {
   SimpleFnsBindings({ffi.DynamicLibrary? dynamicLibrary, String? libraryPath})
       : _dynamicLibrary = dynamicLibrary,
@@ -360,6 +452,13 @@ class SimpleFnsBindings {
     return true;
   })();
 
+  late final void Function(ffi.Pointer<_FormatterVTable>) _formatterCallbackInit = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<_FormatterVTable>), void Function(ffi.Pointer<_FormatterVTable>)>('formatter_callback_init');
+  late final ffi.Pointer<_FormatterVTable> _formatterCallbackVTable = _FormatterCallbackBridge.createVTable();
+  late final bool _formatterCallbackInitDone = (() {
+    _formatterCallbackInit(_formatterCallbackVTable);
+    return true;
+  })();
+
   late final int Function(int left, int right) _add = _lib.lookupFunction<ffi.Uint32 Function(ffi.Uint32 left, ffi.Uint32 right), int Function(int left, int right)>('add');
 
   int add(int left, int right) {
@@ -388,6 +487,26 @@ class SimpleFnsBindings {
     return _applyAdder(adderHandle, left, right);
     } finally {
     _AdderCallbackBridge.instance.release(adderHandle);
+    }
+  }
+
+  late final int Function(int formatter, ffi.Pointer<Utf8> prefix, ffi.Pointer<Utf8> person, ffi.Pointer<Utf8> outcome) _applyFormatter = _lib.lookupFunction<ffi.Uint32 Function(ffi.Uint64 formatter, ffi.Pointer<Utf8> prefix, ffi.Pointer<Utf8> person, ffi.Pointer<Utf8> outcome), int Function(int formatter, ffi.Pointer<Utf8> prefix, ffi.Pointer<Utf8> person, ffi.Pointer<Utf8> outcome)>('apply_formatter');
+
+  int applyFormatter(Formatter formatter, String? prefix, Person person, Outcome outcome) {
+    _formatterCallbackInitDone;
+    final int formatterHandle = _FormatterCallbackBridge.instance.register(formatter);
+    final ffi.Pointer<Utf8> prefixNative = prefix == null ? ffi.nullptr : prefix.toNativeUtf8();
+    final String personNativeJson = jsonEncode(person.toJson());
+    final ffi.Pointer<Utf8> personNative = personNativeJson.toNativeUtf8();
+    final String outcomeNativeJson = _encodeOutcome(outcome);
+    final ffi.Pointer<Utf8> outcomeNative = outcomeNativeJson.toNativeUtf8();
+    try {
+    return _applyFormatter(formatterHandle, prefixNative, personNative, outcomeNative);
+    } finally {
+    _FormatterCallbackBridge.instance.release(formatterHandle);
+    if (prefixNative != ffi.nullptr) calloc.free(prefixNative);
+    calloc.free(personNative);
+    calloc.free(outcomeNative);
     }
   }
 
@@ -1510,6 +1629,10 @@ int addU64(int left, int right) {
 
 int applyAdder(Adder adder, int left, int right) {
   return _bindings().applyAdder(adder, left, right);
+}
+
+int applyFormatter(Formatter formatter, String? prefix, Person person, Outcome outcome) {
+  return _bindings().applyFormatter(formatter, prefix, person, outcome);
 }
 
 Future<int> asyncAdd(int left, int right) {

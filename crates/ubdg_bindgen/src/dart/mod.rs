@@ -1119,12 +1119,12 @@ fn render_callback_bridges(
             let mut ffi_args = vec!["ffi.Uint64 handle".to_string()];
             for arg in &method.args {
                 let arg_name = safe_dart_identifier(&to_lower_camel(&arg.name));
-                let arg_native = map_runtime_native_ffi_type(&arg.type_, &[], &[])
+                let arg_native = map_runtime_native_ffi_type(&arg.type_, records, enums)
                     .expect("validated runtime callback arg type");
                 ffi_args.push(format!("{arg_native} {arg_name}"));
             }
             if let Some(return_type) = method.return_type.as_ref() {
-                let out_type = map_runtime_native_ffi_type(return_type, &[], &[])
+                let out_type = map_runtime_native_ffi_type(return_type, records, enums)
                     .expect("validated runtime callback return type");
                 ffi_args.push(format!("ffi.Pointer<{out_type}> outReturn"));
             } else {
@@ -1196,16 +1196,21 @@ fn render_callback_bridges(
             let mut callback_args = Vec::new();
             for arg in &method.args {
                 let arg_name = safe_dart_identifier(&to_lower_camel(&arg.name));
-                let arg_native = map_runtime_native_ffi_type(&arg.type_, &[], &[])
+                let arg_native = map_runtime_native_ffi_type(&arg.type_, records, enums)
                     .expect("validated runtime callback arg type");
-                let arg_dart = map_runtime_dart_ffi_type(&arg.type_, &[], &[])
+                let arg_dart = map_runtime_dart_ffi_type(&arg.type_, records, enums)
                     .expect("validated runtime callback arg type");
                 ffi_args.push(format!("{arg_native} {arg_name}"));
                 dart_args.push(format!("{arg_dart} {arg_name}"));
-                callback_args.push(render_callback_arg_decode_expr(&arg.type_, &arg_name));
+                callback_args.push(render_callback_arg_decode_expr(
+                    &arg.type_,
+                    &arg_name,
+                    records,
+                    enums,
+                ));
             }
             if let Some(return_type) = method.return_type.as_ref() {
-                let out_type = map_runtime_native_ffi_type(return_type, &[], &[])
+                let out_type = map_runtime_native_ffi_type(return_type, records, enums)
                     .expect("validated runtime callback return type");
                 ffi_args.push(format!("ffi.Pointer<{out_type}> outReturn"));
                 dart_args.push(format!("ffi.Pointer<{out_type}> outReturn"));
@@ -1237,7 +1242,8 @@ fn render_callback_bridges(
                     "      final result = callback.{method_name}({});\n",
                     callback_args.join(", ")
                 ));
-                let encoded = render_callback_return_encode_expr(return_type, "result");
+                let encoded =
+                    render_callback_return_encode_expr(return_type, "result", records, enums);
                 out.push_str(&format!("      outReturn.value = {encoded};\n"));
             } else {
                 out.push_str(&format!(
@@ -1407,13 +1413,14 @@ fn render_bound_methods(
                     .expect("validated callback-compatible arg type");
                 native_args.push(format!("{native_type} {arg_name}"));
                 dart_ffi_args.push(format!("{dart_ffi_type} {arg_name}"));
-                if is_runtime_timestamp_type(&arg.type_) {
-                    call_args.push(format!("{arg_name}.toUtc().microsecondsSinceEpoch"));
-                } else if is_runtime_duration_type(&arg.type_) {
-                    call_args.push(format!("{arg_name}.inMicroseconds"));
-                } else {
-                    call_args.push(arg_name);
-                }
+                append_runtime_arg_marshalling(
+                    &arg_name,
+                    &arg.type_,
+                    enums,
+                    &mut pre_call,
+                    &mut post_call,
+                    &mut call_args,
+                );
             }
 
             let native_sig = format!("{native_return} Function({})", native_args.join(", "));
@@ -3111,7 +3118,7 @@ fn is_runtime_callback_compatible_function(
     let return_supported = function
         .return_type
         .as_ref()
-        .map(is_runtime_callback_primitive_compatible_type)
+        .map(is_runtime_callback_function_return_compatible_type)
         .unwrap_or(true);
     if !return_supported {
         return false;
@@ -3126,14 +3133,12 @@ fn is_runtime_callback_compatible_function(
             else {
                 return false;
             };
-            if !is_runtime_callback_interface_compatible(callback_interface) {
+            if !is_runtime_callback_interface_compatible(callback_interface, records, enums) {
                 return false;
             }
             continue;
         }
-        if !is_runtime_ffi_compatible_type(&arg.type_, records, enums)
-            || !is_runtime_callback_primitive_compatible_type(&arg.type_)
-        {
+        if !is_runtime_ffi_compatible_type(&arg.type_, records, enums) {
             return false;
         }
     }
@@ -3149,7 +3154,7 @@ fn callback_interfaces_used_for_runtime<'a>(
     callback_interfaces
         .iter()
         .filter(|callback_interface| {
-            is_runtime_callback_interface_compatible(callback_interface)
+            is_runtime_callback_interface_compatible(callback_interface, records, enums)
                 && functions.iter().any(|function| {
                     is_runtime_callback_compatible_function(
                         function,
@@ -3172,28 +3177,36 @@ fn callback_interface_name_from_type(type_: &Type) -> Option<&str> {
     }
 }
 
-fn is_runtime_callback_interface_compatible(callback_interface: &UdlCallbackInterface) -> bool {
+fn is_runtime_callback_interface_compatible(
+    callback_interface: &UdlCallbackInterface,
+    records: &[UdlRecord],
+    enums: &[UdlEnum],
+) -> bool {
     callback_interface
         .methods
         .iter()
-        .all(is_runtime_callback_method_compatible)
+        .all(|method| is_runtime_callback_method_compatible(method, records, enums))
 }
 
-fn is_runtime_callback_method_compatible(method: &UdlCallbackMethod) -> bool {
+fn is_runtime_callback_method_compatible(
+    method: &UdlCallbackMethod,
+    records: &[UdlRecord],
+    enums: &[UdlEnum],
+) -> bool {
     !method.is_async
         && method.throws_type.is_none()
         && method
             .return_type
             .as_ref()
-            .map(is_runtime_callback_primitive_compatible_type)
+            .map(|t| is_runtime_callback_method_type_compatible(t, records, enums))
             .unwrap_or(true)
         && method
             .args
             .iter()
-            .all(|arg| is_runtime_callback_primitive_compatible_type(&arg.type_))
+            .all(|arg| is_runtime_callback_method_type_compatible(&arg.type_, records, enums))
 }
 
-fn is_runtime_callback_primitive_compatible_type(type_: &Type) -> bool {
+fn is_runtime_callback_function_return_compatible_type(type_: &Type) -> bool {
     matches!(
         type_,
         Type::UInt8
@@ -3210,6 +3223,18 @@ fn is_runtime_callback_primitive_compatible_type(type_: &Type) -> bool {
             | Type::Timestamp
             | Type::Duration
     )
+}
+
+fn is_runtime_callback_method_type_compatible(
+    type_: &Type,
+    records: &[UdlRecord],
+    enums: &[UdlEnum],
+) -> bool {
+    is_runtime_callback_function_return_compatible_type(type_)
+        || is_runtime_string_type(type_)
+        || is_runtime_optional_string_type(type_)
+        || records.iter().any(|r| record_name_from_type(type_) == Some(r.name.as_str()))
+        || is_runtime_enum_type(type_, enums)
 }
 
 fn callback_bridge_class_name(callback_name: &str) -> String {
@@ -3239,8 +3264,36 @@ fn callback_vtable_field_name(callback_name: &str) -> String {
     safe_dart_identifier(&format!("_{}CallbackVTable", to_lower_camel(callback_name)))
 }
 
-fn render_callback_arg_decode_expr(type_: &Type, arg_name: &str) -> String {
+fn render_callback_arg_decode_expr(
+    type_: &Type,
+    arg_name: &str,
+    records: &[UdlRecord],
+    enums: &[UdlEnum],
+) -> String {
     match type_ {
+        Type::String => format!(
+            "{arg_name} == ffi.nullptr ? (throw StateError('Rust passed null string callback arg')) : {arg_name}.toDartString()"
+        ),
+        Type::Optional { inner_type } if is_runtime_string_type(inner_type) => {
+            format!("{arg_name} == ffi.nullptr ? null : {arg_name}.toDartString()")
+        }
+        Type::Record { .. } if records
+            .iter()
+            .any(|r| record_name_from_type(type_) == Some(r.name.as_str())) =>
+        {
+            let record_name = record_name_from_type(type_).unwrap_or("Record");
+            format!(
+                "{arg_name} == ffi.nullptr ? (throw StateError('Rust passed null record callback arg')) : {}.fromJson(jsonDecode({arg_name}.toDartString()) as Map<String, dynamic>)",
+                to_upper_camel(record_name)
+            )
+        }
+        Type::Enum { .. } if is_runtime_enum_type(type_, enums) => {
+            let enum_name = enum_name_from_type(type_).unwrap_or("Enum");
+            format!(
+                "{arg_name} == ffi.nullptr ? (throw StateError('Rust passed null enum callback arg')) : _decode{}({arg_name}.toDartString())",
+                to_upper_camel(enum_name)
+            )
+        }
         Type::Timestamp => {
             format!("DateTime.fromMicrosecondsSinceEpoch({arg_name}, isUtc: true)")
         }
@@ -3249,8 +3302,27 @@ fn render_callback_arg_decode_expr(type_: &Type, arg_name: &str) -> String {
     }
 }
 
-fn render_callback_return_encode_expr(type_: &Type, value_expr: &str) -> String {
+fn render_callback_return_encode_expr(
+    type_: &Type,
+    value_expr: &str,
+    records: &[UdlRecord],
+    enums: &[UdlEnum],
+) -> String {
     match type_ {
+        Type::String => format!("{value_expr}.toNativeUtf8()"),
+        Type::Optional { inner_type } if is_runtime_string_type(inner_type) => {
+            format!("{value_expr} == null ? ffi.nullptr : {value_expr}.toNativeUtf8()")
+        }
+        Type::Record { .. } if records
+            .iter()
+            .any(|r| record_name_from_type(type_) == Some(r.name.as_str())) =>
+        {
+            format!("jsonEncode({value_expr}.toJson()).toNativeUtf8()")
+        }
+        Type::Enum { .. } if is_runtime_enum_type(type_, enums) => {
+            let enum_name = enum_name_from_type(type_).unwrap_or("Enum");
+            format!("_encode{}({value_expr}).toNativeUtf8()", to_upper_camel(enum_name))
+        }
         Type::Timestamp => format!("{value_expr}.toUtc().microsecondsSinceEpoch"),
         Type::Duration => format!("{value_expr}.inMicroseconds"),
         _ => value_expr.to_string(),
@@ -3968,10 +4040,26 @@ interface Counter {
             r#"
 namespace callbacks {
   u32 apply_adder(Adder adder, u32 left, u32 right);
+  u32 apply_formatter(Formatter formatter, string? prefix, Person person, Outcome outcome);
 };
 
 callback interface Adder {
   u32 add(u32 left, u32 right);
+};
+
+callback interface Formatter {
+  string format(string? prefix, Person person, Outcome outcome);
+};
+
+dictionary Person {
+  string name;
+  u32 age;
+};
+
+[Enum]
+interface Outcome {
+  Success(string message);
+  Failure(i32 code, string reason);
 };
 "#,
         )
@@ -3996,6 +4084,13 @@ callback interface Adder {
         assert!(content.contains("'adder_callback_init'"));
         assert!(content.contains("int applyAdder(Adder adder, int left, int right) {"));
         assert!(content.contains("return _bindings().applyAdder(adder, left, right);"));
+        assert!(content.contains("abstract interface class Formatter {"));
+        assert!(content.contains("String format(String? prefix, Person person, Outcome outcome);"));
+        assert!(content.contains("'formatter_callback_init'"));
+        assert!(content.contains("final class _FormatterVTable extends ffi.Struct {"));
+        assert!(content.contains("final class _FormatterCallbackBridge {"));
+        assert!(content
+            .contains("int applyFormatter(Formatter formatter, String? prefix, Person person, Outcome outcome) {"));
     }
 
     #[test]
