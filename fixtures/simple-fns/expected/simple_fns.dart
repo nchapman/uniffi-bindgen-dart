@@ -4,7 +4,7 @@ library simple_fns;
 import 'dart:ffi' as ffi;
 
 class SimpleFnsBindings {
-  const SimpleFnsBindings({ffi.DynamicLibrary? dynamicLibrary, String? libraryPath})
+  SimpleFnsBindings({ffi.DynamicLibrary? dynamicLibrary, String? libraryPath})
       : _dynamicLibrary = dynamicLibrary,
         _libraryPath = libraryPath;
 

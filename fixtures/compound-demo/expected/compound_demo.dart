@@ -5,7 +5,7 @@ import 'dart:ffi' as ffi;
 import 'dart:typed_data';
 
 class CompoundDemoFfi {
-  const CompoundDemoFfi({ffi.DynamicLibrary? dynamicLibrary, String? libraryPath})
+  CompoundDemoFfi({ffi.DynamicLibrary? dynamicLibrary, String? libraryPath})
       : _dynamicLibrary = dynamicLibrary,
         _libraryPath = libraryPath;
 

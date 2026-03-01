@@ -162,7 +162,7 @@ fn render_dart_scaffold(
     }
     out.push('\n');
     out.push_str(&format!(
-        "class {ffi_class_name} {{\n  const {ffi_class_name}({{ffi.DynamicLibrary? dynamicLibrary, String? libraryPath}})\n      : _dynamicLibrary = dynamicLibrary,\n        _libraryPath = libraryPath;\n\n"
+        "class {ffi_class_name} {{\n  {ffi_class_name}({{ffi.DynamicLibrary? dynamicLibrary, String? libraryPath}})\n      : _dynamicLibrary = dynamicLibrary,\n        _libraryPath = libraryPath;\n\n"
     ));
     out.push_str("  final ffi.DynamicLibrary? _dynamicLibrary;\n");
     out.push_str("  final String? _libraryPath;\n\n");
