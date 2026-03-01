@@ -12,7 +12,7 @@ Legend:
 |---|---|---|
 | Top-level functions | Implemented | includes primitives, temporal, bytes, records/enums, and typed throws envelope paths |
 | Objects/interfaces | Partial | sync constructors/methods + lifecycle (`close`/finalizer) implemented; async wrappers for `[Async]` methods are generated across supported return families including bytes and string-keyed maps; trait edge-case parity still pending |
-| Trait methods | Partial | object-level `Display`/`Debug`/`Hash`/`Eq` traits map to idiomatic Dart `toString()`/`hashCode`/`operator ==`; `Ord` is currently blocked in this toolchain by UniFFI UDL parser support (`Invalid trait name: Ord`) |
+| Trait methods | Partial | object-level `Display`/`Debug`/`Hash`/`Eq` traits map to idiomatic Dart `toString()`/`hashCode`/`operator ==`; UniFFI `0.31.x` accepts UDL `Ord`, and Dart-side idiomatic ordering (`Comparable<T>`/`compareTo`) is the remaining gap |
 | Records | Implemented | model generation + JSON codecs + `copyWith` |
 | Enums | Implemented | flat + data-carrying codecs |
 | Errors (`[Error]` + `[Throws]`) | Partial | typed Dart exception mapping for supported runtime-compatible paths, including external enum throw-contract paths via `*ExceptionFfiCodec.decode` |
