@@ -95,6 +95,12 @@ void main() {
     expect(contents, contains('final class MathErrorExceptionDivisionByZero extends MathErrorException {'));
     expect(contents, contains('final class MathErrorExceptionNegativeInput extends MathErrorException {'));
     expect(contents, contains('MathErrorException _decodeMathErrorException(Object? raw) {'));
+    expect(contents, contains('final class Counter {'));
+    expect(contents, contains('static Counter create(int initial) {'));
+    expect(contents, contains('void addValue(int amount) {'));
+    expect(contents, contains('int currentValue() {'));
+    expect(contents, contains('int divideBy(int divisor) {'));
+    expect(contents, contains('void close() {'));
     expect(contents, contains('final class OutcomeSuccess extends Outcome {'));
     expect(contents, contains('final class OutcomeFailure extends Outcome {'));
     expect(contents, contains('String _encodeColor(Color value) {'));
@@ -185,12 +191,27 @@ void main() {
       ),
     );
     expect(bindings.freeCount(), 5);
+    final counter = bindings.counterCreateNew(10);
+    expect(counter.currentValue(), 10);
+    counter.addValue(5);
+    expect(counter.currentValue(), 15);
+    expect(counter.divideBy(3), 5);
+    expect(counter.currentValue(), 5);
+    expect(() => counter.divideBy(0), throwsA(isA<MathErrorExceptionDivisionByZero>()));
+    expect(
+      () => counter.divideBy(-2),
+      throwsA(
+        isA<MathErrorExceptionNegativeInput>().having((e) => e.value, 'value', -2),
+      ),
+    );
+    counter.close();
+    expect(() => counter.currentValue(), throwsA(isA<StateError>()));
     expect(bindings.maybeGreet('dart'), 'maybe, dart');
-    expect(bindings.freeCount(), 6);
+    expect(bindings.freeCount(), 9);
     expect(bindings.maybeGreet(null), isNull);
-    expect(bindings.freeCount(), 6);
+    expect(bindings.freeCount(), 9);
     expect(() => bindings.brokenGreet(), throwsA(isA<StateError>()));
-    expect(bindings.freeCount(), 6);
+    expect(bindings.freeCount(), 9);
     expect(bindings.isEven(8), isTrue);
     expect(bindings.cycleColor(Color.red), Color.green);
     expect(bindings.cycleColor(Color.green), Color.blue);

@@ -632,6 +632,106 @@ class SimpleFnsBindings {
   void tick() {
       _tick();
   }
+
+  late final void Function(int handle) _counterFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('counter_free');
+
+  late final int Function(int initial) _counterCtorNew = _lib.lookupFunction<ffi.Uint64 Function(ffi.Uint32 initial), int Function(int initial)>('counter_new');
+
+  Counter counterCreateNew(int initial) {
+    final int handle = _counterCtorNew(initial);
+    return Counter._(this, handle);
+  }
+
+  late final void Function(int handle, int amount) _counterAddValue = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Uint32 amount), void Function(int handle, int amount)>('counter_add_value');
+
+  void counterInvokeAddValue(int handle, int amount) {
+    _counterAddValue(handle, amount);
+  }
+
+  late final int Function(int handle) _counterCurrentValue = _lib.lookupFunction<ffi.Uint32 Function(ffi.Uint64 handle), int Function(int handle)>('counter_current_value');
+
+  int counterInvokeCurrentValue(int handle) {
+    return _counterCurrentValue(handle);
+  }
+
+  late final ffi.Pointer<Utf8> Function(int handle, int divisor) _counterDivideBy = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle, ffi.Int32 divisor), ffi.Pointer<Utf8> Function(int handle, int divisor)>('counter_divide_by');
+
+  int counterInvokeDivideBy(int handle, int divisor) {
+    final ffi.Pointer<Utf8> resultPtr = _counterDivideBy(handle, divisor);
+    if (resultPtr == ffi.nullptr) {
+      throw StateError('Rust returned null for counter_divide_by');
+    }
+    final String payload;
+    try {
+      payload = resultPtr.toDartString();
+    } finally {
+      _rustStringFree(resultPtr);
+    }
+    final Map<String, dynamic> envelope = jsonDecode(payload) as Map<String, dynamic>;
+    final Object? errRaw = envelope['err'];
+    if (errRaw != null) {
+      throw _decodeMathErrorException(errRaw);
+    }
+    final Object? okRaw = envelope['ok'];
+    return (okRaw as num).toInt();
+  }
+}
+
+final class _CounterFinalizerToken {
+  const _CounterFinalizerToken(this.free, this.handle);
+  final void Function(int) free;
+  final int handle;
+}
+
+final class Counter {
+  Counter._(this._ffi, this._handle) {
+    _finalizer.attach(this, _CounterFinalizerToken(_ffi._counterFree, _handle), detach: this);
+  }
+
+  final SimpleFnsBindings _ffi;
+  int _handle;
+  bool _closed = false;
+
+  static final Finalizer<_CounterFinalizerToken> _finalizer = Finalizer((token) {
+    token.free(token.handle);
+  });
+
+  bool get isClosed => _closed;
+
+  void close() {
+    if (_closed) {
+      return;
+    }
+    _closed = true;
+    _finalizer.detach(this);
+    _ffi._counterFree(_handle);
+  }
+
+  void _ensureOpen() {
+    if (_closed) {
+      throw StateError('Counter is closed');
+    }
+  }
+
+  static Counter create(int initial) {
+    return _bindings().counterCreateNew(initial);
+  }
+
+  void addValue(int amount) {
+    _ensureOpen();
+    _ffi.counterInvokeAddValue(_handle, amount);
+  }
+
+  int currentValue() {
+    _ensureOpen();
+    return _ffi.counterInvokeCurrentValue(_handle);
+  }
+
+  int divideBy(int divisor) {
+    _ensureOpen();
+    return _ffi.counterInvokeDivideBy(_handle, divisor);
+  }
+
 }
 
 SimpleFnsBindings? _defaultBindings;

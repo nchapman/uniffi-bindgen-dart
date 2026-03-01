@@ -51,3 +51,11 @@ interface MathError {
   DivisionByZero();
   NegativeInput(i32 value);
 };
+
+interface Counter {
+  constructor(u32 initial);
+  void add_value(u32 amount);
+  u32 current_value();
+  [Throws=MathError]
+  i32 divide_by(i32 divisor);
+};

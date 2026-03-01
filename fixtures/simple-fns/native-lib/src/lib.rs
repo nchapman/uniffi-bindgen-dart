@@ -1,5 +1,7 @@
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
+use std::collections::HashMap;
+use std::sync::{LazyLock, Mutex};
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use serde_json::Value;
@@ -8,6 +10,8 @@ static TICK_COUNT: AtomicU32 = AtomicU32::new(0);
 static FREE_COUNT: AtomicU32 = AtomicU32::new(0);
 static BYTES_FREE_COUNT: AtomicU32 = AtomicU32::new(0);
 static BYTES_VEC_FREE_COUNT: AtomicU32 = AtomicU32::new(0);
+static NEXT_COUNTER_HANDLE: AtomicU32 = AtomicU32::new(1);
+static COUNTERS: LazyLock<Mutex<HashMap<u64, i32>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -308,6 +312,61 @@ pub extern "C" fn checked_divide(left: i32, right: i32) -> *mut c_char {
         serde_json::json!({
             "ok": left / right
         })
+    };
+
+    CString::new(envelope.to_string())
+        .expect("valid CString")
+        .into_raw()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_new(initial: u32) -> u64 {
+    let handle = NEXT_COUNTER_HANDLE.fetch_add(1, Ordering::Relaxed) as u64;
+    COUNTERS
+        .lock()
+        .expect("counter map lock")
+        .insert(handle, initial as i32);
+    handle
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_free(handle: u64) {
+    COUNTERS.lock().expect("counter map lock").remove(&handle);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_add_value(handle: u64, amount: u32) {
+    if let Some(value) = COUNTERS.lock().expect("counter map lock").get_mut(&handle) {
+        *value += amount as i32;
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_current_value(handle: u64) -> u32 {
+    COUNTERS
+        .lock()
+        .expect("counter map lock")
+        .get(&handle)
+        .copied()
+        .unwrap_or_default() as u32
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_divide_by(handle: u64, divisor: i32) -> *mut c_char {
+    let mut counters = COUNTERS.lock().expect("counter map lock");
+    let value = counters.get(&handle).copied().unwrap_or_default();
+    let envelope = if divisor == 0 {
+        serde_json::json!({
+            "err": { "tag": "divisionByZero" }
+        })
+    } else if divisor < 0 {
+        serde_json::json!({
+            "err": { "tag": "negativeInput", "value": divisor }
+        })
+    } else {
+        let quotient = value / divisor;
+        counters.insert(handle, quotient);
+        serde_json::json!({ "ok": quotient })
     };
 
     CString::new(envelope.to_string())

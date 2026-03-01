@@ -44,6 +44,7 @@ pub fn generate_bindings(args: &GenerateArgs) -> Result<()> {
         &ffi_class_name,
         &library_name,
         &metadata.functions,
+        &metadata.objects,
         &metadata.records,
         &metadata.enums,
     );
@@ -114,6 +115,28 @@ struct UdlArg {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+struct UdlObject {
+    name: String,
+    constructors: Vec<UdlObjectConstructor>,
+    methods: Vec<UdlObjectMethod>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct UdlObjectConstructor {
+    name: String,
+    args: Vec<UdlArg>,
+    throws_type: Option<Type>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct UdlObjectMethod {
+    name: String,
+    return_type: Option<Type>,
+    throws_type: Option<Type>,
+    args: Vec<UdlArg>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct UdlRecord {
     name: String,
     fields: Vec<UdlArg>,
@@ -176,6 +199,7 @@ impl UdlFunction {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 struct UdlMetadata {
     functions: Vec<UdlFunction>,
+    objects: Vec<UdlObject>,
     records: Vec<UdlRecord>,
     enums: Vec<UdlEnum>,
 }
@@ -244,9 +268,50 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
                 .collect(),
         })
         .collect::<Vec<_>>();
+    let objects = ci
+        .object_definitions()
+        .iter()
+        .map(|obj| UdlObject {
+            name: obj.name().to_string(),
+            constructors: obj
+                .constructors()
+                .into_iter()
+                .map(|ctor| UdlObjectConstructor {
+                    name: ctor.name().to_string(),
+                    args: ctor
+                        .arguments()
+                        .into_iter()
+                        .map(|a| UdlArg {
+                            name: a.name().to_string(),
+                            type_: a.as_type(),
+                        })
+                        .collect(),
+                    throws_type: ctor.throws_type().cloned(),
+                })
+                .collect(),
+            methods: obj
+                .methods()
+                .into_iter()
+                .map(|m| UdlObjectMethod {
+                    name: m.name().to_string(),
+                    return_type: m.return_type().cloned(),
+                    throws_type: m.throws_type().cloned(),
+                    args: m
+                        .arguments()
+                        .into_iter()
+                        .map(|a| UdlArg {
+                            name: a.name().to_string(),
+                            type_: a.as_type(),
+                        })
+                        .collect(),
+                })
+                .collect(),
+        })
+        .collect::<Vec<_>>();
 
     Ok(UdlMetadata {
         functions,
+        objects,
         records,
         enums,
     })
@@ -257,10 +322,17 @@ fn render_dart_scaffold(
     ffi_class_name: &str,
     library_name: &str,
     functions: &[UdlFunction],
+    objects: &[UdlObject],
     records: &[UdlRecord],
     enums: &[UdlEnum],
 ) -> String {
-    let needs_typed_data = functions.iter().any(UdlFunction::uses_bytes);
+    let needs_typed_data = functions.iter().any(UdlFunction::uses_bytes)
+        || objects.iter().any(|o| {
+            o.methods.iter().any(|m| {
+                m.return_type.as_ref().is_some_and(uniffi_type_uses_bytes)
+                    || m.args.iter().any(|a| uniffi_type_uses_bytes(&a.type_))
+            })
+        });
     let needs_json_convert = !records.is_empty() || !enums.is_empty();
     let needs_ffi_helpers = functions.iter().any(|f| {
         is_runtime_ffi_compatible_function(f, records, enums)
@@ -272,10 +344,18 @@ fn render_dart_scaffold(
                 || f.args
                     .iter()
                     .any(|a| is_runtime_record_or_enum_string_type(&a.type_, enums)))
-    });
+    }) || !objects.is_empty();
     let needs_runtime_bytes = functions
         .iter()
-        .any(|f| is_runtime_ffi_compatible_function(f, records, enums) && f.uses_runtime_bytes());
+        .any(|f| is_runtime_ffi_compatible_function(f, records, enums) && f.uses_runtime_bytes())
+        || objects.iter().any(|o| {
+            o.methods.iter().any(|m| {
+                m.return_type
+                    .as_ref()
+                    .is_some_and(is_runtime_bytes_like_type)
+                    || m.args.iter().any(|a| is_runtime_bytes_like_type(&a.type_))
+            })
+        });
     let needs_runtime_optional_bytes = functions.iter().any(|f| {
         is_runtime_ffi_compatible_function(f, records, enums)
             && (f
@@ -285,6 +365,15 @@ fn render_dart_scaffold(
                 || f.args
                     .iter()
                     .any(|a| is_runtime_optional_bytes_type(&a.type_)))
+    }) || objects.iter().any(|o| {
+        o.methods.iter().any(|m| {
+            m.return_type
+                .as_ref()
+                .is_some_and(is_runtime_optional_bytes_type)
+                || m.args
+                    .iter()
+                    .any(|a| is_runtime_optional_bytes_type(&a.type_))
+        })
     });
     let needs_runtime_sequence_bytes = functions.iter().any(|f| {
         is_runtime_ffi_compatible_function(f, records, enums)
@@ -295,6 +384,15 @@ fn render_dart_scaffold(
                 || f.args
                     .iter()
                     .any(|a| is_runtime_sequence_bytes_type(&a.type_)))
+    }) || objects.iter().any(|o| {
+        o.methods.iter().any(|m| {
+            m.return_type
+                .as_ref()
+                .is_some_and(is_runtime_sequence_bytes_type)
+                || m.args
+                    .iter()
+                    .any(|a| is_runtime_sequence_bytes_type(&a.type_))
+        })
     });
 
     let mut out = String::new();
@@ -350,10 +448,23 @@ fn render_dart_scaffold(
     out.push_str("    return ffi.DynamicLibrary.open(_libraryPath ?? libraryName);\n");
     out.push_str("  }\n\n");
     out.push_str("  late final ffi.DynamicLibrary _lib = open();\n");
-    out.push_str(&render_bound_methods(functions, records, enums));
+    out.push_str(&render_bound_methods(
+        functions,
+        objects,
+        ffi_class_name,
+        records,
+        enums,
+    ));
     out.push_str("}\n");
+    out.push_str(&render_object_classes(
+        objects,
+        ffi_class_name,
+        records,
+        enums,
+    ));
     out.push_str(&render_function_stubs(
         functions,
+        objects,
         ffi_class_name,
         records,
         enums,
@@ -706,6 +817,8 @@ fn render_json_decode_expr(value_expr: &str, type_: &Type) -> String {
 
 fn render_bound_methods(
     functions: &[UdlFunction],
+    objects: &[UdlObject],
+    _ffi_class_name: &str,
     records: &[UdlRecord],
     enums: &[UdlEnum],
 ) -> String {
@@ -1238,23 +1351,429 @@ fn render_bound_methods(
         out.push_str("  }\n");
     }
 
+    for object in objects {
+        let object_name = to_upper_camel(&object.name);
+        let object_lower = safe_dart_identifier(&to_lower_camel(&object.name));
+        let object_symbol = dart_identifier(&object.name);
+        let free_field = format!("_{}Free", object_lower);
+        out.push_str("\n");
+        out.push_str(&format!(
+            "  late final void Function(int handle) {free_field} = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('{object_symbol}_free');\n"
+        ));
+
+        for ctor in &object.constructors {
+            if !ctor
+                .args
+                .iter()
+                .all(|a| is_runtime_plain_ffi_type(&a.type_))
+            {
+                continue;
+            }
+            let ctor_camel = to_upper_camel(&ctor.name);
+            let ctor_field = format!("_{}Ctor{}", object_lower, ctor_camel);
+            let ctor_method = format!("{}Create{}", object_lower, ctor_camel);
+            let ctor_symbol = format!("{}_{}", object_symbol, dart_identifier(&ctor.name));
+            let is_throwing = ctor.throws_type.is_some();
+            let native_return = if is_throwing {
+                "ffi.Pointer<Utf8>"
+            } else {
+                "ffi.Uint64"
+            };
+            let dart_return = if is_throwing {
+                "ffi.Pointer<Utf8>"
+            } else {
+                "int"
+            };
+            let mut native_args = Vec::new();
+            let mut dart_args = Vec::new();
+            let mut dart_ffi_args = Vec::new();
+            let mut call_args = Vec::new();
+            for arg in &ctor.args {
+                let arg_name = safe_dart_identifier(&to_lower_camel(&arg.name));
+                let Some(native_ty) = map_runtime_native_ffi_type(&arg.type_, records, enums)
+                else {
+                    continue;
+                };
+                let Some(dart_ffi_ty) = map_runtime_dart_ffi_type(&arg.type_, records, enums)
+                else {
+                    continue;
+                };
+                native_args.push(format!("{native_ty} {arg_name}"));
+                dart_ffi_args.push(format!("{dart_ffi_ty} {arg_name}"));
+                dart_args.push(format!(
+                    "{} {arg_name}",
+                    map_uniffi_type_to_dart(&arg.type_)
+                ));
+                call_args.push(arg_name);
+            }
+            out.push_str("\n");
+            out.push_str(&format!(
+                "  late final {dart_return} Function({}) {ctor_field} = _lib.lookupFunction<{native_return} Function({}), {dart_return} Function({})>('{ctor_symbol}');\n",
+                dart_ffi_args.join(", "),
+                native_args.join(", "),
+                dart_ffi_args.join(", ")
+            ));
+            out.push('\n');
+            out.push_str(&format!(
+                "  {object_name} {ctor_method}({}) {{\n",
+                dart_args.join(", ")
+            ));
+            if is_throwing {
+                let Some(throws_name) = ctor
+                    .throws_type
+                    .as_ref()
+                    .and_then(enum_name_from_type)
+                    .map(to_upper_camel)
+                else {
+                    continue;
+                };
+                out.push_str(&format!(
+                    "    final ffi.Pointer<Utf8> resultPtr = {ctor_field}({});\n",
+                    call_args.join(", ")
+                ));
+                out.push_str("    if (resultPtr == ffi.nullptr) {\n");
+                out.push_str(&format!(
+                    "      throw StateError('Rust returned null for {}');\n",
+                    ctor_symbol
+                ));
+                out.push_str("    }\n");
+                out.push_str("    final String payload;\n");
+                out.push_str("    try {\n");
+                out.push_str("      payload = resultPtr.toDartString();\n");
+                out.push_str("    } finally {\n");
+                out.push_str("      _rustStringFree(resultPtr);\n");
+                out.push_str("    }\n");
+                out.push_str(
+                    "    final Map<String, dynamic> envelope = jsonDecode(payload) as Map<String, dynamic>;\n",
+                );
+                out.push_str("    final Object? errRaw = envelope['err'];\n");
+                out.push_str("    if (errRaw != null) {\n");
+                out.push_str(&format!(
+                    "      throw _decode{}Exception(errRaw);\n",
+                    throws_name
+                ));
+                out.push_str("    }\n");
+                out.push_str("    final Object? okRaw = envelope['ok'];\n");
+                out.push_str("    final int handle = (okRaw as num).toInt();\n");
+                out.push_str(&format!("    return {object_name}._(this, handle);\n"));
+            } else {
+                out.push_str(&format!(
+                    "    final int handle = {ctor_field}({});\n",
+                    call_args.join(", ")
+                ));
+                out.push_str(&format!("    return {object_name}._(this, handle);\n"));
+            }
+            out.push_str("  }\n");
+        }
+
+        for method in &object.methods {
+            let supported_return = method
+                .return_type
+                .as_ref()
+                .map(is_runtime_plain_ffi_type)
+                .unwrap_or(true);
+            if !supported_return
+                || !method
+                    .args
+                    .iter()
+                    .all(|a| is_runtime_plain_ffi_type(&a.type_))
+            {
+                continue;
+            }
+            let method_camel = to_upper_camel(&method.name);
+            let method_field = format!("_{}{}", object_lower, method_camel);
+            let method_invoke = format!("{}Invoke{}", object_lower, method_camel);
+            let method_symbol = format!("{}_{}", object_symbol, dart_identifier(&method.name));
+            let is_throwing = method.throws_type.is_some();
+
+            let mut native_args = vec!["ffi.Uint64 handle".to_string()];
+            let mut dart_ffi_args = vec!["int handle".to_string()];
+            let mut dart_args = vec!["int handle".to_string()];
+            let mut call_args = vec!["handle".to_string()];
+            for arg in &method.args {
+                let arg_name = safe_dart_identifier(&to_lower_camel(&arg.name));
+                let Some(native_ty) = map_runtime_native_ffi_type(&arg.type_, records, enums)
+                else {
+                    continue;
+                };
+                let Some(dart_ffi_ty) = map_runtime_dart_ffi_type(&arg.type_, records, enums)
+                else {
+                    continue;
+                };
+                native_args.push(format!("{native_ty} {arg_name}"));
+                dart_ffi_args.push(format!("{dart_ffi_ty} {arg_name}"));
+                dart_args.push(format!(
+                    "{} {arg_name}",
+                    map_uniffi_type_to_dart(&arg.type_)
+                ));
+                call_args.push(arg_name);
+            }
+            let return_type = method
+                .return_type
+                .as_ref()
+                .map(map_uniffi_type_to_dart)
+                .unwrap_or_else(|| "void".to_string());
+            let native_return = if is_throwing {
+                "ffi.Pointer<Utf8>".to_string()
+            } else {
+                method
+                    .return_type
+                    .as_ref()
+                    .and_then(|t| map_runtime_native_ffi_type(t, records, enums))
+                    .unwrap_or("ffi.Void")
+                    .to_string()
+            };
+            let dart_return = if is_throwing {
+                "ffi.Pointer<Utf8>".to_string()
+            } else {
+                method
+                    .return_type
+                    .as_ref()
+                    .and_then(|t| map_runtime_dart_ffi_type(t, records, enums))
+                    .unwrap_or("void")
+                    .to_string()
+            };
+
+            out.push_str("\n");
+            out.push_str(&format!(
+                "  late final {dart_return} Function({}) {method_field} = _lib.lookupFunction<{native_return} Function({}), {dart_return} Function({})>('{method_symbol}');\n",
+                dart_ffi_args.join(", "),
+                native_args.join(", "),
+                dart_ffi_args.join(", ")
+            ));
+            out.push('\n');
+            out.push_str(&format!(
+                "  {return_type} {method_invoke}({}) {{\n",
+                dart_args.join(", ")
+            ));
+            if is_throwing {
+                let Some(throws_name) = method
+                    .throws_type
+                    .as_ref()
+                    .and_then(enum_name_from_type)
+                    .map(to_upper_camel)
+                else {
+                    continue;
+                };
+                out.push_str(&format!(
+                    "    final ffi.Pointer<Utf8> resultPtr = {method_field}({});\n",
+                    call_args.join(", ")
+                ));
+                out.push_str("    if (resultPtr == ffi.nullptr) {\n");
+                out.push_str(&format!(
+                    "      throw StateError('Rust returned null for {}');\n",
+                    method_symbol
+                ));
+                out.push_str("    }\n");
+                out.push_str("    final String payload;\n");
+                out.push_str("    try {\n");
+                out.push_str("      payload = resultPtr.toDartString();\n");
+                out.push_str("    } finally {\n");
+                out.push_str("      _rustStringFree(resultPtr);\n");
+                out.push_str("    }\n");
+                out.push_str(
+                    "    final Map<String, dynamic> envelope = jsonDecode(payload) as Map<String, dynamic>;\n",
+                );
+                out.push_str("    final Object? errRaw = envelope['err'];\n");
+                out.push_str("    if (errRaw != null) {\n");
+                out.push_str(&format!(
+                    "      throw _decode{}Exception(errRaw);\n",
+                    throws_name
+                ));
+                out.push_str("    }\n");
+                if method.return_type.is_some() {
+                    out.push_str("    final Object? okRaw = envelope['ok'];\n");
+                    let decode = render_plain_json_ok_decode_expr(
+                        "okRaw",
+                        method.return_type.as_ref().expect("checked"),
+                    );
+                    out.push_str(&format!("    return {decode};\n"));
+                } else {
+                    out.push_str("    return;\n");
+                }
+            } else if let Some(ret) = &method.return_type {
+                let decode = render_plain_ffi_decode_expr(
+                    ret,
+                    &format!("{method_field}({})", call_args.join(", ")),
+                );
+                out.push_str(&format!("    return {decode};\n"));
+            } else {
+                out.push_str(&format!("    {method_field}({});\n", call_args.join(", ")));
+            }
+            out.push_str("  }\n");
+        }
+    }
+
+    out
+}
+
+fn render_object_classes(
+    objects: &[UdlObject],
+    ffi_class_name: &str,
+    records: &[UdlRecord],
+    enums: &[UdlEnum],
+) -> String {
+    let mut out = String::new();
+    for object in objects {
+        let object_name = to_upper_camel(&object.name);
+        let object_lower = safe_dart_identifier(&to_lower_camel(&object.name));
+        let free_field = format!("_{}Free", object_lower);
+        let token_name = format!("_{}FinalizerToken", object_name);
+        out.push('\n');
+        out.push_str(&format!(
+            "final class {token_name} {{\n  const {token_name}(this.free, this.handle);\n  final void Function(int) free;\n  final int handle;\n}}\n\n"
+        ));
+        out.push_str(&format!("final class {object_name} {{\n"));
+        out.push_str(&format!("  {object_name}._(this._ffi, this._handle) {{\n"));
+        out.push_str(&format!(
+            "    _finalizer.attach(this, {token_name}(_ffi.{free_field}, _handle), detach: this);\n"
+        ));
+        out.push_str("  }\n\n");
+        out.push_str(&format!("  final {ffi_class_name} _ffi;\n"));
+        out.push_str("  int _handle;\n");
+        out.push_str("  bool _closed = false;\n\n");
+        out.push_str(&format!(
+            "  static final Finalizer<{token_name}> _finalizer = Finalizer((token) {{\n"
+        ));
+        out.push_str("    token.free(token.handle);\n");
+        out.push_str("  });\n\n");
+        out.push_str("  bool get isClosed => _closed;\n\n");
+        out.push_str("  void close() {\n");
+        out.push_str("    if (_closed) {\n");
+        out.push_str("      return;\n");
+        out.push_str("    }\n");
+        out.push_str("    _closed = true;\n");
+        out.push_str("    _finalizer.detach(this);\n");
+        out.push_str(&format!("    _ffi.{free_field}(_handle);\n"));
+        out.push_str("  }\n\n");
+        out.push_str("  void _ensureOpen() {\n");
+        out.push_str("    if (_closed) {\n");
+        out.push_str(&format!(
+            "      throw StateError('{object_name} is closed');\n"
+        ));
+        out.push_str("    }\n");
+        out.push_str("  }\n\n");
+
+        for ctor in &object.constructors {
+            if !ctor
+                .args
+                .iter()
+                .all(|a| is_runtime_plain_ffi_type(&a.type_))
+            {
+                continue;
+            }
+            let ctor_camel = to_upper_camel(&ctor.name);
+            let ctor_invoker = format!("{}Create{}", object_lower, ctor_camel);
+            let static_name = if ctor.name == "new" {
+                "create".to_string()
+            } else {
+                safe_dart_identifier(&to_lower_camel(&ctor.name))
+            };
+            let args = ctor
+                .args
+                .iter()
+                .map(|a| {
+                    format!(
+                        "{} {}",
+                        map_uniffi_type_to_dart(&a.type_),
+                        safe_dart_identifier(&to_lower_camel(&a.name))
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            let arg_names = ctor
+                .args
+                .iter()
+                .map(|a| safe_dart_identifier(&to_lower_camel(&a.name)))
+                .collect::<Vec<_>>()
+                .join(", ");
+            out.push_str(&format!(
+                "  static {object_name} {static_name}({args}) {{\n"
+            ));
+            out.push_str(&format!(
+                "    return _bindings().{ctor_invoker}({arg_names});\n"
+            ));
+            out.push_str("  }\n\n");
+        }
+
+        for method in &object.methods {
+            let supported_return = method
+                .return_type
+                .as_ref()
+                .map(is_runtime_plain_ffi_type)
+                .unwrap_or(true);
+            if !supported_return
+                || !method
+                    .args
+                    .iter()
+                    .all(|a| is_runtime_plain_ffi_type(&a.type_))
+            {
+                continue;
+            }
+            let method_name = safe_dart_identifier(&to_lower_camel(&method.name));
+            let method_camel = to_upper_camel(&method.name);
+            let invoke_name = format!("{}Invoke{}", object_lower, method_camel);
+            let return_type = method
+                .return_type
+                .as_ref()
+                .map(map_uniffi_type_to_dart)
+                .unwrap_or_else(|| "void".to_string());
+            let args = method
+                .args
+                .iter()
+                .map(|a| {
+                    format!(
+                        "{} {}",
+                        map_uniffi_type_to_dart(&a.type_),
+                        safe_dart_identifier(&to_lower_camel(&a.name))
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            let arg_names = method
+                .args
+                .iter()
+                .map(|a| safe_dart_identifier(&to_lower_camel(&a.name)))
+                .collect::<Vec<_>>()
+                .join(", ");
+            out.push_str(&format!("  {return_type} {method_name}({args}) {{\n"));
+            out.push_str("    _ensureOpen();\n");
+            let invoke_args = if arg_names.is_empty() {
+                "_handle".to_string()
+            } else {
+                format!("_handle, {arg_names}")
+            };
+            if method.return_type.is_some() {
+                out.push_str(&format!("    return _ffi.{invoke_name}({invoke_args});\n"));
+            } else {
+                out.push_str(&format!("    _ffi.{invoke_name}({invoke_args});\n"));
+            }
+            out.push_str("  }\n\n");
+        }
+        out.push_str("}\n");
+    }
+
+    // keep these params intentionally available for feature-parity expansion.
+    let _ = (records, enums);
     out
 }
 
 fn render_function_stubs(
     functions: &[UdlFunction],
+    objects: &[UdlObject],
     ffi_class_name: &str,
     records: &[UdlRecord],
     enums: &[UdlEnum],
 ) -> String {
-    if functions.is_empty() {
+    if functions.is_empty() && objects.is_empty() {
         return String::new();
     }
 
     let mut out = String::new();
     let has_runtime_functions = functions
         .iter()
-        .any(|f| is_runtime_ffi_compatible_function(f, records, enums));
+        .any(|f| is_runtime_ffi_compatible_function(f, records, enums))
+        || !objects.is_empty();
     out.push('\n');
     if has_runtime_functions {
         out.push_str(&format!("{ffi_class_name}? _defaultBindings;\n\n"));
@@ -1499,6 +2018,53 @@ fn is_runtime_optional_string_type(type_: &Type) -> bool {
 
 fn is_runtime_string_like_type(type_: &Type) -> bool {
     is_runtime_string_type(type_) || is_runtime_optional_string_type(type_)
+}
+
+fn is_runtime_plain_ffi_type(type_: &Type) -> bool {
+    matches!(
+        type_,
+        Type::UInt8
+            | Type::Int8
+            | Type::UInt16
+            | Type::Int16
+            | Type::UInt32
+            | Type::Int32
+            | Type::UInt64
+            | Type::Int64
+            | Type::Float32
+            | Type::Float64
+            | Type::Boolean
+            | Type::Timestamp
+            | Type::Duration
+    )
+}
+
+fn render_plain_json_ok_decode_expr(value_expr: &str, type_: &Type) -> String {
+    match type_ {
+        Type::UInt8
+        | Type::Int8
+        | Type::UInt16
+        | Type::Int16
+        | Type::UInt32
+        | Type::Int32
+        | Type::UInt64
+        | Type::Int64 => format!("({value_expr} as num).toInt()"),
+        Type::Float32 | Type::Float64 => format!("({value_expr} as num).toDouble()"),
+        Type::Boolean => format!("{value_expr} as bool"),
+        Type::Timestamp => format!(
+            "DateTime.fromMicrosecondsSinceEpoch(({value_expr} as num).toInt(), isUtc: true)"
+        ),
+        Type::Duration => format!("Duration(microseconds: ({value_expr} as num).toInt())"),
+        _ => "throw UnimplementedError('unsupported object ok decode type')".to_string(),
+    }
+}
+
+fn render_plain_ffi_decode_expr(type_: &Type, call_expr: &str) -> String {
+    match type_ {
+        Type::Timestamp => format!("DateTime.fromMicrosecondsSinceEpoch({call_expr}, isUtc: true)"),
+        Type::Duration => format!("Duration(microseconds: {call_expr})"),
+        _ => call_expr.to_string(),
+    }
 }
 
 fn map_uniffi_type_to_dart(type_: &Type) -> String {
@@ -2099,6 +2665,55 @@ interface MathError {
         assert!(content.contains("MathErrorException _decodeMathErrorException(Object? raw) {"));
         assert!(content.contains("throw _decodeMathErrorException(errRaw);"));
         assert!(content.contains("_rustStringFree(resultPtr);"));
+    }
+
+    #[test]
+    fn renders_object_classes_with_lifecycle_and_throws() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = temp.path().join("objects.udl");
+        let out_dir = temp.path().join("out");
+        fs::write(
+            &source,
+            r#"
+namespace objects {};
+
+[Error]
+interface MathError {
+  DivisionByZero();
+};
+
+interface Counter {
+  constructor(u32 initial);
+  void add_value(u32 amount);
+  u32 current_value();
+  [Throws=MathError]
+  i32 divide_by(i32 divisor);
+};
+"#,
+        )
+        .expect("write source");
+
+        let args = GenerateArgs {
+            source,
+            out_dir: out_dir.clone(),
+            library: false,
+            config: None,
+            crate_name: None,
+            no_format: false,
+        };
+
+        generate_bindings(&args).expect("generate");
+        let content = fs::read_to_string(out_dir.join("objects.dart")).expect("read generated");
+        assert!(content.contains("final class Counter {"));
+        assert!(content.contains("Counter._(this._ffi, this._handle) {"));
+        assert!(content.contains("void close() {"));
+        assert!(content.contains("void addValue(int amount) {"));
+        assert!(content.contains("int currentValue() {"));
+        assert!(content.contains("int divideBy(int divisor) {"));
+        assert!(content.contains("late final void Function(int handle) _counterFree ="));
+        assert!(content.contains("Counter counterCreateNew(int initial) {"));
+        assert!(content.contains("int counterInvokeCurrentValue(int handle) {"));
+        assert!(content.contains("throw _decodeMathErrorException(errRaw);"));
     }
 
     #[test]
