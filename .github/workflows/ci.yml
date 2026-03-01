@@ -6,22 +6,32 @@ on:
   pull_request:
 
 jobs:
-  rust:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - name: Test workspace
         run: cargo test --workspace
+      - name: Generate bindings artifacts
+        run: ./scripts/build_bindings.sh
+      - name: Upload generated bindings artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-bindings
+          path: binding_tests/generated
 
-  dart:
+  test-bindings:
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
       - uses: dart-lang/setup-dart@v1
-      - name: Generate bindings
-        run: ./scripts/build_bindings.sh
+      - name: Download generated bindings artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-bindings
+          path: binding_tests/generated
       - name: Dart tests
         run: |
           cd binding_tests

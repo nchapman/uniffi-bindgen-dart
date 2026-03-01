@@ -8,6 +8,7 @@ if command -v dart >/dev/null 2>&1; then
   (
     cd binding_tests
     dart pub get
+    dart analyze
     dart test
   )
 else
