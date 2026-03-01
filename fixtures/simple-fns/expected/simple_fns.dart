@@ -642,10 +642,77 @@ class SimpleFnsBindings {
     return Counter._(this, handle);
   }
 
+  late final int Function(ffi.Pointer<Utf8> seed) _counterCtorWithPerson = _lib.lookupFunction<ffi.Uint64 Function(ffi.Pointer<Utf8> seed), int Function(ffi.Pointer<Utf8> seed)>('counter_with_person');
+
+  Counter counterCreateWithPerson(Person seed) {
+    final String seedNativeJson = jsonEncode(seed.toJson());
+    final ffi.Pointer<Utf8> seedNative = seedNativeJson.toNativeUtf8();
+    try {
+    final int handle = _counterCtorWithPerson(seedNative);
+    return Counter._(this, handle);
+    } finally {
+    calloc.free(seedNative);
+    }
+  }
+
   late final void Function(int handle, int amount) _counterAddValue = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Uint32 amount), void Function(int handle, int amount)>('counter_add_value');
 
   void counterInvokeAddValue(int handle, int amount) {
     _counterAddValue(handle, amount);
+  }
+
+  late final int Function(int handle, _RustBuffer input) _counterBytesLen = _lib.lookupFunction<ffi.Uint32 Function(ffi.Uint64 handle, _RustBuffer input), int Function(int handle, _RustBuffer input)>('counter_bytes_len');
+
+  int counterInvokeBytesLen(int handle, Uint8List input) {
+    final ffi.Pointer<ffi.Uint8> inputData = input.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>(input.length);
+    if (inputData != ffi.nullptr) {
+      inputData.asTypedList(input.length).setAll(0, input);
+    }
+    final ffi.Pointer<_RustBuffer> inputBufferPtr = calloc<_RustBuffer>();
+    inputBufferPtr.ref.data = inputData;
+    inputBufferPtr.ref.len = input.length;
+    final _RustBuffer inputNative = inputBufferPtr.ref;
+    try {
+    return _counterBytesLen(handle, inputNative);
+    } finally {
+    if (inputData != ffi.nullptr) calloc.free(inputData);
+    calloc.free(inputBufferPtr);
+    }
+  }
+
+  late final int Function(int handle, _RustBufferVec input) _counterChunksTotalLen = _lib.lookupFunction<ffi.Uint32 Function(ffi.Uint64 handle, _RustBufferVec input), int Function(int handle, _RustBufferVec input)>('counter_chunks_total_len');
+
+  int counterInvokeChunksTotalLen(int handle, List<Uint8List> input) {
+    final ffi.Pointer<_RustBuffer> inputData = input.isEmpty ? ffi.nullptr : calloc<_RustBuffer>(input.length);
+    if (inputData != ffi.nullptr) {
+      for (var i = 0; i < input.length; i++) {
+        final item = input[i];
+        final ffi.Pointer<ffi.Uint8> itemData = item.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>(item.length);
+        if (itemData != ffi.nullptr) {
+          itemData.asTypedList(item.length).setAll(0, item);
+        }
+        (inputData + i).ref
+          ..data = itemData
+          ..len = item.length;
+      }
+    }
+    final ffi.Pointer<_RustBufferVec> inputVecPtr = calloc<_RustBufferVec>();
+    inputVecPtr.ref
+      ..data = inputData
+      ..len = input.length;
+    final _RustBufferVec inputNative = inputVecPtr.ref;
+    try {
+    return _counterChunksTotalLen(handle, inputNative);
+    } finally {
+    if (inputData != ffi.nullptr) {
+      for (var i = 0; i < input.length; i++) {
+        final data = (inputData + i).ref.data;
+        if (data != ffi.nullptr) calloc.free(data);
+      }
+      calloc.free(inputData);
+    }
+    calloc.free(inputVecPtr);
+    }
   }
 
   late final int Function(int handle) _counterCurrentValue = _lib.lookupFunction<ffi.Uint32 Function(ffi.Uint64 handle), int Function(int handle)>('counter_current_value');
@@ -690,6 +757,83 @@ class SimpleFnsBindings {
     return (okRaw as num).toInt();
   }
 
+  late final ffi.Pointer<Utf8> Function(int handle, ffi.Pointer<Utf8> input) _counterFlipOutcome = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle, ffi.Pointer<Utf8> input), ffi.Pointer<Utf8> Function(int handle, ffi.Pointer<Utf8> input)>('counter_flip_outcome');
+
+  Outcome counterInvokeFlipOutcome(int handle, Outcome input) {
+    final String inputNativeJson = _encodeOutcome(input);
+    final ffi.Pointer<Utf8> inputNative = inputNativeJson.toNativeUtf8();
+    try {
+    final ffi.Pointer<Utf8> resultPtr = _counterFlipOutcome(handle, inputNative);
+    if (resultPtr == ffi.nullptr) {
+      throw StateError('Rust returned null for counter_flip_outcome');
+    }
+    try {
+      final String payload = resultPtr.toDartString();
+      return _decodeOutcome(payload);
+    } finally {
+      _rustStringFree(resultPtr);
+    }
+    } finally {
+    calloc.free(inputNative);
+    }
+  }
+
+  late final void Function(int handle, ffi.Pointer<Utf8> input) _counterIngestPerson = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<Utf8> input), void Function(int handle, ffi.Pointer<Utf8> input)>('counter_ingest_person');
+
+  void counterInvokeIngestPerson(int handle, Person input) {
+    final String inputNativeJson = jsonEncode(input.toJson());
+    final ffi.Pointer<Utf8> inputNative = inputNativeJson.toNativeUtf8();
+    try {
+    _counterIngestPerson(handle, inputNative);
+    } finally {
+    calloc.free(inputNative);
+    }
+  }
+
+  late final ffi.Pointer<Utf8> Function(int handle, ffi.Pointer<Utf8> suffix) _counterMaybeLabel = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle, ffi.Pointer<Utf8> suffix), ffi.Pointer<Utf8> Function(int handle, ffi.Pointer<Utf8> suffix)>('counter_maybe_label');
+
+  String counterInvokeMaybeLabel(int handle, String? suffix) {
+    final ffi.Pointer<Utf8> suffixNative = suffix == null ? ffi.nullptr : suffix.toNativeUtf8();
+    try {
+    final ffi.Pointer<Utf8> resultPtr = _counterMaybeLabel(handle, suffixNative);
+    if (resultPtr == ffi.nullptr) {
+      throw StateError('Rust returned null for counter_maybe_label');
+    }
+    try {
+      return resultPtr.toDartString();
+    } finally {
+      _rustStringFree(resultPtr);
+    }
+    } finally {
+    if (suffixNative != ffi.nullptr) calloc.free(suffixNative);
+    }
+  }
+
+  late final int Function(int handle, _RustBufferOpt input) _counterOptionalBytesLen = _lib.lookupFunction<ffi.Uint32 Function(ffi.Uint64 handle, _RustBufferOpt input), int Function(int handle, _RustBufferOpt input)>('counter_optional_bytes_len');
+
+  int counterInvokeOptionalBytesLen(int handle, Uint8List? input) {
+    final bool inputIsSome = input != null;
+    final Uint8List inputValue = input ?? Uint8List(0);
+    final ffi.Pointer<ffi.Uint8> inputData = !inputIsSome || inputValue.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>(inputValue.length);
+    if (inputData != ffi.nullptr) {
+      inputData.asTypedList(inputValue.length).setAll(0, inputValue);
+    }
+    final ffi.Pointer<_RustBuffer> inputBufferPtr = calloc<_RustBuffer>();
+    inputBufferPtr.ref.data = inputData;
+    inputBufferPtr.ref.len = inputIsSome ? inputValue.length : 0;
+    final ffi.Pointer<_RustBufferOpt> inputOptPtr = calloc<_RustBufferOpt>();
+    inputOptPtr.ref.isSome = inputIsSome ? 1 : 0;
+    inputOptPtr.ref.value = inputBufferPtr.ref;
+    final _RustBufferOpt inputNative = inputOptPtr.ref;
+    try {
+    return _counterOptionalBytesLen(handle, inputNative);
+    } finally {
+    if (inputData != ffi.nullptr) calloc.free(inputData);
+    calloc.free(inputBufferPtr);
+    calloc.free(inputOptPtr);
+    }
+  }
+
   late final ffi.Pointer<Utf8> Function(int handle, int divisor) _counterRiskyOutcome = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle, ffi.Int32 divisor), ffi.Pointer<Utf8> Function(int handle, int divisor)>('counter_risky_outcome');
 
   Outcome counterInvokeRiskyOutcome(int handle, int divisor) {
@@ -710,6 +854,17 @@ class SimpleFnsBindings {
     }
     final Object? okRaw = envelope['ok'];
     return _decodeOutcome(okRaw as String);
+  }
+
+  late final void Function(int handle, ffi.Pointer<Utf8> label) _counterSetLabel = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<Utf8> label), void Function(int handle, ffi.Pointer<Utf8> label)>('counter_set_label');
+
+  void counterInvokeSetLabel(int handle, String label) {
+    final ffi.Pointer<Utf8> labelNative = label.toNativeUtf8();
+    try {
+    _counterSetLabel(handle, labelNative);
+    } finally {
+    calloc.free(labelNative);
+    }
   }
 
   late final _RustBuffer Function(int handle) _counterSnapshotBytes = _lib.lookupFunction<_RustBuffer Function(ffi.Uint64 handle), _RustBuffer Function(int handle)>('counter_snapshot_bytes');
@@ -803,9 +958,23 @@ final class Counter {
     return _bindings().counterCreateNew(initial);
   }
 
+  static Counter withPerson(Person seed) {
+    return _bindings().counterCreateWithPerson(seed);
+  }
+
   void addValue(int amount) {
     _ensureOpen();
     _ffi.counterInvokeAddValue(_handle, amount);
+  }
+
+  int bytesLen(Uint8List input) {
+    _ensureOpen();
+    return _ffi.counterInvokeBytesLen(_handle, input);
+  }
+
+  int chunksTotalLen(List<Uint8List> input) {
+    _ensureOpen();
+    return _ffi.counterInvokeChunksTotalLen(_handle, input);
   }
 
   int currentValue() {
@@ -823,9 +992,34 @@ final class Counter {
     return _ffi.counterInvokeDivideBy(_handle, divisor);
   }
 
+  Outcome flipOutcome(Outcome input) {
+    _ensureOpen();
+    return _ffi.counterInvokeFlipOutcome(_handle, input);
+  }
+
+  void ingestPerson(Person input) {
+    _ensureOpen();
+    _ffi.counterInvokeIngestPerson(_handle, input);
+  }
+
+  String maybeLabel(String? suffix) {
+    _ensureOpen();
+    return _ffi.counterInvokeMaybeLabel(_handle, suffix);
+  }
+
+  int optionalBytesLen(Uint8List? input) {
+    _ensureOpen();
+    return _ffi.counterInvokeOptionalBytesLen(_handle, input);
+  }
+
   Outcome riskyOutcome(int divisor) {
     _ensureOpen();
     return _ffi.counterInvokeRiskyOutcome(_handle, divisor);
+  }
+
+  void setLabel(String label) {
+    _ensureOpen();
+    _ffi.counterInvokeSetLabel(_handle, label);
   }
 
   Uint8List snapshotBytes() {

@@ -815,6 +815,153 @@ fn render_json_decode_expr(value_expr: &str, type_: &Type) -> String {
     }
 }
 
+fn append_runtime_arg_marshalling(
+    arg_name: &str,
+    type_: &Type,
+    enums: &[UdlEnum],
+    pre_call: &mut Vec<String>,
+    post_call: &mut Vec<String>,
+    call_args: &mut Vec<String>,
+) {
+    if is_runtime_string_type(type_) {
+        let native_name = format!("{arg_name}Native");
+        pre_call.push(format!(
+            "    final ffi.Pointer<Utf8> {native_name} = {arg_name}.toNativeUtf8();\n"
+        ));
+        post_call.push(format!("    calloc.free({native_name});\n"));
+        call_args.push(native_name);
+    } else if is_runtime_optional_string_type(type_) {
+        let native_name = format!("{arg_name}Native");
+        pre_call.push(format!(
+            "    final ffi.Pointer<Utf8> {native_name} = {arg_name} == null ? ffi.nullptr : {arg_name}.toNativeUtf8();\n"
+        ));
+        post_call.push(format!(
+            "    if ({native_name} != ffi.nullptr) calloc.free({native_name});\n"
+        ));
+        call_args.push(native_name);
+    } else if is_runtime_timestamp_type(type_) {
+        call_args.push(format!("{arg_name}.toUtc().microsecondsSinceEpoch"));
+    } else if is_runtime_duration_type(type_) {
+        call_args.push(format!("{arg_name}.inMicroseconds"));
+    } else if is_runtime_bytes_type(type_) {
+        let data_name = format!("{arg_name}Data");
+        let buffer_ptr_name = format!("{arg_name}BufferPtr");
+        let native_name = format!("{arg_name}Native");
+        pre_call.push(format!(
+            "    final ffi.Pointer<ffi.Uint8> {data_name} = {arg_name}.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>({arg_name}.length);\n"
+        ));
+        pre_call.push(format!(
+            "    if ({data_name} != ffi.nullptr) {{\n      {data_name}.asTypedList({arg_name}.length).setAll(0, {arg_name});\n    }}\n"
+        ));
+        pre_call.push(format!(
+            "    final ffi.Pointer<_RustBuffer> {buffer_ptr_name} = calloc<_RustBuffer>();\n"
+        ));
+        pre_call.push(format!("    {buffer_ptr_name}.ref.data = {data_name};\n"));
+        pre_call.push(format!(
+            "    {buffer_ptr_name}.ref.len = {arg_name}.length;\n"
+        ));
+        pre_call.push(format!(
+            "    final _RustBuffer {native_name} = {buffer_ptr_name}.ref;\n"
+        ));
+        post_call.push(format!(
+            "    if ({data_name} != ffi.nullptr) calloc.free({data_name});\n"
+        ));
+        post_call.push(format!("    calloc.free({buffer_ptr_name});\n"));
+        call_args.push(native_name);
+    } else if is_runtime_optional_bytes_type(type_) {
+        let data_name = format!("{arg_name}Data");
+        let buffer_ptr_name = format!("{arg_name}BufferPtr");
+        let opt_ptr_name = format!("{arg_name}OptPtr");
+        let native_name = format!("{arg_name}Native");
+        let value_name = format!("{arg_name}Value");
+        pre_call.push(format!(
+            "    final bool {arg_name}IsSome = {arg_name} != null;\n"
+        ));
+        pre_call.push(format!(
+            "    final Uint8List {value_name} = {arg_name} ?? Uint8List(0);\n"
+        ));
+        pre_call.push(format!(
+            "    final ffi.Pointer<ffi.Uint8> {data_name} = !{arg_name}IsSome || {value_name}.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>({value_name}.length);\n"
+        ));
+        pre_call.push(format!(
+            "    if ({data_name} != ffi.nullptr) {{\n      {data_name}.asTypedList({value_name}.length).setAll(0, {value_name});\n    }}\n"
+        ));
+        pre_call.push(format!(
+            "    final ffi.Pointer<_RustBuffer> {buffer_ptr_name} = calloc<_RustBuffer>();\n"
+        ));
+        pre_call.push(format!("    {buffer_ptr_name}.ref.data = {data_name};\n"));
+        pre_call.push(format!(
+            "    {buffer_ptr_name}.ref.len = {arg_name}IsSome ? {value_name}.length : 0;\n"
+        ));
+        pre_call.push(format!(
+            "    final ffi.Pointer<_RustBufferOpt> {opt_ptr_name} = calloc<_RustBufferOpt>();\n"
+        ));
+        pre_call.push(format!(
+            "    {opt_ptr_name}.ref.isSome = {arg_name}IsSome ? 1 : 0;\n"
+        ));
+        pre_call.push(format!(
+            "    {opt_ptr_name}.ref.value = {buffer_ptr_name}.ref;\n"
+        ));
+        pre_call.push(format!(
+            "    final _RustBufferOpt {native_name} = {opt_ptr_name}.ref;\n"
+        ));
+        post_call.push(format!(
+            "    if ({data_name} != ffi.nullptr) calloc.free({data_name});\n"
+        ));
+        post_call.push(format!("    calloc.free({buffer_ptr_name});\n"));
+        post_call.push(format!("    calloc.free({opt_ptr_name});\n"));
+        call_args.push(native_name);
+    } else if is_runtime_sequence_bytes_type(type_) {
+        let data_name = format!("{arg_name}Data");
+        let vec_ptr_name = format!("{arg_name}VecPtr");
+        let native_name = format!("{arg_name}Native");
+        pre_call.push(format!(
+            "    final ffi.Pointer<_RustBuffer> {data_name} = {arg_name}.isEmpty ? ffi.nullptr : calloc<_RustBuffer>({arg_name}.length);\n"
+        ));
+        pre_call.push(format!(
+            "    if ({data_name} != ffi.nullptr) {{\n      for (var i = 0; i < {arg_name}.length; i++) {{\n        final item = {arg_name}[i];\n        final ffi.Pointer<ffi.Uint8> itemData = item.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>(item.length);\n        if (itemData != ffi.nullptr) {{\n          itemData.asTypedList(item.length).setAll(0, item);\n        }}\n        ({data_name} + i).ref\n          ..data = itemData\n          ..len = item.length;\n      }}\n    }}\n"
+        ));
+        pre_call.push(format!(
+            "    final ffi.Pointer<_RustBufferVec> {vec_ptr_name} = calloc<_RustBufferVec>();\n"
+        ));
+        pre_call.push(format!(
+            "    {vec_ptr_name}.ref\n      ..data = {data_name}\n      ..len = {arg_name}.length;\n"
+        ));
+        pre_call.push(format!(
+            "    final _RustBufferVec {native_name} = {vec_ptr_name}.ref;\n"
+        ));
+        post_call.push(format!(
+            "    if ({data_name} != ffi.nullptr) {{\n      for (var i = 0; i < {arg_name}.length; i++) {{\n        final data = ({data_name} + i).ref.data;\n        if (data != ffi.nullptr) calloc.free(data);\n      }}\n      calloc.free({data_name});\n    }}\n"
+        ));
+        post_call.push(format!("    calloc.free({vec_ptr_name});\n"));
+        call_args.push(native_name);
+    } else if is_runtime_record_type(type_) {
+        let native_name = format!("{arg_name}Native");
+        pre_call.push(format!(
+            "    final String {native_name}Json = jsonEncode({arg_name}.toJson());\n"
+        ));
+        pre_call.push(format!(
+            "    final ffi.Pointer<Utf8> {native_name} = {native_name}Json.toNativeUtf8();\n"
+        ));
+        post_call.push(format!("    calloc.free({native_name});\n"));
+        call_args.push(native_name);
+    } else if is_runtime_enum_type(type_, enums) {
+        let native_name = format!("{arg_name}Native");
+        let enum_name = enum_name_from_type(type_).unwrap_or("Enum");
+        pre_call.push(format!(
+            "    final String {native_name}Json = _encode{}({arg_name});\n",
+            to_upper_camel(enum_name)
+        ));
+        pre_call.push(format!(
+            "    final ffi.Pointer<Utf8> {native_name} = {native_name}Json.toNativeUtf8();\n"
+        ));
+        post_call.push(format!("    calloc.free({native_name});\n"));
+        call_args.push(native_name);
+    } else {
+        call_args.push(arg_name.to_string());
+    }
+}
+
 fn render_bound_methods(
     functions: &[UdlFunction],
     objects: &[UdlObject],
@@ -1365,7 +1512,7 @@ fn render_bound_methods(
             if !ctor
                 .args
                 .iter()
-                .all(|a| is_runtime_plain_ffi_type(&a.type_))
+                .all(|a| is_runtime_ffi_compatible_type(&a.type_, records, enums))
             {
                 continue;
             }
@@ -1388,15 +1535,20 @@ fn render_bound_methods(
             let mut dart_args = Vec::new();
             let mut dart_ffi_args = Vec::new();
             let mut call_args = Vec::new();
+            let mut pre_call = Vec::new();
+            let mut post_call = Vec::new();
+            let mut signature_compatible = true;
             for arg in &ctor.args {
                 let arg_name = safe_dart_identifier(&to_lower_camel(&arg.name));
                 let Some(native_ty) = map_runtime_native_ffi_type(&arg.type_, records, enums)
                 else {
-                    continue;
+                    signature_compatible = false;
+                    break;
                 };
                 let Some(dart_ffi_ty) = map_runtime_dart_ffi_type(&arg.type_, records, enums)
                 else {
-                    continue;
+                    signature_compatible = false;
+                    break;
                 };
                 native_args.push(format!("{native_ty} {arg_name}"));
                 dart_ffi_args.push(format!("{dart_ffi_ty} {arg_name}"));
@@ -1404,7 +1556,17 @@ fn render_bound_methods(
                     "{} {arg_name}",
                     map_uniffi_type_to_dart(&arg.type_)
                 ));
-                call_args.push(arg_name);
+                append_runtime_arg_marshalling(
+                    &arg_name,
+                    &arg.type_,
+                    enums,
+                    &mut pre_call,
+                    &mut post_call,
+                    &mut call_args,
+                );
+            }
+            if !signature_compatible {
+                continue;
             }
             out.push_str("\n");
             out.push_str(&format!(
@@ -1418,6 +1580,12 @@ fn render_bound_methods(
                 "  {object_name} {ctor_method}({}) {{\n",
                 dart_args.join(", ")
             ));
+            for line in &pre_call {
+                out.push_str(line);
+            }
+            if !post_call.is_empty() {
+                out.push_str("    try {\n");
+            }
             if is_throwing {
                 let Some(throws_name) = ctor
                     .throws_type
@@ -1463,6 +1631,13 @@ fn render_bound_methods(
                 ));
                 out.push_str(&format!("    return {object_name}._(this, handle);\n"));
             }
+            if !post_call.is_empty() {
+                out.push_str("    } finally {\n");
+                for line in &post_call {
+                    out.push_str(line);
+                }
+                out.push_str("    }\n");
+            }
             out.push_str("  }\n");
         }
 
@@ -1476,7 +1651,7 @@ fn render_bound_methods(
                 || !method
                     .args
                     .iter()
-                    .all(|a| is_runtime_plain_ffi_type(&a.type_))
+                    .all(|a| is_runtime_ffi_compatible_type(&a.type_, records, enums))
             {
                 continue;
             }
@@ -1490,15 +1665,20 @@ fn render_bound_methods(
             let mut dart_ffi_args = vec!["int handle".to_string()];
             let mut dart_args = vec!["int handle".to_string()];
             let mut call_args = vec!["handle".to_string()];
+            let mut pre_call = Vec::new();
+            let mut post_call = Vec::new();
+            let mut signature_compatible = true;
             for arg in &method.args {
                 let arg_name = safe_dart_identifier(&to_lower_camel(&arg.name));
                 let Some(native_ty) = map_runtime_native_ffi_type(&arg.type_, records, enums)
                 else {
-                    continue;
+                    signature_compatible = false;
+                    break;
                 };
                 let Some(dart_ffi_ty) = map_runtime_dart_ffi_type(&arg.type_, records, enums)
                 else {
-                    continue;
+                    signature_compatible = false;
+                    break;
                 };
                 native_args.push(format!("{native_ty} {arg_name}"));
                 dart_ffi_args.push(format!("{dart_ffi_ty} {arg_name}"));
@@ -1506,7 +1686,17 @@ fn render_bound_methods(
                     "{} {arg_name}",
                     map_uniffi_type_to_dart(&arg.type_)
                 ));
-                call_args.push(arg_name);
+                append_runtime_arg_marshalling(
+                    &arg_name,
+                    &arg.type_,
+                    enums,
+                    &mut pre_call,
+                    &mut post_call,
+                    &mut call_args,
+                );
+            }
+            if !signature_compatible {
+                continue;
             }
             let return_type = method
                 .return_type
@@ -1546,6 +1736,12 @@ fn render_bound_methods(
                 "  {return_type} {method_invoke}({}) {{\n",
                 dart_args.join(", ")
             ));
+            for line in &pre_call {
+                out.push_str(line);
+            }
+            if !post_call.is_empty() {
+                out.push_str("    try {\n");
+            }
             if is_throwing {
                 let Some(throws_name) = method
                     .throws_type
@@ -1688,6 +1884,13 @@ fn render_bound_methods(
             } else {
                 out.push_str(&format!("    {method_field}({});\n", call_args.join(", ")));
             }
+            if !post_call.is_empty() {
+                out.push_str("    } finally {\n");
+                for line in &post_call {
+                    out.push_str(line);
+                }
+                out.push_str("    }\n");
+            }
             out.push_str("  }\n");
         }
     }
@@ -1746,7 +1949,7 @@ fn render_object_classes(
             if !ctor
                 .args
                 .iter()
-                .all(|a| is_runtime_plain_ffi_type(&a.type_))
+                .all(|a| is_runtime_ffi_compatible_type(&a.type_, records, enums))
             {
                 continue;
             }
@@ -1794,7 +1997,7 @@ fn render_object_classes(
                 || !method
                     .args
                     .iter()
-                    .all(|a| is_runtime_plain_ffi_type(&a.type_))
+                    .all(|a| is_runtime_ffi_compatible_type(&a.type_, records, enums))
             {
                 continue;
             }
@@ -2106,25 +2309,6 @@ fn is_runtime_optional_string_type(type_: &Type) -> bool {
 
 fn is_runtime_string_like_type(type_: &Type) -> bool {
     is_runtime_string_type(type_) || is_runtime_optional_string_type(type_)
-}
-
-fn is_runtime_plain_ffi_type(type_: &Type) -> bool {
-    matches!(
-        type_,
-        Type::UInt8
-            | Type::Int8
-            | Type::UInt16
-            | Type::Int16
-            | Type::UInt32
-            | Type::Int32
-            | Type::UInt64
-            | Type::Int64
-            | Type::Float32
-            | Type::Float64
-            | Type::Boolean
-            | Type::Timestamp
-            | Type::Duration
-    )
 }
 
 fn render_plain_ffi_decode_expr(type_: &Type, call_expr: &str) -> String {
@@ -2763,8 +2947,17 @@ interface Outcome {
 
 interface Counter {
   constructor(u32 initial);
+  [Name=with_person]
+  constructor(Person seed);
   void add_value(u32 amount);
   u32 current_value();
+  void set_label(string label);
+  string maybe_label(string? suffix);
+  void ingest_person(Person input);
+  Outcome flip_outcome(Outcome input);
+  u32 bytes_len(bytes input);
+  u32 optional_bytes_len(bytes? input);
+  u32 chunks_total_len(sequence<bytes> input);
   string describe();
   Person snapshot_person();
   Outcome snapshot_outcome();
@@ -2792,8 +2985,16 @@ interface Counter {
         assert!(content.contains("final class Counter {"));
         assert!(content.contains("Counter._(this._ffi, this._handle) {"));
         assert!(content.contains("void close() {"));
+        assert!(content.contains("static Counter withPerson(Person seed) {"));
         assert!(content.contains("void addValue(int amount) {"));
         assert!(content.contains("int currentValue() {"));
+        assert!(content.contains("void setLabel(String label) {"));
+        assert!(content.contains("String maybeLabel(String? suffix) {"));
+        assert!(content.contains("void ingestPerson(Person input) {"));
+        assert!(content.contains("Outcome flipOutcome(Outcome input) {"));
+        assert!(content.contains("int bytesLen(Uint8List input) {"));
+        assert!(content.contains("int optionalBytesLen(Uint8List? input) {"));
+        assert!(content.contains("int chunksTotalLen(List<Uint8List> input) {"));
         assert!(content.contains("String describe() {"));
         assert!(content.contains("Person snapshotPerson() {"));
         assert!(content.contains("Outcome snapshotOutcome() {"));

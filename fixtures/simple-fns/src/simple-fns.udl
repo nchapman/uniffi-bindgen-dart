@@ -54,8 +54,17 @@ interface MathError {
 
 interface Counter {
   constructor(u32 initial);
+  [Name=with_person]
+  constructor(Person seed);
   void add_value(u32 amount);
   u32 current_value();
+  void set_label(string label);
+  string maybe_label(string? suffix);
+  void ingest_person(Person input);
+  Outcome flip_outcome(Outcome input);
+  u32 bytes_len(bytes input);
+  u32 optional_bytes_len(bytes? input);
+  u32 chunks_total_len(sequence<bytes> input);
   string describe();
   Person snapshot_person();
   Outcome snapshot_outcome();

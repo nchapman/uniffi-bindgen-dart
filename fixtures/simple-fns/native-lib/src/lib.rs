@@ -12,6 +12,8 @@ static BYTES_FREE_COUNT: AtomicU32 = AtomicU32::new(0);
 static BYTES_VEC_FREE_COUNT: AtomicU32 = AtomicU32::new(0);
 static NEXT_COUNTER_HANDLE: AtomicU32 = AtomicU32::new(1);
 static COUNTERS: LazyLock<Mutex<HashMap<u64, i32>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+static COUNTER_LABELS: LazyLock<Mutex<HashMap<u64, String>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -326,12 +328,34 @@ pub extern "C" fn counter_new(initial: u32) -> u64 {
         .lock()
         .expect("counter map lock")
         .insert(handle, initial as i32);
+    COUNTER_LABELS
+        .lock()
+        .expect("counter labels lock")
+        .insert(handle, String::new());
     handle
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_with_person(seed: *const c_char) -> u64 {
+    let initial = if seed.is_null() {
+        0
+    } else {
+        let payload = unsafe { CStr::from_ptr(seed) }.to_string_lossy().into_owned();
+        serde_json::from_str::<Value>(&payload)
+            .ok()
+            .and_then(|v| v.get("age").and_then(Value::as_u64))
+            .unwrap_or_default() as u32
+    };
+    counter_new(initial)
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn counter_free(handle: u64) {
     COUNTERS.lock().expect("counter map lock").remove(&handle);
+    COUNTER_LABELS
+        .lock()
+        .expect("counter labels lock")
+        .remove(&handle);
 }
 
 #[unsafe(no_mangle)]
@@ -352,6 +376,123 @@ pub extern "C" fn counter_current_value(handle: u64) -> u32 {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn counter_set_label(handle: u64, label: *const c_char) {
+    if label.is_null() {
+        return;
+    }
+    let label = unsafe { CStr::from_ptr(label) }.to_string_lossy().into_owned();
+    COUNTER_LABELS
+        .lock()
+        .expect("counter labels lock")
+        .insert(handle, label);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_maybe_label(handle: u64, suffix: *const c_char) -> *mut c_char {
+    let value = COUNTERS
+        .lock()
+        .expect("counter map lock")
+        .get(&handle)
+        .copied()
+        .unwrap_or_default();
+    let suffix = if suffix.is_null() {
+        "none".to_string()
+    } else {
+        unsafe { CStr::from_ptr(suffix) }.to_string_lossy().into_owned()
+    };
+    CString::new(format!("counter:{value}:{suffix}"))
+        .expect("valid CString")
+        .into_raw()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_ingest_person(handle: u64, input: *const c_char) {
+    if input.is_null() {
+        return;
+    }
+    let payload = unsafe { CStr::from_ptr(input) }.to_string_lossy().into_owned();
+    let Ok(value) = serde_json::from_str::<Value>(&payload) else {
+        return;
+    };
+    let age = value.get("age").and_then(Value::as_i64).unwrap_or_default() as i32;
+    if let Some(existing) = COUNTERS.lock().expect("counter map lock").get_mut(&handle) {
+        *existing = age;
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_flip_outcome(_handle: u64, input: *const c_char) -> *mut c_char {
+    if input.is_null() {
+        return std::ptr::null_mut();
+    }
+    let payload = unsafe { CStr::from_ptr(input) }.to_string_lossy().into_owned();
+    let Ok(value) = serde_json::from_str::<Value>(&payload) else {
+        return std::ptr::null_mut();
+    };
+    let Some(tag) = value.get("tag").and_then(Value::as_str) else {
+        return std::ptr::null_mut();
+    };
+    let out = match tag {
+        "success" => {
+            let message = value
+                .get("message")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string();
+            serde_json::json!({
+                "tag": "failure",
+                "code": message.len() as i64,
+                "reason": message
+            })
+        }
+        "failure" => {
+            let code = value.get("code").and_then(Value::as_i64).unwrap_or_default();
+            let reason = value
+                .get("reason")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string();
+            serde_json::json!({
+                "tag": "success",
+                "message": format!("{code}:{reason}")
+            })
+        }
+        _ => return std::ptr::null_mut(),
+    };
+    CString::new(out.to_string())
+        .expect("valid CString")
+        .into_raw()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_bytes_len(_handle: u64, input: RustBuffer) -> u32 {
+    rust_buffer_to_vec(input).len() as u32
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_optional_bytes_len(_handle: u64, input: RustBufferOpt) -> u32 {
+    if input.is_some == 0 {
+        0
+    } else {
+        rust_buffer_to_vec(input.value).len() as u32
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_chunks_total_len(_handle: u64, input: RustBufferVec) -> u32 {
+    if input.data.is_null() || input.len == 0 {
+        return 0;
+    }
+    let items = unsafe { std::slice::from_raw_parts(input.data, input.len as usize) };
+    items
+        .iter()
+        .copied()
+        .map(rust_buffer_to_vec)
+        .map(|v| v.len() as u32)
+        .sum()
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn counter_describe(handle: u64) -> *mut c_char {
     let value = COUNTERS
         .lock()
@@ -359,7 +500,18 @@ pub extern "C" fn counter_describe(handle: u64) -> *mut c_char {
         .get(&handle)
         .copied()
         .unwrap_or_default();
-    CString::new(format!("counter:{value}"))
+    let label = COUNTER_LABELS
+        .lock()
+        .expect("counter labels lock")
+        .get(&handle)
+        .cloned()
+        .unwrap_or_default();
+    let text = if label.is_empty() {
+        format!("counter:{value}")
+    } else {
+        format!("counter:{value}:{label}")
+    };
+    CString::new(text)
         .expect("valid CString")
         .into_raw()
 }

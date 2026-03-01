@@ -97,8 +97,16 @@ void main() {
     expect(contents, contains('MathErrorException _decodeMathErrorException(Object? raw) {'));
     expect(contents, contains('final class Counter {'));
     expect(contents, contains('static Counter create(int initial) {'));
+    expect(contents, contains('static Counter withPerson(Person seed) {'));
     expect(contents, contains('void addValue(int amount) {'));
     expect(contents, contains('int currentValue() {'));
+    expect(contents, contains('void setLabel(String label) {'));
+    expect(contents, contains('String maybeLabel(String? suffix) {'));
+    expect(contents, contains('void ingestPerson(Person input) {'));
+    expect(contents, contains('Outcome flipOutcome(Outcome input) {'));
+    expect(contents, contains('int bytesLen(Uint8List input) {'));
+    expect(contents, contains('int optionalBytesLen(Uint8List? input) {'));
+    expect(contents, contains('int chunksTotalLen(List<Uint8List> input) {'));
     expect(contents, contains('String describe() {'));
     expect(contents, contains('Person snapshotPerson() {'));
     expect(contents, contains('Outcome snapshotOutcome() {'));
@@ -202,17 +210,34 @@ void main() {
     expect(counter.currentValue(), 15);
     expect(counter.divideBy(3), 5);
     expect(counter.currentValue(), 5);
-    expect(counter.describe(), 'counter:5');
+    counter.setLabel('alpha');
+    expect(counter.describe(), 'counter:5:alpha');
+    expect(counter.maybeLabel('tail'), 'counter:5:tail');
+    expect(counter.maybeLabel(null), 'counter:5:none');
+    counter.ingestPerson(const Person(name: 'Eve', age: 9));
+    expect(counter.currentValue(), 9);
+    final flipped = counter.flipOutcome(const OutcomeSuccess(message: 'ok'));
+    expect(flipped, isA<OutcomeFailure>());
+    final flippedFailure = flipped as OutcomeFailure;
+    expect(flippedFailure.code, 2);
+    expect(flippedFailure.reason, 'ok');
+    expect(counter.bytesLen(Uint8List.fromList([1, 2, 3])), 3);
+    expect(counter.optionalBytesLen(Uint8List.fromList([9, 8])), 2);
+    expect(counter.optionalBytesLen(null), 0);
+    expect(
+      counter.chunksTotalLen([Uint8List.fromList([1]), Uint8List(0), Uint8List.fromList([2, 3])]),
+      3,
+    );
     final snapPerson = counter.snapshotPerson();
     expect(snapPerson.name, 'counter');
-    expect(snapPerson.age, 5);
+    expect(snapPerson.age, 9);
     final snapOutcome = counter.snapshotOutcome();
     expect(snapOutcome, isA<OutcomeFailure>());
-    final snapFailure = snapOutcome as OutcomeFailure;
-    expect(snapFailure.code, 5);
-    expect(snapFailure.reason, 'odd');
+    final snapOutcomeFailure = snapOutcome as OutcomeFailure;
+    expect(snapOutcomeFailure.code, 9);
+    expect(snapOutcomeFailure.reason, 'odd');
     final bytesBeforeSnapshot = bindings.bytesFreeCount();
-    expect(counter.snapshotBytes(), Uint8List.fromList('bytes:5'.codeUnits));
+    expect(counter.snapshotBytes(), Uint8List.fromList('bytes:9'.codeUnits));
     expect(bindings.bytesFreeCount(), bytesBeforeSnapshot + 1);
     final risky = counter.riskyOutcome(5);
     expect(risky, isA<OutcomeSuccess>());
@@ -231,6 +256,11 @@ void main() {
     );
     counter.close();
     expect(() => counter.currentValue(), throwsA(isA<StateError>()));
+    final counterFromPerson = bindings.counterCreateWithPerson(
+      const Person(name: 'Neo', age: 4),
+    );
+    expect(counterFromPerson.currentValue(), 4);
+    counterFromPerson.close();
     final freeAfterCounter = bindings.freeCount();
     expect(freeAfterCounter, greaterThanOrEqualTo(9));
     expect(bindings.maybeGreet('dart'), 'maybe, dart');
