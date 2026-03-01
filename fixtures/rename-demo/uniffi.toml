@@ -1,0 +1,3 @@
+[bindings.dart]
+rename = { add_numbers = "sumValues", Counter = "Meter", "Counter.current_value" = "valueNow", "Counter.with_seed" = "seeded" }
+exclude = ["hidden_sum", "Counter.hidden_value"]

@@ -1,0 +1,12 @@
+namespace rename_demo {
+  u32 add_numbers(u32 left, u32 right);
+  u32 hidden_sum(u32 value);
+};
+
+interface Counter {
+  constructor(u32 initial);
+  [Name=with_seed]
+  constructor(u32 seed);
+  u32 current_value();
+  u32 hidden_value();
+};

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -13,6 +14,8 @@ pub struct DartBindingsConfig {
     pub ffi_class_name: Option<String>,
     pub library_name: Option<String>,
     pub dart_format: Option<bool>,
+    pub rename: HashMap<String, String>,
+    pub exclude: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -86,6 +89,8 @@ module_name = "my_module"
 ffi_class_name = "MyFfi"
 library_name = "my_lib"
 dart_format = false
+rename = { old_name = "new_name", "Counter.value" = "reading" }
+exclude = ["skip_me", "Counter.hidden"]
 "#,
         )
         .expect("write config");
@@ -104,6 +109,16 @@ dart_format = false
         assert_eq!(cfg.ffi_class_name.as_deref(), Some("MyFfi"));
         assert_eq!(cfg.library_name.as_deref(), Some("my_lib"));
         assert_eq!(cfg.dart_format, Some(false));
+        assert_eq!(
+            cfg.rename.get("old_name").map(String::as_str),
+            Some("new_name")
+        );
+        assert_eq!(
+            cfg.rename.get("Counter.value").map(String::as_str),
+            Some("reading")
+        );
+        assert!(cfg.exclude.iter().any(|e| e == "skip_me"));
+        assert!(cfg.exclude.iter().any(|e| e == "Counter.hidden"));
     }
 
     #[test]

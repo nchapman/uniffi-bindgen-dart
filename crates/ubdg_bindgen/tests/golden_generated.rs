@@ -99,3 +99,17 @@ fn golden_custom_types_demo() {
     generate(&source, &out_dir, None);
     assert_matches_expected(&out_dir.join("custom_types_demo.dart"), &expected);
 }
+
+#[test]
+fn golden_rename_demo() {
+    let root = repo_root();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let out_dir = temp.path().join("out");
+
+    let source = root.join("fixtures/rename-demo/src/rename-demo.udl");
+    let config = root.join("fixtures/rename-demo/uniffi.toml");
+    let expected = root.join("fixtures/rename-demo/expected/rename_demo.dart");
+
+    generate(&source, &out_dir, Some(&config));
+    assert_matches_expected(&out_dir.join("rename_demo.dart"), &expected);
+}

@@ -1,3 +1,4 @@
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::Path;
 
@@ -43,6 +44,8 @@ pub fn generate_bindings(args: &GenerateArgs) -> Result<()> {
         &module_name,
         &ffi_class_name,
         &library_name,
+        &cfg.rename,
+        &cfg.exclude,
         &metadata.functions,
         &metadata.objects,
         &metadata.callback_interfaces,
@@ -535,12 +538,15 @@ fn render_dart_scaffold(
     module_name: &str,
     ffi_class_name: &str,
     library_name: &str,
+    rename: &HashMap<String, String>,
+    exclude: &[String],
     functions: &[UdlFunction],
     objects: &[UdlObject],
     callback_interfaces: &[UdlCallbackInterface],
     records: &[UdlRecord],
     enums: &[UdlEnum],
 ) -> String {
+    let api_overrides = ApiOverrides::new(rename, exclude);
     let needs_callback_runtime =
         has_runtime_callback_support(functions, objects, callback_interfaces, records, enums);
     let needs_async_rust_future = has_runtime_async_rust_future_support(
@@ -736,6 +742,7 @@ fn render_dart_scaffold(
         objects,
         callback_interfaces,
         ffi_class_name,
+        &api_overrides,
         records,
         enums,
     ));
@@ -744,6 +751,7 @@ fn render_dart_scaffold(
         objects,
         callback_interfaces,
         ffi_class_name,
+        &api_overrides,
         records,
         enums,
     ));
@@ -3532,16 +3540,58 @@ fn render_bound_methods(
     out
 }
 
+#[derive(Debug, Clone, Default)]
+struct ApiOverrides {
+    rename: HashMap<String, String>,
+    exclude: HashSet<String>,
+}
+
+impl ApiOverrides {
+    fn new(rename: &HashMap<String, String>, exclude: &[String]) -> Self {
+        Self {
+            rename: rename.clone(),
+            exclude: exclude.iter().cloned().collect(),
+        }
+    }
+
+    fn fn_key(name: &str) -> String {
+        name.to_string()
+    }
+
+    fn object_key(object: &str) -> String {
+        object.to_string()
+    }
+
+    fn object_member_key(object: &str, member: &str) -> String {
+        format!("{object}.{member}")
+    }
+
+    fn renamed_or_default(&self, key: &str, default: impl FnOnce() -> String) -> String {
+        self.rename.get(key).cloned().unwrap_or_else(default)
+    }
+
+    fn excluded(&self, key: &str) -> bool {
+        self.exclude.contains(key)
+    }
+}
+
 fn render_object_classes(
     objects: &[UdlObject],
     callback_interfaces: &[UdlCallbackInterface],
     ffi_class_name: &str,
+    api_overrides: &ApiOverrides,
     records: &[UdlRecord],
     enums: &[UdlEnum],
 ) -> String {
     let mut out = String::new();
     for object in objects {
-        let object_name = to_upper_camel(&object.name);
+        if api_overrides.excluded(&ApiOverrides::object_key(&object.name)) {
+            continue;
+        }
+        let object_name = api_overrides
+            .renamed_or_default(&ApiOverrides::object_key(&object.name), || {
+                to_upper_camel(&object.name)
+            });
         let object_lower = safe_dart_identifier(&to_lower_camel(&object.name));
         let free_field = format!("_{}Free", object_lower);
         let token_name = format!("_{}FinalizerToken", object_name);
@@ -3581,6 +3631,9 @@ fn render_object_classes(
         out.push_str("  }\n\n");
 
         for ctor in &object.constructors {
+            if api_overrides.excluded(&ApiOverrides::object_member_key(&object.name, &ctor.name)) {
+                continue;
+            }
             if !ctor
                 .args
                 .iter()
@@ -3590,11 +3643,16 @@ fn render_object_classes(
             }
             let ctor_camel = to_upper_camel(&ctor.name);
             let ctor_invoker = format!("{}Create{}", object_lower, ctor_camel);
-            let static_name = if ctor.name == "new" {
-                "create".to_string()
-            } else {
-                safe_dart_identifier(&to_lower_camel(&ctor.name))
-            };
+            let static_name = safe_dart_identifier(&api_overrides.renamed_or_default(
+                &ApiOverrides::object_member_key(&object.name, &ctor.name),
+                || {
+                    if ctor.name == "new" {
+                        "create".to_string()
+                    } else {
+                        to_lower_camel(&ctor.name)
+                    }
+                },
+            ));
             let args = ctor
                 .args
                 .iter()
@@ -3634,6 +3692,10 @@ fn render_object_classes(
             if is_uniffi_trait_method_name(&method.name) {
                 continue;
             }
+            if api_overrides.excluded(&ApiOverrides::object_member_key(&object.name, &method.name))
+            {
+                continue;
+            }
             let has_callback_args = has_runtime_callback_args_in_args(
                 &method.args,
                 callback_interfaces,
@@ -3652,7 +3714,10 @@ fn render_object_classes(
             if !has_callback_args && (!supported_return || !supports_runtime_args) {
                 continue;
             }
-            let method_name = safe_dart_identifier(&to_lower_camel(&method.name));
+            let method_name = safe_dart_identifier(&api_overrides.renamed_or_default(
+                &ApiOverrides::object_member_key(&object.name, &method.name),
+                || to_lower_camel(&method.name),
+            ));
             let method_camel = to_upper_camel(&method.name);
             let invoke_name = format!("{}Invoke{}", object_lower, method_camel);
             let return_type = method
@@ -3765,6 +3830,7 @@ fn render_function_stubs(
     objects: &[UdlObject],
     callback_interfaces: &[UdlCallbackInterface],
     ffi_class_name: &str,
+    api_overrides: &ApiOverrides,
     records: &[UdlRecord],
     enums: &[UdlEnum],
 ) -> String {
@@ -3796,7 +3862,14 @@ fn render_function_stubs(
         out.push_str("}\n\n");
     }
     for f in functions {
-        let fn_name = safe_dart_identifier(&to_lower_camel(&f.name));
+        if api_overrides.excluded(&ApiOverrides::fn_key(&f.name)) {
+            continue;
+        }
+        let public_fn_name = safe_dart_identifier(
+            &api_overrides
+                .renamed_or_default(&ApiOverrides::fn_key(&f.name), || to_lower_camel(&f.name)),
+        );
+        let internal_fn_name = safe_dart_identifier(&to_lower_camel(&f.name));
         let value_return_type = f
             .return_type
             .as_ref()
@@ -3826,7 +3899,9 @@ fn render_function_stubs(
             .collect::<Vec<_>>()
             .join(", ");
 
-        out.push_str(&format!("{signature_return_type} {fn_name}({args}) {{\n"));
+        out.push_str(&format!(
+            "{signature_return_type} {public_fn_name}({args}) {{\n"
+        ));
         if is_runtime_ffi_compatible_function(f, records, enums)
             || is_runtime_callback_compatible_function(f, callback_interfaces, records, enums)
             || has_runtime_callback_args_in_args(&f.args, callback_interfaces, records, enums)
@@ -3838,16 +3913,20 @@ fn render_function_stubs(
                     records,
                     enums,
                 ) {
-                    out.push_str(&format!("  return _bindings().{fn_name}({arg_names});\n"));
+                    out.push_str(&format!(
+                        "  return _bindings().{internal_fn_name}({arg_names});\n"
+                    ));
                 } else {
                     out.push_str(&format!(
-                        "  return Future(() => _bindings().{fn_name}({arg_names}));\n"
+                        "  return Future(() => _bindings().{internal_fn_name}({arg_names}));\n"
                     ));
                 }
             } else if f.return_type.is_some() {
-                out.push_str(&format!("  return _bindings().{fn_name}({arg_names});\n"));
+                out.push_str(&format!(
+                    "  return _bindings().{internal_fn_name}({arg_names});\n"
+                ));
             } else {
-                out.push_str(&format!("  _bindings().{fn_name}({arg_names});\n"));
+                out.push_str(&format!("  _bindings().{internal_fn_name}({arg_names});\n"));
             }
         } else if f.is_async {
             out.push_str("  return Future.error(UnimplementedError('TODO: bind to Rust FFI'));\n");
@@ -4956,6 +5035,60 @@ library_name = "demoffi"
         assert!(content.contains("library demo_bindings;"));
         assert!(content.contains("class DemoInterop {"));
         assert!(content.contains("libraryName = 'demoffi';"));
+    }
+
+    #[test]
+    fn applies_rename_and_exclude_overrides() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = temp.path().join("rename_demo.udl");
+        let out_dir = temp.path().join("out");
+        let config = temp.path().join("uniffi.toml");
+        fs::write(
+            &source,
+            r#"
+namespace rename_demo {
+  u32 add_numbers(u32 left, u32 right);
+  u32 skip_top_level(u32 value);
+};
+
+interface Counter {
+  constructor(u32 initial);
+  [Name=with_seed]
+  constructor(u32 seed);
+  u32 current_value();
+  u32 hidden_value();
+};
+"#,
+        )
+        .expect("write source");
+        fs::write(
+            &config,
+            r#"
+[bindings.dart]
+rename = { add_numbers = "sumValues", Counter = "Meter", "Counter.current_value" = "valueNow", "Counter.with_seed" = "seeded" }
+exclude = ["skip_top_level", "Counter.hidden_value"]
+"#,
+        )
+        .expect("write config");
+
+        let args = GenerateArgs {
+            source,
+            out_dir: out_dir.clone(),
+            library: false,
+            config: Some(config),
+            crate_name: None,
+            no_format: false,
+        };
+
+        generate_bindings(&args).expect("generate");
+        let content =
+            fs::read_to_string(out_dir.join("rename_demo.dart")).expect("read generated file");
+        assert!(content.contains("int sumValues(int left, int right) {"));
+        assert!(!content.contains("\nint skipTopLevel("));
+        assert!(content.contains("final class Meter {"));
+        assert!(content.contains("static Meter seeded(int seed) {"));
+        assert!(content.contains("int valueNow() {"));
+        assert!(!content.contains("\n  int hiddenValue() {"));
     }
 
     #[test]

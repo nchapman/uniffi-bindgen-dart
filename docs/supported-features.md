@@ -22,7 +22,7 @@ Legend:
 | Callback interfaces | Partial | sync/async/throws callback argument paths for top-level + object methods are implemented, including callback-interface method-level async/throws generation for primitive + string/optional string/record/enum return families with runtime fixture coverage |
 | Custom types | Partial | builtin-backed typedef unwrapping is implemented for runtime-compatible paths and validated for string, integer, bytes/optional-bytes, and string-keyed custom-map aliases across sync/async top-level + object calls; dedicated `custom-types-demo` golden fixture is in place; broader custom lift/lower coverage is pending |
 | External/remote types | Planned | pending; current UniFFI type surface in this integration path does not yet expose a standalone external-type variant for direct mapping, so ext-type support needs library/component metadata wiring first |
-| Rename/exclude/docstrings | Planned | pending |
+| Rename/exclude/docstrings | Partial | `rename`/`exclude` config keys are implemented for generated Dart public API wrappers (top-level functions + object class/constructor/method names) with dedicated `rename-demo` golden coverage; docstring emission is still pending |
 
 ## Notes
 - Current fixture coverage is centered on `simple-fns` (rich runtime interactions) plus focused golden fixtures.
