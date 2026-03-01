@@ -6,6 +6,8 @@ namespace simple_fns {
   [Throws=MathError]
   u32 checked_apply_adder(Adder adder, u32 left, u32 right);
   u32 apply_formatter(Formatter formatter, string? prefix, Person person, Outcome outcome);
+  [Async]
+  string async_apply_formatter(Formatter formatter, string? prefix, Person person, Outcome outcome);
   Person echo_person(Person input);
   Outcome evolve_outcome(Outcome input);
   timestamp add_seconds(timestamp when, i64 seconds);
@@ -51,6 +53,8 @@ callback interface Adder {
 
 callback interface Formatter {
   string format(string? prefix, Person person, Outcome outcome);
+  [Async]
+  string format_async(string? prefix, Person person, Outcome outcome);
 };
 
 dictionary Person {

@@ -44,6 +44,13 @@ pub struct ForeignFutureResultU32 {
 
 #[repr(C)]
 #[derive(Clone, Copy)]
+pub struct ForeignFutureResultString {
+    pub return_value: *mut c_char,
+    pub call_status: RustCallStatus,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
 pub struct ForeignFutureDroppedCallbackStruct {
     pub handle: u64,
     pub callback: Option<extern "C" fn(u64)>,
@@ -73,6 +80,15 @@ pub struct FormatterVTable {
     pub uniffi_clone: extern "C" fn(u64) -> u64,
     pub format:
         extern "C" fn(u64, *const c_char, *const c_char, *const c_char, *mut *mut c_char, *mut RustCallStatus),
+    pub format_async: extern "C" fn(
+        u64,
+        *const c_char,
+        *const c_char,
+        *const c_char,
+        extern "C" fn(u64, ForeignFutureResultString),
+        u64,
+        *mut ForeignFutureDroppedCallbackStruct,
+    ),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -85,6 +101,7 @@ enum AsyncFuturePollState {
 enum AsyncFutureResult {
     String(String),
     U32(u32),
+    PendingString,
     PendingU32,
     Failed(String),
     Void,
@@ -181,6 +198,20 @@ fn enqueue_pending_u32_future() -> u64 {
             cancelled: false,
             ready: false,
             result: AsyncFutureResult::PendingU32,
+        },
+    );
+    handle
+}
+
+fn enqueue_pending_string_future() -> u64 {
+    let handle = NEXT_ASYNC_FUTURE_HANDLE.fetch_add(1, Ordering::Relaxed);
+    ASYNC_FUTURES.lock().expect("async futures lock").insert(
+        handle,
+        AsyncFutureState {
+            poll_state: AsyncFuturePollState::PendingWake,
+            cancelled: false,
+            ready: false,
+            result: AsyncFutureResult::PendingString,
         },
     );
     handle
@@ -406,6 +437,45 @@ pub extern "C" fn formatter_callback_init(vtable: *const FormatterVTable) {
     *FORMATTER_VTABLE.lock().expect("formatter vtable lock") = Some(value);
 }
 
+extern "C" fn complete_async_formatter(callback_data: u64, result: ForeignFutureResultString) {
+    if !result.call_status.error_buf.is_null() {
+        unsafe {
+            let _ = CString::from_raw(result.call_status.error_buf);
+        }
+    }
+    let mut futures = ASYNC_FUTURES.lock().expect("async futures lock");
+    let Some(state) = futures.get_mut(&callback_data) else {
+        if !result.return_value.is_null() {
+            unsafe {
+                let _ = CString::from_raw(result.return_value);
+            }
+        }
+        return;
+    };
+    if result.call_status.code == RUST_CALL_STATUS_SUCCESS {
+        if result.return_value.is_null() {
+            state.result = AsyncFutureResult::Failed("async formatter callback returned null".to_string());
+        } else {
+            let value = unsafe { CStr::from_ptr(result.return_value) }
+                .to_string_lossy()
+                .into_owned();
+            unsafe {
+                let _ = CString::from_raw(result.return_value);
+            }
+            state.result = AsyncFutureResult::String(value);
+        }
+    } else {
+        if !result.return_value.is_null() {
+            unsafe {
+                let _ = CString::from_raw(result.return_value);
+            }
+        }
+        state.result = AsyncFutureResult::Failed("async formatter callback failed".to_string());
+    }
+    state.ready = true;
+    state.poll_state = AsyncFuturePollState::PendingWake;
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn apply_formatter(
     formatter: u64,
@@ -432,6 +502,11 @@ pub extern "C" fn apply_formatter(
     );
     (vtable.uniffi_free)(callback_handle);
     if status.code != RUST_CALL_STATUS_SUCCESS {
+        if !status.error_buf.is_null() {
+            unsafe {
+                let _ = CString::from_raw(status.error_buf);
+            }
+        }
         return 0;
     }
     if out.is_null() {
@@ -442,6 +517,35 @@ pub extern "C" fn apply_formatter(
         let _ = CString::from_raw(out);
     }
     value.len() as u32
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn async_apply_formatter(
+    formatter: u64,
+    prefix: *const c_char,
+    person: *const c_char,
+    outcome: *const c_char,
+) -> u64 {
+    let Some(vtable) = *FORMATTER_VTABLE.lock().expect("formatter vtable lock") else {
+        return enqueue_string_future(String::new());
+    };
+    let handle = enqueue_pending_string_future();
+    let callback_handle = (vtable.uniffi_clone)(formatter);
+    let mut dropped = ForeignFutureDroppedCallbackStruct {
+        handle: 0,
+        callback: None,
+    };
+    (vtable.format_async)(
+        callback_handle,
+        prefix,
+        person,
+        outcome,
+        complete_async_formatter,
+        handle,
+        &mut dropped,
+    );
+    (vtable.uniffi_free)(callback_handle);
+    handle
 }
 
 #[unsafe(no_mangle)]
@@ -729,6 +833,24 @@ pub extern "C" fn rust_future_complete_string(
         AsyncFutureResult::String(result) => CString::new(result.as_str())
             .expect("valid CString")
             .into_raw(),
+        AsyncFutureResult::Failed(message) => {
+            write_out_status(
+                out_status,
+                RUST_CALL_STATUS_UNEXPECTED_ERROR,
+                CString::new(message.as_str()).expect("valid CString").into_raw(),
+            );
+            std::ptr::null_mut()
+        }
+        AsyncFutureResult::PendingString => {
+            write_out_status(
+                out_status,
+                RUST_CALL_STATUS_UNEXPECTED_ERROR,
+                CString::new("string callback future not completed")
+                    .expect("valid CString")
+                    .into_raw(),
+            );
+            std::ptr::null_mut()
+        }
         _ => {
             write_out_status(
                 out_status,

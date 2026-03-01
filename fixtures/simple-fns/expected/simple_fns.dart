@@ -243,6 +243,7 @@ abstract interface class Adder {
 
 abstract interface class Formatter {
   String format(String? prefix, Person person, Outcome outcome);
+  Future<String> formatAsync(String? prefix, Person person, Outcome outcome);
 }
 
 final class _ForeignFutureDroppedCallbackStruct extends ffi.Struct {
@@ -412,12 +413,20 @@ final class _AdderCallbackBridge {
   }
 }
 
+final class _FormatterFormatAsyncAsyncResult extends ffi.Struct {
+  external ffi.Pointer<Utf8> returnValue;
+
+  external _RustCallStatus callStatus;
+}
+
 final class _FormatterVTable extends ffi.Struct {
   external ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 handle)>> uniffiFree;
 
   external ffi.Pointer<ffi.NativeFunction<ffi.Uint64 Function(ffi.Uint64 handle)>> uniffiClone;
 
   external ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<Utf8> prefix, ffi.Pointer<Utf8> person, ffi.Pointer<Utf8> outcome, ffi.Pointer<ffi.Pointer<Utf8>> outReturn, ffi.Pointer<_RustCallStatus> outStatus)>> format;
+
+  external ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<Utf8> prefix, ffi.Pointer<Utf8> person, ffi.Pointer<Utf8> outcome, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, _FormatterFormatAsyncAsyncResult result)>> uniffiFutureCallback, ffi.Uint64 callbackData, ffi.Pointer<_ForeignFutureDroppedCallbackStruct> uniffiOutDroppedCallback)>> formatAsync;
 
 }
 
@@ -489,12 +498,51 @@ final class _FormatterCallbackBridge {
     }
   });
 
+  static final ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<Utf8> prefix, ffi.Pointer<Utf8> person, ffi.Pointer<Utf8> outcome, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, _FormatterFormatAsyncAsyncResult result)>> uniffiFutureCallback, ffi.Uint64 callbackData, ffi.Pointer<_ForeignFutureDroppedCallbackStruct> uniffiOutDroppedCallback)> _formatAsyncNative = ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<Utf8> prefix, ffi.Pointer<Utf8> person, ffi.Pointer<Utf8> outcome, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, _FormatterFormatAsyncAsyncResult result)>> uniffiFutureCallback, ffi.Uint64 callbackData, ffi.Pointer<_ForeignFutureDroppedCallbackStruct> uniffiOutDroppedCallback)>.isolateLocal((int handle, ffi.Pointer<Utf8> prefix, ffi.Pointer<Utf8> person, ffi.Pointer<Utf8> outcome, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, _FormatterFormatAsyncAsyncResult result)>> uniffiFutureCallback, int callbackData, ffi.Pointer<_ForeignFutureDroppedCallbackStruct> uniffiOutDroppedCallback) {
+    final Formatter? callback = instance.lookup(handle);
+    final complete = uniffiFutureCallback.asFunction<void Function(int callbackData, _FormatterFormatAsyncAsyncResult result)>();
+    if (uniffiOutDroppedCallback != ffi.nullptr) {
+      uniffiOutDroppedCallback.ref
+        ..handle = 0
+        ..callback = ffi.nullptr;
+    }
+    if (callback == null) {
+      final ffi.Pointer<_FormatterFormatAsyncAsyncResult> resultPtr = calloc<_FormatterFormatAsyncAsyncResult>();
+      resultPtr.ref.returnValue = ffi.nullptr;
+      resultPtr.ref.callStatus
+        ..code = _rustCallStatusUnexpectedError
+        ..errorBuf = ffi.nullptr;
+      complete(callbackData, resultPtr.ref);
+      calloc.free(resultPtr);
+      return;
+    }
+    () async {
+      final ffi.Pointer<_FormatterFormatAsyncAsyncResult> resultPtr = calloc<_FormatterFormatAsyncAsyncResult>();
+      resultPtr.ref.returnValue = ffi.nullptr;
+      try {
+        final result = await callback.formatAsync(prefix == ffi.nullptr ? null : prefix.toDartString(), person == ffi.nullptr ? (throw StateError('Rust passed null record callback arg')) : Person.fromJson(jsonDecode(person.toDartString()) as Map<String, dynamic>), outcome == ffi.nullptr ? (throw StateError('Rust passed null enum callback arg')) : _decodeOutcome(outcome.toDartString()));
+        resultPtr.ref.returnValue = result.toNativeUtf8();
+        resultPtr.ref.callStatus
+          ..code = _rustCallStatusSuccess
+          ..errorBuf = ffi.nullptr;
+      } catch (_) {
+        resultPtr.ref.callStatus
+          ..code = _rustCallStatusUnexpectedError
+          ..errorBuf = ffi.nullptr;
+      } finally {
+        complete(callbackData, resultPtr.ref);
+        calloc.free(resultPtr);
+      }
+    }();
+  });
+
   static ffi.Pointer<_FormatterVTable> createVTable() {
     final ffi.Pointer<_FormatterVTable> vtablePtr = calloc<_FormatterVTable>();
     vtablePtr.ref
       ..uniffiFree = _freeNative.nativeFunction
       ..uniffiClone = _cloneNative.nativeFunction
       ..format = _formatNative.nativeFunction
+      ..formatAsync = _formatAsyncNative.nativeFunction
     ;
     return vtablePtr;
   }
@@ -710,6 +758,85 @@ class SimpleFnsBindings {
       await pollEvents.close();
       callback.close();
       _asyncApplyAdderRustFutureFree(futureHandle);
+    }
+  }
+
+  late final int Function(int formatter, ffi.Pointer<Utf8> prefix, ffi.Pointer<Utf8> person, ffi.Pointer<Utf8> outcome) _asyncApplyFormatter = _lib.lookupFunction<ffi.Uint64 Function(ffi.Uint64 formatter, ffi.Pointer<Utf8> prefix, ffi.Pointer<Utf8> person, ffi.Pointer<Utf8> outcome), int Function(int formatter, ffi.Pointer<Utf8> prefix, ffi.Pointer<Utf8> person, ffi.Pointer<Utf8> outcome)>('async_apply_formatter');
+  late final void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData) _asyncApplyFormatterRustFuturePoll = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, ffi.Uint64 callbackData), void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData)>('rust_future_poll_string');
+  late final void Function(int handle) _asyncApplyFormatterRustFutureCancel = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_cancel_string');
+  late final ffi.Pointer<Utf8> Function(int handle, ffi.Pointer<_RustCallStatus> outStatus) _asyncApplyFormatterRustFutureComplete = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle, ffi.Pointer<_RustCallStatus> outStatus), ffi.Pointer<Utf8> Function(int handle, ffi.Pointer<_RustCallStatus> outStatus)>('rust_future_complete_string');
+  late final void Function(int handle) _asyncApplyFormatterRustFutureFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_free_string');
+
+  Future<String> asyncApplyFormatter(Formatter formatter, String? prefix, Person person, Outcome outcome) async {
+    _formatterCallbackInitDone;
+    final int formatterHandle = _FormatterCallbackBridge.instance.register(formatter);
+    final ffi.Pointer<Utf8> prefixNative = prefix == null ? ffi.nullptr : prefix.toNativeUtf8();
+    final String personNativeJson = jsonEncode(person.toJson());
+    final ffi.Pointer<Utf8> personNative = personNativeJson.toNativeUtf8();
+    final String outcomeNativeJson = _encodeOutcome(outcome);
+    final ffi.Pointer<Utf8> outcomeNative = outcomeNativeJson.toNativeUtf8();
+    final int futureHandle;
+    try {
+      futureHandle = _asyncApplyFormatter(formatterHandle, prefixNative, personNative, outcomeNative);
+    } finally {
+    _FormatterCallbackBridge.instance.release(formatterHandle);
+    if (prefixNative != ffi.nullptr) calloc.free(prefixNative);
+    calloc.free(personNative);
+    calloc.free(outcomeNative);
+    }
+    final StreamController<int> pollEvents = StreamController<int>.broadcast();
+    final callback = ffi.NativeCallable<ffi.Void Function(ffi.Uint64, ffi.Int8)>.listener((int _, int pollResult) {
+      pollEvents.add(pollResult);
+    });
+    try {
+      _asyncApplyFormatterRustFuturePoll(futureHandle, callback.nativeFunction, 0);
+      while (true) {
+        final int pollResult = await pollEvents.stream.first;
+        if (pollResult == _rustFuturePollReady) {
+          break;
+        }
+        if (pollResult == _rustFuturePollWake) {
+          _asyncApplyFormatterRustFuturePoll(futureHandle, callback.nativeFunction, 0);
+          continue;
+        }
+        throw StateError('Rust future poll returned invalid status for async_apply_formatter: $pollResult');
+      }
+      final ffi.Pointer<_RustCallStatus> outStatusPtr = calloc<_RustCallStatus>();
+      try {
+        final ffi.Pointer<Utf8> resultPtr = _asyncApplyFormatterRustFutureComplete(futureHandle, outStatusPtr);
+        final int statusCode = outStatusPtr.ref.code;
+        if (statusCode == _rustCallStatusSuccess) {
+          if (resultPtr == ffi.nullptr) {
+            throw StateError('Rust returned null for async_apply_formatter');
+          }
+          try {
+            return resultPtr.toDartString();
+          } finally {
+            _rustStringFree(resultPtr);
+          }
+        }
+        if (statusCode == _rustCallStatusCancelled) {
+          throw StateError('Rust future was cancelled for async_apply_formatter');
+        }
+        final ffi.Pointer<Utf8> errorPtr = outStatusPtr.ref.errorBuf;
+        if (errorPtr != ffi.nullptr) {
+          try {
+            throw StateError(errorPtr.toDartString());
+          } finally {
+            _rustStringFree(errorPtr);
+          }
+        }
+        throw StateError('Rust future failed for async_apply_formatter with status code: $statusCode');
+      } finally {
+        calloc.free(outStatusPtr);
+      }
+    } catch (_) {
+      _asyncApplyFormatterRustFutureCancel(futureHandle);
+      rethrow;
+    } finally {
+      await pollEvents.close();
+      callback.close();
+      _asyncApplyFormatterRustFutureFree(futureHandle);
     }
   }
 
@@ -1936,6 +2063,10 @@ Future<int> asyncAdd(int left, int right) {
 
 Future<int> asyncApplyAdder(Adder adder, int left, int right) {
   return _bindings().asyncApplyAdder(adder, left, right);
+}
+
+Future<String> asyncApplyFormatter(Formatter formatter, String? prefix, Person person, Outcome outcome) {
+  return _bindings().asyncApplyFormatter(formatter, prefix, person, outcome);
 }
 
 Future<String> asyncGreet(String name) {

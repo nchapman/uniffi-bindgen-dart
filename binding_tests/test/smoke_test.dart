@@ -38,6 +38,16 @@ final class _TestFormatter implements Formatter {
     };
     return '$prefixPart:${person.name}:${person.age}:$outcomeTag';
   }
+
+  @override
+  Future<String> formatAsync(String? prefix, Person person, Outcome outcome) async {
+    final String prefixPart = prefix ?? 'none';
+    final String outcomeTag = switch (outcome) {
+      OutcomeSuccess() => 'success',
+      OutcomeFailure() => 'failure',
+    };
+    return 'async:$prefixPart:${person.name}:${person.age}:$outcomeTag';
+  }
 }
 
 void main() {
@@ -61,6 +71,7 @@ void main() {
     expect(contents, contains('Future<int> asyncApplyAdder(Adder adder, int left, int right) {'));
     expect(contents, contains('int checkedApplyAdder(Adder adder, int left, int right) {'));
     expect(contents, contains('int applyFormatter(Formatter formatter, String? prefix, Person person, Outcome outcome) {'));
+    expect(contents, contains('Future<String> asyncApplyFormatter(Formatter formatter, String? prefix, Person person, Outcome outcome) {'));
     expect(contents, contains('Person echoPerson(Person input) {'));
     expect(contents, contains('Outcome evolveOutcome(Outcome input) {'));
     expect(contents, contains('DateTime addSeconds(DateTime when_, int seconds) {'));
@@ -113,6 +124,8 @@ void main() {
     expect(contents, contains('final class _AdderAddAsyncAsyncResult extends ffi.Struct {'));
     expect(contents, contains('abstract interface class Formatter {'));
     expect(contents, contains('String format(String? prefix, Person person, Outcome outcome);'));
+    expect(contents, contains('Future<String> formatAsync(String? prefix, Person person, Outcome outcome);'));
+    expect(contents, contains('final class _FormatterFormatAsyncAsyncResult extends ffi.Struct {'));
     expect(contents, contains("'formatter_callback_init'"));
     expect(contents, contains('final class _FormatterVTable extends ffi.Struct {'));
     expect(contents, contains('final class _FormatterCallbackBridge {'));
@@ -247,6 +260,15 @@ void main() {
       ),
       'prefix:Ada:33:success'.length,
     );
+    expect(
+      await bindings.asyncApplyFormatter(
+        const _TestFormatter(),
+        'prefix',
+        const Person(name: 'Ada', age: 33),
+        const OutcomeSuccess(message: 'go'),
+      ),
+      'async:prefix:Ada:33:success',
+    );
     final echoed = bindings.echoPerson(const Person(name: 'Ada', age: 33));
     expect(echoed.name, 'Ada');
     expect(echoed.age, 33);
@@ -300,7 +322,7 @@ void main() {
     final asyncTickBefore = bindings.currentTick();
     await bindings.asyncTick();
     expect(bindings.currentTick(), asyncTickBefore + 1);
-    expect(bindings.freeCount(), 6);
+    expect(bindings.freeCount(), 7);
     expect(bindings.checkedDivide(12, 3), 4);
     expect(
       () => bindings.checkedDivide(10, 0),
@@ -316,7 +338,7 @@ void main() {
         ),
       ),
     );
-    expect(bindings.freeCount(), 9);
+    expect(bindings.freeCount(), 10);
     final counter = bindings.counterCreateNew(10);
     expect(counter.currentValue(), 10);
     counter.addValue(5);
@@ -459,6 +481,15 @@ void main() {
       ),
       'none:Lin:10:failure'.length,
     );
+    expect(
+      await asyncApplyFormatter(
+        const _TestFormatter(),
+        null,
+        const Person(name: 'Lin', age: 10),
+        const OutcomeFailure(code: 7, reason: 'bad'),
+      ),
+      'async:none:Lin:10:failure',
+    );
     final echoedTop = echoPerson(const Person(name: 'Lin', age: 10));
     expect(echoedTop.name, 'Lin');
     expect(echoedTop.age, 10);
@@ -497,7 +528,7 @@ void main() {
     final asyncGlobalBefore = currentTick();
     await asyncTick();
     expect(currentTick(), asyncGlobalBefore + 1);
-    expect(freeCount(), 6);
+    expect(freeCount(), 7);
     expect(checkedDivide(20, 4), 5);
     expect(
       () => checkedDivide(7, 0),
@@ -513,13 +544,13 @@ void main() {
         ),
       ),
     );
-    expect(freeCount(), 9);
+    expect(freeCount(), 10);
     expect(maybeGreet('ffi'), 'maybe, ffi');
-    expect(freeCount(), 10);
+    expect(freeCount(), 11);
     expect(maybeGreet(null), isNull);
-    expect(freeCount(), 10);
+    expect(freeCount(), 11);
     expect(() => brokenGreet(), throwsA(isA<StateError>()));
-    expect(freeCount(), 10);
+    expect(freeCount(), 11);
     expect(isEven(10), isTrue);
     expect(cycleColor(Color.red), Color.green);
     final freeBeforeTopOutcome = freeCount();

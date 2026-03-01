@@ -1141,8 +1141,9 @@ fn render_callback_bridges(
                 "final class {result_struct_name} extends ffi.Struct {{\n"
             ));
             if let Some(return_type) = method.return_type.as_ref() {
-                let return_field = render_callback_async_result_return_field(return_type)
-                    .expect("validated runtime callback async return type");
+                let return_field =
+                    render_callback_async_result_return_field(return_type, records, enums)
+                        .expect("validated runtime callback async return type");
                 out.push_str(&return_field);
             }
             out.push_str("  external _RustCallStatus callStatus;\n");
@@ -1304,7 +1305,8 @@ fn render_callback_bridges(
                     "      final ffi.Pointer<{result_struct_name}> resultPtr = calloc<{result_struct_name}>();\n"
                 ));
                 if let Some(return_type) = method.return_type.as_ref() {
-                    let default_value = callback_async_default_return_expr(return_type);
+                    let default_value =
+                        callback_async_default_return_expr(return_type, records, enums);
                     out.push_str(&format!(
                         "      resultPtr.ref.returnValue = {default_value};\n"
                     ));
@@ -1321,7 +1323,8 @@ fn render_callback_bridges(
                     "      final ffi.Pointer<{result_struct_name}> resultPtr = calloc<{result_struct_name}>();\n"
                 ));
                 if let Some(return_type) = method.return_type.as_ref() {
-                    let default_value = callback_async_default_return_expr(return_type);
+                    let default_value =
+                        callback_async_default_return_expr(return_type, records, enums);
                     out.push_str(&format!(
                         "      resultPtr.ref.returnValue = {default_value};\n"
                     ));
@@ -3507,7 +3510,7 @@ fn is_runtime_callback_method_compatible(
             .as_ref()
             .map(|t| {
                 if method.is_async {
-                    is_runtime_callback_async_return_type_compatible(t)
+                    is_runtime_callback_async_return_type_compatible(t, records, enums)
                 } else {
                     is_runtime_callback_method_type_compatible(t, records, enums)
                 }
@@ -3552,8 +3555,12 @@ fn is_runtime_callback_method_type_compatible(
         || is_runtime_enum_type(type_, enums)
 }
 
-fn is_runtime_callback_async_return_type_compatible(type_: &Type) -> bool {
-    is_runtime_callback_function_return_compatible_type(type_)
+fn is_runtime_callback_async_return_type_compatible(
+    type_: &Type,
+    records: &[UdlRecord],
+    enums: &[UdlEnum],
+) -> bool {
+    is_runtime_callback_method_type_compatible(type_, records, enums)
 }
 
 fn callback_bridge_class_name(callback_name: &str) -> String {
@@ -3591,7 +3598,11 @@ fn callback_async_result_struct_name(callback_name: &str, method_name: &str) -> 
     )
 }
 
-fn render_callback_async_result_return_field(type_: &Type) -> Option<String> {
+fn render_callback_async_result_return_field(
+    type_: &Type,
+    records: &[UdlRecord],
+    enums: &[UdlEnum],
+) -> Option<String> {
     match type_ {
         Type::UInt8 => Some("  @ffi.Uint8()\n  external int returnValue;\n\n".to_string()),
         Type::Int8 => Some("  @ffi.Int8()\n  external int returnValue;\n\n".to_string()),
@@ -3607,13 +3618,41 @@ fn render_callback_async_result_return_field(type_: &Type) -> Option<String> {
         Type::Timestamp | Type::Duration => {
             Some("  @ffi.Int64()\n  external int returnValue;\n\n".to_string())
         }
+        Type::String => Some("  external ffi.Pointer<Utf8> returnValue;\n\n".to_string()),
+        Type::Optional { inner_type } if is_runtime_string_type(inner_type) => {
+            Some("  external ffi.Pointer<Utf8> returnValue;\n\n".to_string())
+        }
+        Type::Record { .. }
+            if records
+                .iter()
+                .any(|r| record_name_from_type(type_) == Some(r.name.as_str())) =>
+        {
+            Some("  external ffi.Pointer<Utf8> returnValue;\n\n".to_string())
+        }
+        Type::Enum { .. } if is_runtime_enum_type(type_, enums) => {
+            Some("  external ffi.Pointer<Utf8> returnValue;\n\n".to_string())
+        }
         _ => None,
     }
 }
 
-fn callback_async_default_return_expr(type_: &Type) -> &'static str {
+fn callback_async_default_return_expr(
+    type_: &Type,
+    records: &[UdlRecord],
+    enums: &[UdlEnum],
+) -> &'static str {
     match type_ {
         Type::Float32 | Type::Float64 => "0.0",
+        Type::String => "ffi.nullptr",
+        Type::Optional { inner_type } if is_runtime_string_type(inner_type) => "ffi.nullptr",
+        Type::Record { .. }
+            if records
+                .iter()
+                .any(|r| record_name_from_type(type_) == Some(r.name.as_str())) =>
+        {
+            "ffi.nullptr"
+        }
+        Type::Enum { .. } if is_runtime_enum_type(type_, enums) => "ffi.nullptr",
         _ => "0",
     }
 }
@@ -4440,6 +4479,8 @@ namespace callbacks {
   [Throws=MathError]
   u32 checked_apply_adder(Adder adder, u32 left, u32 right);
   u32 apply_formatter(Formatter formatter, string? prefix, Person person, Outcome outcome);
+  [Async]
+  string apply_formatter_async(Formatter formatter, string? prefix, Person person, Outcome outcome);
 };
 
 callback interface Adder {
@@ -4452,6 +4493,8 @@ callback interface Adder {
 
 callback interface Formatter {
   string format(string? prefix, Person person, Outcome outcome);
+  [Async]
+  string format_async(string? prefix, Person person, Outcome outcome);
 };
 
 dictionary Person {
@@ -4512,11 +4555,20 @@ interface MathError {
         assert!(content.contains("return _bindings().checkedApplyAdder(adder, left, right);"));
         assert!(content.contains("abstract interface class Formatter {"));
         assert!(content.contains("String format(String? prefix, Person person, Outcome outcome);"));
+        assert!(content.contains(
+            "Future<String> formatAsync(String? prefix, Person person, Outcome outcome);"
+        ));
+        assert!(
+            content.contains("final class _FormatterFormatAsyncAsyncResult extends ffi.Struct {")
+        );
         assert!(content.contains("'formatter_callback_init'"));
         assert!(content.contains("final class _FormatterVTable extends ffi.Struct {"));
         assert!(content.contains("final class _FormatterCallbackBridge {"));
         assert!(content
             .contains("int applyFormatter(Formatter formatter, String? prefix, Person person, Outcome outcome) {"));
+        assert!(content.contains(
+            "Future<String> applyFormatterAsync(Formatter formatter, String? prefix, Person person, Outcome outcome) {"
+        ));
         assert!(content.contains(
             "int counterInvokeApplyAdderWith(int handle, Adder adder, int left, int right) {"
         ));
