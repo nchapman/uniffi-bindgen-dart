@@ -264,8 +264,9 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
     let ci = ComponentInterface::from_webidl(&udl, module_path)
         .with_context(|| format!("failed to parse UDL: {}", source.display()))?;
     let udl_interface_traits = parse_udl_interface_traits(&udl);
+    let udl_namespace_function_docstrings = parse_udl_namespace_function_docstrings(&udl);
 
-    let functions = ci
+    let mut functions = ci
         .function_definitions()
         .iter()
         .map(|f| UdlFunction {
@@ -285,6 +286,13 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
                 .collect(),
         })
         .collect::<Vec<_>>();
+    for function in &mut functions {
+        if function.docstring.is_none() {
+            function.docstring = udl_namespace_function_docstrings
+                .get(&function.name)
+                .cloned();
+        }
+    }
     let records = ci
         .record_definitions()
         .iter()
@@ -534,6 +542,77 @@ fn parse_udl_interface_traits(udl: &str) -> std::collections::HashMap<String, Ve
             || line.starts_with("callback interface ")
         {
             pending_traits = None;
+        }
+    }
+
+    out
+}
+
+fn parse_udl_namespace_function_docstrings(udl: &str) -> std::collections::HashMap<String, String> {
+    let mut out = std::collections::HashMap::new();
+    let mut pending_doc_lines: Vec<String> = Vec::new();
+    let mut in_namespace = false;
+    let mut brace_depth = 0_i32;
+
+    for raw_line in udl.lines() {
+        let line = raw_line.trim();
+        if line.is_empty() {
+            continue;
+        }
+
+        if line.starts_with("///") {
+            let text = line.trim_start_matches("///").trim().to_string();
+            pending_doc_lines.push(text);
+            continue;
+        }
+
+        let open_count = line.matches('{').count() as i32;
+        let close_count = line.matches('}').count() as i32;
+        if line.starts_with("namespace ") {
+            in_namespace = true;
+            brace_depth += open_count - close_count;
+            if brace_depth <= 0 {
+                in_namespace = false;
+                brace_depth = 0;
+            }
+            pending_doc_lines.clear();
+            continue;
+        }
+
+        if in_namespace {
+            brace_depth += open_count - close_count;
+            if line.ends_with(';')
+                && line.contains('(')
+                && !line.starts_with('[')
+                && !line.starts_with("interface ")
+                && !line.starts_with("dictionary ")
+                && !line.starts_with("enum ")
+                && !line.starts_with("callback interface ")
+            {
+                if let Some(idx) = line.find('(') {
+                    let head = &line[..idx];
+                    let name = head
+                        .split_whitespace()
+                        .last()
+                        .filter(|s| !s.is_empty())
+                        .map(str::to_string);
+                    if let Some(name) = name {
+                        if !pending_doc_lines.is_empty() {
+                            let doc = pending_doc_lines.join("\n");
+                            out.insert(name.clone(), doc.clone());
+                            out.insert(to_lower_camel(&name), doc);
+                        }
+                    }
+                }
+            }
+            if brace_depth <= 0 {
+                in_namespace = false;
+                brace_depth = 0;
+            }
+        }
+
+        if !line.starts_with('[') {
+            pending_doc_lines.clear();
         }
     }
 
@@ -4080,6 +4159,7 @@ fn render_function_stubs(
             .collect::<Vec<_>>()
             .join(", ");
 
+        out.push_str(&render_doc_comment(f.docstring.as_deref(), ""));
         out.push_str(&format!(
             "{signature_return_type} {public_fn_name}({args}) {{\n"
         ));
@@ -5310,6 +5390,80 @@ external_packages = { other_crate = "package:other_bindings/other_bindings.dart"
         assert!(content.contains("RemoteThing echoRemote(RemoteThing input) {"));
         assert!(content.contains("return _bindings().echoRemote(input);"));
         assert!(!content.contains("TODO: bind to Rust FFI"));
+    }
+
+    #[test]
+    fn renders_docstrings_for_public_api_surfaces() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = temp.path().join("docstrings_demo.udl");
+        let out_dir = temp.path().join("out");
+        fs::write(
+            &source,
+            r#"
+/// Namespace docs.
+namespace docstrings_demo {
+  /// Adds two values.
+  u32 add_values(u32 left, u32 right);
+};
+
+/// 2D point value.
+dictionary Point {
+  /// Horizontal position.
+  i32 x;
+  /// Vertical position.
+  i32 y;
+};
+
+/// Mood state.
+enum Mood {
+  /// Positive.
+  "happy",
+  /// Negative.
+  "sad",
+};
+
+/// Callback reporter.
+callback interface Reporter {
+  /// Reports a message.
+  void report(string message);
+};
+
+/// Counter docs.
+interface Counter {
+  /// Creates a counter.
+  constructor();
+  /// Returns current value.
+  u32 current_value();
+};
+"#,
+        )
+        .expect("write source");
+
+        let args = GenerateArgs {
+            source,
+            out_dir: out_dir.clone(),
+            library: false,
+            config: None,
+            crate_name: None,
+            no_format: false,
+        };
+
+        generate_bindings(&args).expect("generate");
+        let content =
+            fs::read_to_string(out_dir.join("docstrings_demo.dart")).expect("read generated");
+        assert!(content.contains("/// Adds two values.\nint addValues(int left, int right) {"));
+        assert!(content.contains("/// 2D point value.\nclass Point {"));
+        assert!(
+            content.contains("/// Horizontal position.\n    required this.x,")
+                || content.contains("/// Horizontal position.\n  final int x;")
+        );
+        assert!(content.contains("/// Mood state.\nenum Mood {"));
+        assert!(content.contains("/// Positive.\n  happy,"));
+        assert!(content.contains("/// Callback reporter.\nabstract interface class Reporter {"));
+        assert!(content.contains("/// Reports a message.\n  void report(String message);"));
+        assert!(content.contains("/// Counter docs.\nfinal class Counter {"));
+        assert!(content.contains("/// Creates a counter.\n  static Counter create() {"));
+        assert!(content.contains("/// Returns current value.\n  int currentValue() {"));
     }
 
     #[test]

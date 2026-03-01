@@ -22,7 +22,7 @@ Legend:
 | Callback interfaces | Partial | sync/async/throws callback argument paths for top-level + object methods are implemented, including callback-interface method-level async/throws generation for primitive + string/optional string/record/enum return families with runtime fixture coverage |
 | Custom types | Partial | builtin-backed typedef unwrapping is implemented for runtime-compatible paths and validated for string, integer, bytes/optional-bytes, and string-keyed custom-map aliases across sync/async top-level + object calls; dedicated `custom-types-demo` golden fixture is in place; broader custom lift/lower coverage is pending |
 | External/remote types | Partial | external record typedef references can now bind through runtime wrappers and import mapped Dart packages via `external_packages` config; dedicated `ext-types-demo` golden coverage is in place; full external parity (enums/errors/objects/traits across crates) still needs deeper metadata/library-mode integration |
-| Rename/exclude/docstrings | Partial | `rename`/`exclude` config keys are implemented for generated Dart public API wrappers (top-level functions + object class/constructor/method names) with dedicated `rename-demo` golden coverage; docstring emission is still pending |
+| Rename/exclude/docstrings | Implemented | `rename`/`exclude` config keys are implemented for generated Dart public API wrappers (top-level functions + object class/constructor/method names) with dedicated `rename-demo` golden coverage; docstring emission is implemented across generated public Dart API/model surfaces with dedicated `docstrings-demo` golden coverage |
 
 ## Notes
 - Current fixture coverage is centered on `simple-fns` (rich runtime interactions) plus focused golden fixtures.

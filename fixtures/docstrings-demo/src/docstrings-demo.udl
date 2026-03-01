@@ -1,0 +1,35 @@
+/// Namespace docs.
+namespace docstrings_demo {
+  /// Adds two values.
+  u32 add_values(u32 left, u32 right);
+};
+
+/// 2D point value.
+dictionary Point {
+  /// Horizontal position.
+  i32 x;
+  /// Vertical position.
+  i32 y;
+};
+
+/// Mood state.
+enum Mood {
+  /// Positive.
+  "happy",
+  /// Negative.
+  "sad",
+};
+
+/// Callback reporter.
+callback interface Reporter {
+  /// Reports a message.
+  void report(string message);
+};
+
+/// Counter docs.
+interface Counter {
+  /// Creates a counter.
+  constructor();
+  /// Returns current value.
+  u32 current_value();
+};

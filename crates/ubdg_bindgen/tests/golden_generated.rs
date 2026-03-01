@@ -127,3 +127,16 @@ fn golden_ext_types_demo() {
     generate(&source, &out_dir, Some(&config));
     assert_matches_expected(&out_dir.join("ext_types_demo.dart"), &expected);
 }
+
+#[test]
+fn golden_docstrings_demo() {
+    let root = repo_root();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let out_dir = temp.path().join("out");
+
+    let source = root.join("fixtures/docstrings-demo/src/docstrings-demo.udl");
+    let expected = root.join("fixtures/docstrings-demo/expected/docstrings_demo.dart");
+
+    generate(&source, &out_dir, None);
+    assert_matches_expected(&out_dir.join("docstrings_demo.dart"), &expected);
+}
