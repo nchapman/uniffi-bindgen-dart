@@ -39,6 +39,11 @@ void main() {
     expect(contents, contains('String brokenGreet() {'));
     expect(contents, contains('String greet(String name) {'));
     expect(contents, contains('Future<String> asyncGreet(String name) {'));
+    expect(contents, contains('rust_future_poll_string'));
+    expect(contents, contains('rust_future_cancel_string'));
+    expect(contents, contains('rust_future_complete_string'));
+    expect(contents, contains('rust_future_free_string'));
+    expect(contents, contains('final class _RustCallStatus extends ffi.Struct {'));
     expect(
       contents,
       contains('Duration multiplyDuration(Duration value, int factor) {'),

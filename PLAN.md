@@ -216,7 +216,7 @@ Use this ledger as the execution checklist for full parity. This is the operatio
 | Enums (flat/data-carrying) | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | Dart sealed-style model conventions | complete for current fixture scope | complete for current fixture scope | `dart::tests::renders_record_and_enum_models`; golden `compound-demo`; runtime smoke assertions | Done | flat + data-carrying enums covered |
 | Objects/interfaces lifecycle | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | wrappers with `close()` + finalizer fallback | sync constructors/methods complete | sync lifecycle paths complete | `dart::tests::renders_object_classes_with_lifecycle_and_throws`; runtime smoke object calls | In progress | async/trait-related object parity pending |
 | Trait methods | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | trait mapping into idiomatic Dart APIs | pending | pending | add dedicated trait fixture + runtime tests | Not started | phase 4 parity gap |
-| Async futures | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | `Future<T>`-based idiomatic APIs | top-level/object API wrappers for `[Async]` added | sync export bridge currently used | add dedicated futures fixture + full rust-future runtime tests | In progress | API-level `Future` surface implemented; rust-future poll/cancel/complete/free still pending |
+| Async futures | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | `Future<T>`-based idiomatic APIs | top-level/object API wrappers for `[Async]` added | rust-future poll/cancel/complete/free flow implemented for string-backed async paths | extend to non-string return types + dedicated futures fixture stress cases | In progress | async lifecycle is now runtime-driven (poll/wake/ready/cancel/free) for current supported async return shape |
 | Callback interfaces (sync/async) | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | callback APIs with Dart callable conventions | pending | pending | add callbacks fixture + runtime tests | Not started | phase 5 target |
 | Custom types | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | Dart conversion helpers | pending | pending | add custom-types fixture + tests | Not started | phase 6 target |
 | External/remote types | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | cross-package import/type mapping | pending | pending | add ext-types fixture + tests | Not started | phase 6 target |
@@ -430,7 +430,7 @@ These rules are part of the template and should not be skipped:
 | Release compatibility confusion | Consumer integration failures | Maintain explicit backend-to-UniFFI compatibility table |
 
 ## Immediate Next Steps (Dart Instance)
-1. Complete full Rust-future ABI support for `[Async]` paths (poll/cancel/complete/free + cancellation semantics) and callback interface generation/runtime coverage.
+1. Extend Rust-future ABI support from current string-backed async paths to broader return-type parity, then add callback interface generation/runtime coverage.
 2. Add trait-related parity coverage and fixtures.
 3. Extend advanced config support (rename/exclude/custom/external/docstrings) with dedicated fixture tests.
 4. Keep `docs/supported-features.md` synchronized with every parity change.

@@ -18,7 +18,7 @@ Legend:
 | Errors (`[Error]` + `[Throws]`) | Partial | typed Dart exception mapping for supported runtime-compatible paths |
 | Optionals/sequences/maps | Partial | covered in top-level and selected object paths; broader nesting parity still pending |
 | Builtins | Implemented | int/float/bool/string/bytes/timestamp/duration |
-| Async futures | Partial | `[Async]` now maps to idiomatic `Future<...>` APIs; full rust-future ABI parity (poll/cancel/complete/free semantics) still pending |
+| Async futures | Partial | `[Async]` maps to idiomatic `Future<...>` APIs with rust-future poll/cancel/complete/free runtime flow for string-backed async returns; broader return-type parity still pending |
 | Callback interfaces | Planned | pending |
 | Custom types | Planned | pending |
 | External/remote types | Planned | pending |

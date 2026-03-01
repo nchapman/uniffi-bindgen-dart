@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::{LazyLock, Mutex};
 
 use serde_json::Value;
@@ -11,9 +11,37 @@ static FREE_COUNT: AtomicU32 = AtomicU32::new(0);
 static BYTES_FREE_COUNT: AtomicU32 = AtomicU32::new(0);
 static BYTES_VEC_FREE_COUNT: AtomicU32 = AtomicU32::new(0);
 static NEXT_COUNTER_HANDLE: AtomicU32 = AtomicU32::new(1);
+static NEXT_STRING_FUTURE_HANDLE: AtomicU64 = AtomicU64::new(1);
 static COUNTERS: LazyLock<Mutex<HashMap<u64, i32>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 static COUNTER_LABELS: LazyLock<Mutex<HashMap<u64, String>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
+static STRING_FUTURES: LazyLock<Mutex<HashMap<u64, StringFutureState>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+const RUST_CALL_STATUS_SUCCESS: i8 = 0;
+const RUST_CALL_STATUS_UNEXPECTED_ERROR: i8 = 2;
+const RUST_CALL_STATUS_CANCELLED: i8 = 3;
+const RUST_FUTURE_POLL_READY: i8 = 0;
+const RUST_FUTURE_POLL_WAKE: i8 = 1;
+
+#[repr(C)]
+pub struct RustCallStatus {
+    pub code: i8,
+    pub error_buf: *mut c_char,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum StringFuturePollState {
+    PendingWake,
+    Ready,
+}
+
+#[derive(Clone, Debug)]
+struct StringFutureState {
+    poll_state: StringFuturePollState,
+    cancelled: bool,
+    result: String,
+}
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -73,6 +101,34 @@ fn vec_into_rust_buffer_vec(mut items: Vec<RustBuffer>) -> RustBufferVec {
     };
     std::mem::forget(items);
     out
+}
+
+fn enqueue_string_future(result: String) -> u64 {
+    let handle = NEXT_STRING_FUTURE_HANDLE.fetch_add(1, Ordering::Relaxed);
+    STRING_FUTURES.lock().expect("string futures lock").insert(
+        handle,
+        StringFutureState {
+            poll_state: StringFuturePollState::PendingWake,
+            cancelled: false,
+            result,
+        },
+    );
+    handle
+}
+
+fn write_out_status(
+    out_status: *mut RustCallStatus,
+    code: i8,
+    error_buf: *mut c_char,
+) -> *mut RustCallStatus {
+    if out_status.is_null() {
+        return out_status;
+    }
+    unsafe {
+        (*out_status).code = code;
+        (*out_status).error_buf = error_buf;
+    }
+    out_status
 }
 
 #[unsafe(no_mangle)]
@@ -265,17 +321,14 @@ pub extern "C" fn greet(name: *const c_char) -> *mut c_char {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn async_greet(name: *const c_char) -> *mut c_char {
-    if name.is_null() {
-        return CString::new("async, <null>")
-            .expect("valid CString")
-            .into_raw();
-    }
-
-    let name = unsafe { CStr::from_ptr(name) }.to_string_lossy();
-    CString::new(format!("async, {name}"))
-        .expect("valid CString")
-        .into_raw()
+pub extern "C" fn async_greet(name: *const c_char) -> u64 {
+    let message = if name.is_null() {
+        "async, <null>".to_string()
+    } else {
+        let name = unsafe { CStr::from_ptr(name) }.to_string_lossy();
+        format!("async, {name}")
+    };
+    enqueue_string_future(message)
 }
 
 #[unsafe(no_mangle)]
@@ -314,6 +367,81 @@ pub extern "C" fn reset_free_count() {
 #[unsafe(no_mangle)]
 pub extern "C" fn free_count() -> u32 {
     FREE_COUNT.load(Ordering::Relaxed)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_future_poll_string(
+    handle: u64,
+    callback: extern "C" fn(u64, i8),
+    callback_data: u64,
+) {
+    let mut futures = STRING_FUTURES.lock().expect("string futures lock");
+    let Some(state) = futures.get_mut(&handle) else {
+        callback(callback_data, RUST_FUTURE_POLL_READY);
+        return;
+    };
+    if state.cancelled {
+        callback(callback_data, RUST_FUTURE_POLL_READY);
+        return;
+    }
+
+    match state.poll_state {
+        StringFuturePollState::PendingWake => {
+            state.poll_state = StringFuturePollState::Ready;
+            callback(callback_data, RUST_FUTURE_POLL_WAKE);
+        }
+        StringFuturePollState::Ready => {
+            callback(callback_data, RUST_FUTURE_POLL_READY);
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_future_cancel_string(handle: u64) {
+    if let Some(state) = STRING_FUTURES
+        .lock()
+        .expect("string futures lock")
+        .get_mut(&handle)
+    {
+        state.cancelled = true;
+        state.poll_state = StringFuturePollState::Ready;
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_future_complete_string(
+    handle: u64,
+    out_status: *mut RustCallStatus,
+) -> *mut c_char {
+    let futures = STRING_FUTURES.lock().expect("string futures lock");
+    let Some(state) = futures.get(&handle) else {
+        write_out_status(
+            out_status,
+            RUST_CALL_STATUS_UNEXPECTED_ERROR,
+            CString::new("missing string future handle")
+                .expect("valid CString")
+                .into_raw(),
+        );
+        return std::ptr::null_mut();
+    };
+
+    if state.cancelled {
+        write_out_status(out_status, RUST_CALL_STATUS_CANCELLED, std::ptr::null_mut());
+        return std::ptr::null_mut();
+    }
+
+    write_out_status(out_status, RUST_CALL_STATUS_SUCCESS, std::ptr::null_mut());
+    CString::new(state.result.clone())
+        .expect("valid CString")
+        .into_raw()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_future_free_string(handle: u64) {
+    STRING_FUTURES
+        .lock()
+        .expect("string futures lock")
+        .remove(&handle);
 }
 
 #[unsafe(no_mangle)]
@@ -549,7 +677,7 @@ pub extern "C" fn counter_describe(handle: u64) -> *mut c_char {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn counter_async_describe(handle: u64) -> *mut c_char {
+pub extern "C" fn counter_async_describe(handle: u64) -> u64 {
     let value = COUNTERS
         .lock()
         .expect("counter map lock")
@@ -567,7 +695,7 @@ pub extern "C" fn counter_async_describe(handle: u64) -> *mut c_char {
     } else {
         format!("async:counter:{value}:{label}")
     };
-    CString::new(text).expect("valid CString").into_raw()
+    enqueue_string_future(text)
 }
 
 #[unsafe(no_mangle)]
