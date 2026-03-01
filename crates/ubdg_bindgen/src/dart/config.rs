@@ -16,6 +16,7 @@ pub struct DartBindingsConfig {
     pub dart_format: Option<bool>,
     pub rename: HashMap<String, String>,
     pub exclude: Vec<String>,
+    pub external_packages: HashMap<String, String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -91,6 +92,7 @@ library_name = "my_lib"
 dart_format = false
 rename = { old_name = "new_name", "Counter.value" = "reading" }
 exclude = ["skip_me", "Counter.hidden"]
+external_packages = { other_crate = "package:other_bindings/other_bindings.dart" }
 "#,
         )
         .expect("write config");
@@ -119,6 +121,10 @@ exclude = ["skip_me", "Counter.hidden"]
         );
         assert!(cfg.exclude.iter().any(|e| e == "skip_me"));
         assert!(cfg.exclude.iter().any(|e| e == "Counter.hidden"));
+        assert_eq!(
+            cfg.external_packages.get("other_crate").map(String::as_str),
+            Some("package:other_bindings/other_bindings.dart")
+        );
     }
 
     #[test]

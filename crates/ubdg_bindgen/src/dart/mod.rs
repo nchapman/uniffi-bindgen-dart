@@ -44,6 +44,8 @@ pub fn generate_bindings(args: &GenerateArgs) -> Result<()> {
         &module_name,
         &ffi_class_name,
         &library_name,
+        &metadata.local_module_path,
+        &cfg.external_packages,
         &cfg.rename,
         &cfg.exclude,
         &metadata.functions,
@@ -230,6 +232,7 @@ impl UdlFunction {
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 struct UdlMetadata {
+    local_module_path: String,
     functions: Vec<UdlFunction>,
     objects: Vec<UdlObject>,
     callback_interfaces: Vec<UdlCallbackInterface>,
@@ -239,7 +242,10 @@ struct UdlMetadata {
 
 fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMetadata> {
     if source.extension().and_then(|e| e.to_str()) != Some("udl") {
-        return Ok(UdlMetadata::default());
+        return Ok(UdlMetadata {
+            local_module_path: String::new(),
+            ..UdlMetadata::default()
+        });
     }
 
     let udl = fs::read_to_string(source)
@@ -450,6 +456,7 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
         .collect::<Vec<_>>();
 
     Ok(UdlMetadata {
+        local_module_path: module_path.to_string(),
         functions,
         objects,
         callback_interfaces,
@@ -538,6 +545,8 @@ fn render_dart_scaffold(
     module_name: &str,
     ffi_class_name: &str,
     library_name: &str,
+    local_module_path: &str,
+    external_packages: &HashMap<String, String>,
     rename: &HashMap<String, String>,
     exclude: &[String],
     functions: &[UdlFunction],
@@ -547,6 +556,8 @@ fn render_dart_scaffold(
     enums: &[UdlEnum],
 ) -> String {
     let api_overrides = ApiOverrides::new(rename, exclude);
+    let external_import_uris =
+        collect_external_import_uris(local_module_path, external_packages, functions, objects);
     let needs_callback_runtime =
         has_runtime_callback_support(functions, objects, callback_interfaces, records, enums);
     let needs_async_rust_future = has_runtime_async_rust_future_support(
@@ -666,6 +677,9 @@ fn render_dart_scaffold(
     }
     if needs_typed_data {
         out.push_str("import 'dart:typed_data';\n");
+    }
+    for uri in &external_import_uris {
+        out.push_str(&format!("import '{uri}';\n"));
     }
     out.push('\n');
     if needs_runtime_bytes {
@@ -3575,6 +3589,98 @@ impl ApiOverrides {
     }
 }
 
+fn crate_name_from_module_path(module_path: &str) -> &str {
+    module_path.split("::").next().unwrap_or(module_path)
+}
+
+fn collect_external_import_uris(
+    local_module_path: &str,
+    external_packages: &HashMap<String, String>,
+    functions: &[UdlFunction],
+    objects: &[UdlObject],
+) -> Vec<String> {
+    if local_module_path.is_empty() || external_packages.is_empty() {
+        return Vec::new();
+    }
+
+    let local_crate = crate_name_from_module_path(local_module_path);
+    let mut crates = HashSet::new();
+
+    for f in functions {
+        if let Some(t) = f.return_type.as_ref() {
+            collect_external_crates_from_type(t, local_crate, &mut crates);
+        }
+        if let Some(t) = f.throws_type.as_ref() {
+            collect_external_crates_from_type(t, local_crate, &mut crates);
+        }
+        for a in &f.args {
+            collect_external_crates_from_type(&a.type_, local_crate, &mut crates);
+        }
+    }
+
+    for o in objects {
+        for ctor in &o.constructors {
+            if let Some(t) = ctor.throws_type.as_ref() {
+                collect_external_crates_from_type(t, local_crate, &mut crates);
+            }
+            for a in &ctor.args {
+                collect_external_crates_from_type(&a.type_, local_crate, &mut crates);
+            }
+        }
+        for m in &o.methods {
+            if let Some(t) = m.return_type.as_ref() {
+                collect_external_crates_from_type(t, local_crate, &mut crates);
+            }
+            if let Some(t) = m.throws_type.as_ref() {
+                collect_external_crates_from_type(t, local_crate, &mut crates);
+            }
+            for a in &m.args {
+                collect_external_crates_from_type(&a.type_, local_crate, &mut crates);
+            }
+        }
+    }
+
+    let mut uris = crates
+        .into_iter()
+        .filter_map(|crate_name| external_packages.get(crate_name).cloned())
+        .collect::<Vec<_>>();
+    uris.sort();
+    uris
+}
+
+fn collect_external_crates_from_type<'a>(
+    type_: &'a Type,
+    local_crate: &str,
+    out: &mut HashSet<&'a str>,
+) {
+    match type_ {
+        Type::Object { module_path, .. }
+        | Type::Record { module_path, .. }
+        | Type::Enum { module_path, .. }
+        | Type::CallbackInterface { module_path, .. }
+        | Type::Custom { module_path, .. } => {
+            let crate_name = crate_name_from_module_path(module_path);
+            if crate_name != local_crate {
+                out.insert(crate_name);
+            }
+            if let Type::Custom { builtin, .. } = type_ {
+                collect_external_crates_from_type(builtin, local_crate, out);
+            }
+        }
+        Type::Optional { inner_type } | Type::Sequence { inner_type } => {
+            collect_external_crates_from_type(inner_type, local_crate, out);
+        }
+        Type::Map {
+            key_type,
+            value_type,
+        } => {
+            collect_external_crates_from_type(key_type, local_crate, out);
+            collect_external_crates_from_type(value_type, local_crate, out);
+        }
+        _ => {}
+    }
+}
+
 fn render_object_classes(
     objects: &[UdlObject],
     callback_interfaces: &[UdlCallbackInterface],
@@ -4543,11 +4649,11 @@ fn is_runtime_ffi_compatible_type(type_: &Type, records: &[UdlRecord], enums: &[
 
 fn map_runtime_native_ffi_type(
     type_: &Type,
-    records: &[UdlRecord],
+    _records: &[UdlRecord],
     enums: &[UdlEnum],
 ) -> Option<&'static str> {
     if let Type::Custom { builtin, .. } = type_ {
-        return map_runtime_native_ffi_type(builtin, records, enums);
+        return map_runtime_native_ffi_type(builtin, _records, enums);
     }
 
     match type_ {
@@ -4576,9 +4682,7 @@ fn map_runtime_native_ffi_type(
         Type::Optional { inner_type } if is_runtime_string_type(inner_type) => {
             Some("ffi.Pointer<Utf8>")
         }
-        Type::Record { name, .. } if records.iter().any(|r| r.name == *name) => {
-            Some("ffi.Pointer<Utf8>")
-        }
+        Type::Record { .. } => Some("ffi.Pointer<Utf8>"),
         Type::Enum { name, .. } if enums.iter().any(|e| e.name == *name) => {
             Some("ffi.Pointer<Utf8>")
         }
@@ -4588,11 +4692,11 @@ fn map_runtime_native_ffi_type(
 
 fn map_runtime_dart_ffi_type(
     type_: &Type,
-    records: &[UdlRecord],
+    _records: &[UdlRecord],
     enums: &[UdlEnum],
 ) -> Option<&'static str> {
     if let Type::Custom { builtin, .. } = type_ {
-        return map_runtime_dart_ffi_type(builtin, records, enums);
+        return map_runtime_dart_ffi_type(builtin, _records, enums);
     }
 
     match type_ {
@@ -4619,9 +4723,7 @@ fn map_runtime_dart_ffi_type(
         Type::Optional { inner_type } if is_runtime_string_type(inner_type) => {
             Some("ffi.Pointer<Utf8>")
         }
-        Type::Record { name, .. } if records.iter().any(|r| r.name == *name) => {
-            Some("ffi.Pointer<Utf8>")
-        }
+        Type::Record { .. } => Some("ffi.Pointer<Utf8>"),
         Type::Enum { name, .. } if enums.iter().any(|e| e.name == *name) => {
             Some("ffi.Pointer<Utf8>")
         }
@@ -5089,6 +5191,50 @@ exclude = ["skip_top_level", "Counter.hidden_value"]
         assert!(content.contains("static Meter seeded(int seed) {"));
         assert!(content.contains("int valueNow() {"));
         assert!(!content.contains("\n  int hiddenValue() {"));
+    }
+
+    #[test]
+    fn imports_external_package_and_binds_external_record_type() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = temp.path().join("ext_demo.udl");
+        let out_dir = temp.path().join("out");
+        let config = temp.path().join("uniffi.toml");
+        fs::write(
+            &source,
+            r#"
+[External="other_crate"]
+typedef dictionary RemoteThing;
+
+namespace ext_demo {
+  RemoteThing echo_remote(RemoteThing input);
+};
+"#,
+        )
+        .expect("write source");
+        fs::write(
+            &config,
+            r#"
+[bindings.dart]
+external_packages = { other_crate = "package:other_bindings/other_bindings.dart" }
+"#,
+        )
+        .expect("write config");
+
+        let args = GenerateArgs {
+            source,
+            out_dir: out_dir.clone(),
+            library: false,
+            config: Some(config),
+            crate_name: None,
+            no_format: false,
+        };
+
+        generate_bindings(&args).expect("generate");
+        let content = fs::read_to_string(out_dir.join("ext_demo.dart")).expect("read generated");
+        assert!(content.contains("import 'package:other_bindings/other_bindings.dart';"));
+        assert!(content.contains("RemoteThing echoRemote(RemoteThing input) {"));
+        assert!(content.contains("return _bindings().echoRemote(input);"));
+        assert!(!content.contains("TODO: bind to Rust FFI"));
     }
 
     #[test]

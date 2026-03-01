@@ -10,6 +10,7 @@
 - `dart_format`: reserved; currently accepted but not yet wired to formatter behavior.
 - `rename`: map of UDL API identifiers to Dart public API names.
 - `exclude`: list of UDL API identifiers to omit from generated Dart public API surface.
+- `external_packages`: map of external UniFFI crate names to Dart import URIs used for generated external-type references.
 
 ## `rename` and `exclude` Identifier Format
 
@@ -32,4 +33,5 @@ ffi_class_name = "DemoInterop"
 library_name = "demoffi"
 rename = { add_numbers = "sumValues", Counter = "Meter", "Counter.current_value" = "valueNow" }
 exclude = ["hidden_sum", "Counter.hidden_value"]
+external_packages = { other_crate = "package:other_bindings/other_bindings.dart" }
 ```

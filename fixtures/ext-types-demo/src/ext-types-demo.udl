@@ -1,0 +1,6 @@
+[External="other_crate"]
+typedef dictionary RemoteThing;
+
+namespace ext_types_demo {
+  RemoteThing echo_remote(RemoteThing input);
+};

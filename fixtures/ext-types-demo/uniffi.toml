@@ -1,0 +1,2 @@
+[bindings.dart]
+external_packages = { other_crate = "package:other_bindings/other_bindings.dart" }
