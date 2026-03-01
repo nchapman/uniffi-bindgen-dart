@@ -4,12 +4,29 @@ library simple_fns;
 import 'dart:ffi' as ffi;
 
 class SimpleFnsBindings {
-  const SimpleFnsBindings();
+  const SimpleFnsBindings({ffi.DynamicLibrary? dynamicLibrary, String? libraryPath})
+      : _dynamicLibrary = dynamicLibrary,
+        _libraryPath = libraryPath;
+
+  final ffi.DynamicLibrary? _dynamicLibrary;
+  final String? _libraryPath;
 
   static const String libraryName = 'uniffi_simple_fns';
 
   ffi.DynamicLibrary open() {
-    return ffi.DynamicLibrary.open(libraryName);
+    final provided = _dynamicLibrary;
+    if (provided != null) {
+      return provided;
+    }
+    return ffi.DynamicLibrary.open(_libraryPath ?? libraryName);
+  }
+
+  late final ffi.DynamicLibrary _lib = open();
+
+  late final int Function(int left, int right) _add = _lib.lookupFunction<ffi.Uint32 Function(ffi.Uint32 left, ffi.Uint32 right), int Function(int left, int right)>('add');
+
+  int add(int left, int right) {
+    return _add(left, right);
   }
 }
 

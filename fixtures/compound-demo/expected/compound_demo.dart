@@ -5,13 +5,24 @@ import 'dart:ffi' as ffi;
 import 'dart:typed_data';
 
 class CompoundDemoFfi {
-  const CompoundDemoFfi();
+  const CompoundDemoFfi({ffi.DynamicLibrary? dynamicLibrary, String? libraryPath})
+      : _dynamicLibrary = dynamicLibrary,
+        _libraryPath = libraryPath;
+
+  final ffi.DynamicLibrary? _dynamicLibrary;
+  final String? _libraryPath;
 
   static const String libraryName = 'uniffi_compound_demo';
 
   ffi.DynamicLibrary open() {
-    return ffi.DynamicLibrary.open(libraryName);
+    final provided = _dynamicLibrary;
+    if (provided != null) {
+      return provided;
+    }
+    return ffi.DynamicLibrary.open(_libraryPath ?? libraryName);
   }
+
+  late final ffi.DynamicLibrary _lib = open();
 }
 
 List<Uint8List> chunk(List<Uint8List> input) {

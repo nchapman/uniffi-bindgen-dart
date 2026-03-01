@@ -162,15 +162,100 @@ fn render_dart_scaffold(
     }
     out.push('\n');
     out.push_str(&format!(
-        "class {ffi_class_name} {{\n  const {ffi_class_name}();\n\n"
+        "class {ffi_class_name} {{\n  const {ffi_class_name}({{ffi.DynamicLibrary? dynamicLibrary, String? libraryPath}})\n      : _dynamicLibrary = dynamicLibrary,\n        _libraryPath = libraryPath;\n\n"
     ));
+    out.push_str("  final ffi.DynamicLibrary? _dynamicLibrary;\n");
+    out.push_str("  final String? _libraryPath;\n\n");
     out.push_str(&format!(
         "  static const String libraryName = '{library_name}';\n\n"
     ));
     out.push_str("  ffi.DynamicLibrary open() {\n");
-    out.push_str("    return ffi.DynamicLibrary.open(libraryName);\n");
-    out.push_str("  }\n}\n");
+    out.push_str("    final provided = _dynamicLibrary;\n");
+    out.push_str("    if (provided != null) {\n");
+    out.push_str("      return provided;\n");
+    out.push_str("    }\n");
+    out.push_str("    return ffi.DynamicLibrary.open(_libraryPath ?? libraryName);\n");
+    out.push_str("  }\n\n");
+    out.push_str("  late final ffi.DynamicLibrary _lib = open();\n");
+    out.push_str(&render_bound_methods(functions));
+    out.push_str("}\n");
     out.push_str(&render_function_stubs(functions));
+    out
+}
+
+fn render_bound_methods(functions: &[UdlFunction]) -> String {
+    let mut out = String::new();
+
+    for function in functions {
+        if !is_runtime_ffi_compatible_function(function) {
+            continue;
+        }
+
+        let method_name = safe_dart_identifier(&to_lower_camel(&function.name));
+        let field_name = format!("_{}", method_name);
+        let return_type = function
+            .return_type
+            .as_ref()
+            .map(map_uniffi_type_to_dart)
+            .unwrap_or_else(|| "void".to_string());
+        let native_return = function
+            .return_type
+            .as_ref()
+            .map(map_runtime_native_ffi_type)
+            .unwrap_or(Some("ffi.Void"));
+
+        let Some(native_return) = native_return else {
+            continue;
+        };
+
+        let mut native_args = Vec::new();
+        let mut dart_args = Vec::new();
+        let mut arg_names = Vec::new();
+        let mut signature_compatible = true;
+
+        for arg in &function.args {
+            let arg_name = safe_dart_identifier(&to_lower_camel(&arg.name));
+            let Some(native_type) = map_runtime_native_ffi_type(&arg.type_) else {
+                signature_compatible = false;
+                break;
+            };
+            native_args.push(format!("{native_type} {arg_name}"));
+            dart_args.push(format!(
+                "{} {}",
+                map_uniffi_type_to_dart(&arg.type_),
+                arg_name
+            ));
+            arg_names.push(arg_name);
+        }
+
+        if !signature_compatible {
+            continue;
+        }
+
+        let native_sig = format!(
+            "{native_return} Function({})",
+            native_args.join(", ")
+        );
+        let dart_sig = format!("{return_type} Function({})", dart_args.join(", "));
+
+        out.push_str("\n");
+        out.push_str(&format!(
+            "  late final {dart_sig} {field_name} = _lib.lookupFunction<{native_sig}, {dart_sig}>('{}');\n",
+            function.name
+        ));
+        out.push('\n');
+        out.push_str(&format!(
+            "  {return_type} {method_name}({}) {{\n",
+            dart_args.join(", ")
+        ));
+        if function.return_type.is_some() {
+            out.push_str(&format!("    return {field_name}({});\n", arg_names.join(", ")));
+        } else {
+            out.push_str(&format!("    {field_name}({});\n", arg_names.join(", ")));
+        }
+        out.push_str("  }\n");
+    }
+
     out
 }
 
@@ -206,6 +291,39 @@ fn render_function_stubs(functions: &[UdlFunction]) -> String {
         out.push_str("}\n\n");
     }
     out
+}
+
+fn is_runtime_ffi_compatible_function(function: &UdlFunction) -> bool {
+    function
+        .return_type
+        .as_ref()
+        .map(is_runtime_ffi_compatible_type)
+        .unwrap_or(true)
+        && function
+            .args
+            .iter()
+            .all(|arg| is_runtime_ffi_compatible_type(&arg.type_))
+}
+
+fn is_runtime_ffi_compatible_type(type_: &Type) -> bool {
+    map_runtime_native_ffi_type(type_).is_some()
+}
+
+fn map_runtime_native_ffi_type(type_: &Type) -> Option<&'static str> {
+    match type_ {
+        Type::UInt8 => Some("ffi.Uint8"),
+        Type::Int8 => Some("ffi.Int8"),
+        Type::UInt16 => Some("ffi.Uint16"),
+        Type::Int16 => Some("ffi.Int16"),
+        Type::UInt32 => Some("ffi.Uint32"),
+        Type::Int32 => Some("ffi.Int32"),
+        Type::UInt64 => Some("ffi.Uint64"),
+        Type::Int64 => Some("ffi.Int64"),
+        Type::Float32 => Some("ffi.Float"),
+        Type::Float64 => Some("ffi.Double"),
+        Type::Boolean => Some("ffi.Bool"),
+        _ => None,
+    }
 }
 
 fn map_uniffi_type_to_dart(type_: &Type) -> String {
