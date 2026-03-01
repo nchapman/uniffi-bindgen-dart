@@ -15,7 +15,7 @@ Legend:
 | Trait methods | Partial | object-level `Display`/`Debug`/`Hash`/`Eq` traits map to idiomatic Dart `toString()`/`hashCode`/`operator ==`; `Ord` is currently blocked in this toolchain by UniFFI UDL parser support (`Invalid trait name: Ord`) |
 | Records | Implemented | model generation + JSON codecs + `copyWith` |
 | Enums | Implemented | flat + data-carrying codecs |
-| Errors (`[Error]` + `[Throws]`) | Partial | typed Dart exception mapping for supported runtime-compatible paths |
+| Errors (`[Error]` + `[Throws]`) | Partial | typed Dart exception mapping for supported runtime-compatible paths, including external enum throw-contract paths via `*ExceptionFfiCodec.decode` |
 | Optionals/sequences/maps | Partial | optionals/sequences are covered in top-level + object paths (including async bytes families); string-keyed maps are covered in top-level and object sync/async paths; broader nested map parity still pending |
 | Builtins | Implemented | int/float/bool/string/bytes/timestamp/duration |
 | Async futures | Partial | `[Async]` maps to idiomatic `Future<...>` APIs with rust-future poll/cancel/complete/free runtime flow for string, `void`, integer, bytes, optional-bytes, bytes-sequence, and string-keyed-map return families; builtin-backed custom typedefs in those families are supported; dedicated async golden coverage exists (`fixtures/futures-stress`) and runtime smoke includes failure + timeout/non-completion checks; external/custom parity is still incomplete |

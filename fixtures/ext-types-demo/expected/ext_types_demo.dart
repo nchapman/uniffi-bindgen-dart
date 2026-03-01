@@ -70,6 +70,31 @@ class ExtTypesDemoFfi {
     calloc.free(inputNative);
     }
   }
+
+  late final ffi.Pointer<Utf8> Function(int input) _riskyRemoteCount = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Int32 input), ffi.Pointer<Utf8> Function(int input)>('risky_remote_count');
+
+  int riskyRemoteCount(int input) {
+      final ffi.Pointer<Utf8> resultPtr = _riskyRemoteCount(input);
+      if (resultPtr == ffi.nullptr) {
+        throw StateError('Rust returned null for risky_remote_count');
+      }
+      final String payload;
+      try {
+        payload = resultPtr.toDartString();
+      } finally {
+        _rustStringFree(resultPtr);
+      }
+      final Map<String, dynamic> envelope = jsonDecode(payload) as Map<String, dynamic>;
+      final Object? errRaw = envelope['err'];
+      if (errRaw != null) {
+        throw RemoteFailureExceptionFfiCodec.decode(errRaw);
+      }
+      if (!envelope.containsKey('ok')) {
+        throw StateError('Rust returned malformed result for risky_remote_count');
+      }
+      final Object? okRaw = envelope['ok'];
+      return (okRaw as num).toInt();
+  }
 }
 
 ExtTypesDemoFfi? _defaultBindings;
@@ -90,5 +115,9 @@ RemoteThing echoRemote(RemoteThing input) {
 
 RemoteState echoRemoteState(RemoteState input) {
   return _bindings().echoRemoteState(input);
+}
+
+int riskyRemoteCount(int input) {
+  return _bindings().riskyRemoteCount(input);
 }
 

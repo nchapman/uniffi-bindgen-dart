@@ -4375,7 +4375,7 @@ fn is_runtime_callback_method_compatible(
         .as_ref()
         .map(|t| {
             is_runtime_ffi_compatible_type(t, records, enums)
-                && is_runtime_error_enum_type(t, enums)
+                && is_runtime_throws_enum_type(t, enums)
         })
         .unwrap_or(true)
         && method
@@ -4803,7 +4803,7 @@ fn is_runtime_ffi_compatible_function(
             .as_ref()
             .map(|t| {
                 is_runtime_ffi_compatible_type(t, records, enums)
-                    && is_runtime_error_enum_type(t, enums)
+                    && is_runtime_throws_enum_type(t, enums)
             })
             .unwrap_or(true)
 }
@@ -4819,7 +4819,7 @@ fn is_runtime_throwing_ffi_compatible_function(
         .as_ref()
         .map(|t| {
             is_runtime_ffi_compatible_type(t, records, enums)
-                && is_runtime_error_enum_type(t, enums)
+                && is_runtime_throws_enum_type(t, enums)
         })
         .unwrap_or(false)
         && function
@@ -4949,6 +4949,13 @@ fn is_runtime_error_enum_type(type_: &Type, enums: &[UdlEnum]) -> bool {
         return false;
     };
     enums.iter().any(|e| e.name == name && e.is_error)
+}
+
+fn is_runtime_throws_enum_type(type_: &Type, enums: &[UdlEnum]) -> bool {
+    if is_runtime_error_enum_type(type_, enums) {
+        return true;
+    }
+    matches!(runtime_unwrapped_type(type_), Type::Enum { .. })
 }
 
 fn is_runtime_record_or_enum_string_type(type_: &Type, enums: &[UdlEnum]) -> bool {
@@ -5392,10 +5399,14 @@ exclude = ["skip_top_level", "Counter.hidden_value"]
 typedef dictionary RemoteThing;
 [External="other_crate"]
 typedef enum RemoteState;
+[External="other_crate"]
+typedef enum RemoteFailure;
 
 namespace ext_demo {
   RemoteThing echo_remote(RemoteThing input);
   RemoteState echo_remote_state(RemoteState input);
+  [Throws=RemoteFailure]
+  u32 risky_remote_count(i32 input);
 };
 "#,
         )
@@ -5426,6 +5437,8 @@ external_packages = { other_crate = "package:other_bindings/other_bindings.dart"
         assert!(content.contains("RemoteState echoRemoteState(RemoteState input) {"));
         assert!(content.contains("RemoteStateFfiCodec.encode(input)"));
         assert!(content.contains("RemoteStateFfiCodec.decode(payload)"));
+        assert!(content.contains("int riskyRemoteCount(int input) {"));
+        assert!(content.contains("throw RemoteFailureExceptionFfiCodec.decode(errRaw);"));
         assert!(!content.contains("TODO: bind to Rust FFI"));
     }
 
