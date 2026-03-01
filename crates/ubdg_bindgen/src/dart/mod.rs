@@ -45,6 +45,7 @@ pub fn generate_bindings(args: &GenerateArgs) -> Result<()> {
         &library_name,
         &metadata.functions,
         &metadata.objects,
+        &metadata.callback_interfaces,
         &metadata.records,
         &metadata.enums,
     );
@@ -140,6 +141,21 @@ struct UdlObjectMethod {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+struct UdlCallbackInterface {
+    name: String,
+    methods: Vec<UdlCallbackMethod>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct UdlCallbackMethod {
+    name: String,
+    is_async: bool,
+    return_type: Option<Type>,
+    throws_type: Option<Type>,
+    args: Vec<UdlArg>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct UdlRecord {
     name: String,
     fields: Vec<UdlArg>,
@@ -203,6 +219,7 @@ impl UdlFunction {
 struct UdlMetadata {
     functions: Vec<UdlFunction>,
     objects: Vec<UdlObject>,
+    callback_interfaces: Vec<UdlCallbackInterface>,
     records: Vec<UdlRecord>,
     enums: Vec<UdlEnum>,
 }
@@ -314,26 +331,57 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
                 .collect(),
         })
         .collect::<Vec<_>>();
+    let callback_interfaces = ci
+        .callback_interface_definitions()
+        .iter()
+        .map(|cb| UdlCallbackInterface {
+            name: cb.name().to_string(),
+            methods: cb
+                .methods()
+                .into_iter()
+                .map(|m| UdlCallbackMethod {
+                    name: m.name().to_string(),
+                    is_async: m.is_async(),
+                    return_type: m.return_type().cloned(),
+                    throws_type: m.throws_type().cloned(),
+                    args: m
+                        .arguments()
+                        .into_iter()
+                        .map(|a| UdlArg {
+                            name: a.name().to_string(),
+                            type_: a.as_type(),
+                        })
+                        .collect(),
+                })
+                .collect(),
+        })
+        .collect::<Vec<_>>();
 
     Ok(UdlMetadata {
         functions,
         objects,
+        callback_interfaces,
         records,
         enums,
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render_dart_scaffold(
     module_name: &str,
     ffi_class_name: &str,
     library_name: &str,
     functions: &[UdlFunction],
     objects: &[UdlObject],
+    callback_interfaces: &[UdlCallbackInterface],
     records: &[UdlRecord],
     enums: &[UdlEnum],
 ) -> String {
+    let needs_callback_runtime =
+        has_runtime_callback_support(functions, callback_interfaces, records, enums);
     let needs_async_rust_future =
         has_runtime_async_rust_future_support(functions, objects, records, enums);
+    let needs_rust_call_status = needs_async_rust_future || needs_callback_runtime;
     let needs_typed_data = functions.iter().any(UdlFunction::uses_bytes)
         || objects.iter().any(|o| {
             o.methods.iter().any(|m| {
@@ -343,6 +391,7 @@ fn render_dart_scaffold(
         });
     let needs_json_convert = !records.is_empty() || !enums.is_empty();
     let needs_ffi_helpers = needs_async_rust_future
+        || needs_callback_runtime
         || functions.iter().any(|f| {
             is_runtime_ffi_compatible_function(f, records, enums)
                 && (f.uses_runtime_string()
@@ -444,7 +493,7 @@ fn render_dart_scaffold(
         out.push_str("  external int len;\n");
         out.push_str("}\n\n");
     }
-    if needs_async_rust_future {
+    if needs_rust_call_status {
         out.push_str("final class _RustCallStatus extends ffi.Struct {\n");
         out.push_str("  @ffi.Int8()\n");
         out.push_str("  external int code;\n\n");
@@ -454,10 +503,19 @@ fn render_dart_scaffold(
         out.push_str("const int _rustCallStatusError = 1;\n");
         out.push_str("const int _rustCallStatusUnexpectedError = 2;\n");
         out.push_str("const int _rustCallStatusCancelled = 3;\n");
+    }
+    if needs_async_rust_future {
         out.push_str("const int _rustFuturePollReady = 0;\n");
         out.push_str("const int _rustFuturePollWake = 1;\n\n");
     }
     out.push_str(&render_data_models(records, enums));
+    out.push_str(&render_callback_interfaces(callback_interfaces));
+    out.push_str(&render_callback_bridges(
+        functions,
+        callback_interfaces,
+        records,
+        enums,
+    ));
     out.push_str(&format!(
         "class {ffi_class_name} {{\n  {ffi_class_name}({{ffi.DynamicLibrary? dynamicLibrary, String? libraryPath}})\n      : _dynamicLibrary = dynamicLibrary,\n        _libraryPath = libraryPath;\n\n"
     ));
@@ -477,6 +535,7 @@ fn render_dart_scaffold(
     out.push_str(&render_bound_methods(
         functions,
         objects,
+        callback_interfaces,
         ffi_class_name,
         records,
         enums,
@@ -491,6 +550,7 @@ fn render_dart_scaffold(
     out.push_str(&render_function_stubs(
         functions,
         objects,
+        callback_interfaces,
         ffi_class_name,
         records,
         enums,
@@ -988,14 +1048,249 @@ fn append_runtime_arg_marshalling(
     }
 }
 
+fn render_callback_interfaces(callback_interfaces: &[UdlCallbackInterface]) -> String {
+    if callback_interfaces.is_empty() {
+        return String::new();
+    }
+    let mut out = String::new();
+    for callback_interface in callback_interfaces {
+        let class_name = to_upper_camel(&callback_interface.name);
+        out.push_str(&format!("abstract interface class {class_name} {{\n"));
+        for method in &callback_interface.methods {
+            let value_return_type = method
+                .return_type
+                .as_ref()
+                .map(map_uniffi_type_to_dart)
+                .unwrap_or_else(|| "void".to_string());
+            let signature_return_type = if method.is_async {
+                format!("Future<{value_return_type}>")
+            } else {
+                value_return_type
+            };
+            let args = method
+                .args
+                .iter()
+                .map(|a| {
+                    format!(
+                        "{} {}",
+                        map_uniffi_type_to_dart(&a.type_),
+                        safe_dart_identifier(&to_lower_camel(&a.name))
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            let method_name = safe_dart_identifier(&to_lower_camel(&method.name));
+            out.push_str(&format!(
+                "  {signature_return_type} {method_name}({args});\n"
+            ));
+        }
+        out.push_str("}\n\n");
+    }
+    out
+}
+
+fn render_callback_bridges(
+    functions: &[UdlFunction],
+    callback_interfaces: &[UdlCallbackInterface],
+    records: &[UdlRecord],
+    enums: &[UdlEnum],
+) -> String {
+    let used = callback_interfaces_used_for_runtime(functions, callback_interfaces, records, enums);
+    if used.is_empty() {
+        return String::new();
+    }
+    let mut out = String::new();
+
+    for callback_interface in used {
+        let class_name = to_upper_camel(&callback_interface.name);
+        let vtable_name = callback_vtable_struct_name(&callback_interface.name);
+        let bridge_name = callback_bridge_class_name(&callback_interface.name);
+        out.push_str(&format!(
+            "final class {vtable_name} extends ffi.Struct {{\n"
+        ));
+        out.push_str(
+            "  external ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 handle)>> uniffiFree;\n\n",
+        );
+        out.push_str(
+            "  external ffi.Pointer<ffi.NativeFunction<ffi.Uint64 Function(ffi.Uint64 handle)>> uniffiClone;\n\n",
+        );
+        for method in &callback_interface.methods {
+            let method_name = safe_dart_identifier(&to_lower_camel(&method.name));
+            let mut ffi_args = vec!["ffi.Uint64 handle".to_string()];
+            for arg in &method.args {
+                let arg_name = safe_dart_identifier(&to_lower_camel(&arg.name));
+                let arg_native = map_runtime_native_ffi_type(&arg.type_, &[], &[])
+                    .expect("validated runtime callback arg type");
+                ffi_args.push(format!("{arg_native} {arg_name}"));
+            }
+            if let Some(return_type) = method.return_type.as_ref() {
+                let out_type = map_runtime_native_ffi_type(return_type, &[], &[])
+                    .expect("validated runtime callback return type");
+                ffi_args.push(format!("ffi.Pointer<{out_type}> outReturn"));
+            } else {
+                ffi_args.push("ffi.Pointer<ffi.Void> outReturn".to_string());
+            }
+            ffi_args.push("ffi.Pointer<_RustCallStatus> outStatus".to_string());
+            out.push_str(&format!(
+                "  external ffi.Pointer<ffi.NativeFunction<ffi.Void Function({})>> {method_name};\n\n",
+                ffi_args.join(", ")
+            ));
+        }
+        out.push_str("}\n\n");
+
+        out.push_str(&format!("final class {bridge_name} {{\n"));
+        out.push_str(&format!("  {bridge_name}._();\n"));
+        out.push_str(&format!(
+            "  static final {bridge_name} instance = {bridge_name}._();\n\n"
+        ));
+        out.push_str(&format!(
+            "  final Map<int, {class_name}> _callbacks = <int, {class_name}>{{}};\n"
+        ));
+        out.push_str("  final Map<int, int> _refCounts = <int, int>{};\n");
+        out.push_str("  int _nextHandle = 1;\n\n");
+        out.push_str(&format!("  int register({class_name} callback) {{\n"));
+        out.push_str("    final int handle = _nextHandle++;\n");
+        out.push_str("    _callbacks[handle] = callback;\n");
+        out.push_str("    _refCounts[handle] = 1;\n");
+        out.push_str("    return handle;\n");
+        out.push_str("  }\n\n");
+        out.push_str("  void release(int handle) {\n");
+        out.push_str("    final int? refs = _refCounts[handle];\n");
+        out.push_str("    if (refs == null) {\n");
+        out.push_str("      return;\n");
+        out.push_str("    }\n");
+        out.push_str("    if (refs <= 1) {\n");
+        out.push_str("      _refCounts.remove(handle);\n");
+        out.push_str("      _callbacks.remove(handle);\n");
+        out.push_str("      return;\n");
+        out.push_str("    }\n");
+        out.push_str("    _refCounts[handle] = refs - 1;\n");
+        out.push_str("  }\n\n");
+        out.push_str("  int cloneHandle(int handle) {\n");
+        out.push_str("    final int? refs = _refCounts[handle];\n");
+        out.push_str("    if (refs == null) {\n");
+        out.push_str("      return handle;\n");
+        out.push_str("    }\n");
+        out.push_str("    _refCounts[handle] = refs + 1;\n");
+        out.push_str("    return handle;\n");
+        out.push_str("  }\n\n");
+        out.push_str(&format!(
+            "  {class_name}? lookup(int handle) => _callbacks[handle];\n\n"
+        ));
+        out.push_str(
+            "  static final ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle)> _freeNative = ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle)>.isolateLocal((int handle) {\n",
+        );
+        out.push_str("    instance.release(handle);\n");
+        out.push_str("  });\n\n");
+        out.push_str(
+            "  static final ffi.NativeCallable<ffi.Uint64 Function(ffi.Uint64 handle)> _cloneNative = ffi.NativeCallable<ffi.Uint64 Function(ffi.Uint64 handle)>.isolateLocal((int handle) {\n",
+        );
+        out.push_str("    return instance.cloneHandle(handle);\n");
+        out.push_str("  }, exceptionalReturn: 0);\n\n");
+
+        for method in &callback_interface.methods {
+            let method_name = safe_dart_identifier(&to_lower_camel(&method.name));
+            let native_callable_name = format!("_{}Native", method_name);
+            let mut ffi_args = vec!["ffi.Uint64 handle".to_string()];
+            let mut dart_args = vec!["int handle".to_string()];
+            let mut callback_args = Vec::new();
+            for arg in &method.args {
+                let arg_name = safe_dart_identifier(&to_lower_camel(&arg.name));
+                let arg_native = map_runtime_native_ffi_type(&arg.type_, &[], &[])
+                    .expect("validated runtime callback arg type");
+                let arg_dart = map_runtime_dart_ffi_type(&arg.type_, &[], &[])
+                    .expect("validated runtime callback arg type");
+                ffi_args.push(format!("{arg_native} {arg_name}"));
+                dart_args.push(format!("{arg_dart} {arg_name}"));
+                callback_args.push(render_callback_arg_decode_expr(&arg.type_, &arg_name));
+            }
+            if let Some(return_type) = method.return_type.as_ref() {
+                let out_type = map_runtime_native_ffi_type(return_type, &[], &[])
+                    .expect("validated runtime callback return type");
+                ffi_args.push(format!("ffi.Pointer<{out_type}> outReturn"));
+                dart_args.push(format!("ffi.Pointer<{out_type}> outReturn"));
+            } else {
+                ffi_args.push("ffi.Pointer<ffi.Void> outReturn".to_string());
+                dart_args.push("ffi.Pointer<ffi.Void> outReturn".to_string());
+            }
+            ffi_args.push("ffi.Pointer<_RustCallStatus> outStatus".to_string());
+            dart_args.push("ffi.Pointer<_RustCallStatus> outStatus".to_string());
+
+            out.push_str(&format!(
+                "  static final ffi.NativeCallable<ffi.Void Function({})> {native_callable_name} = ffi.NativeCallable<ffi.Void Function({})>.isolateLocal(({}) {{\n",
+                ffi_args.join(", "),
+                ffi_args.join(", "),
+                dart_args.join(", ")
+            ));
+            out.push_str(&format!(
+                "    final {class_name}? callback = instance.lookup(handle);\n"
+            ));
+            out.push_str("    if (callback == null) {\n");
+            out.push_str("      outStatus.ref\n");
+            out.push_str("        ..code = _rustCallStatusUnexpectedError\n");
+            out.push_str("        ..errorBuf = ffi.nullptr;\n");
+            out.push_str("      return;\n");
+            out.push_str("    }\n");
+            out.push_str("    try {\n");
+            if let Some(return_type) = method.return_type.as_ref() {
+                out.push_str(&format!(
+                    "      final result = callback.{method_name}({});\n",
+                    callback_args.join(", ")
+                ));
+                let encoded = render_callback_return_encode_expr(return_type, "result");
+                out.push_str(&format!("      outReturn.value = {encoded};\n"));
+            } else {
+                out.push_str(&format!(
+                    "      callback.{method_name}({});\n",
+                    callback_args.join(", ")
+                ));
+            }
+            out.push_str("      outStatus.ref\n");
+            out.push_str("        ..code = _rustCallStatusSuccess\n");
+            out.push_str("        ..errorBuf = ffi.nullptr;\n");
+            out.push_str("    } catch (_) {\n");
+            out.push_str("      outStatus.ref\n");
+            out.push_str("        ..code = _rustCallStatusUnexpectedError\n");
+            out.push_str("        ..errorBuf = ffi.nullptr;\n");
+            out.push_str("    }\n");
+            out.push_str("  });\n\n");
+        }
+
+        out.push_str(&format!(
+            "  static ffi.Pointer<{vtable_name}> createVTable() {{\n"
+        ));
+        out.push_str(&format!(
+            "    final ffi.Pointer<{vtable_name}> vtablePtr = calloc<{vtable_name}>();\n"
+        ));
+        out.push_str("    vtablePtr.ref\n");
+        out.push_str("      ..uniffiFree = _freeNative.nativeFunction\n");
+        out.push_str("      ..uniffiClone = _cloneNative.nativeFunction\n");
+        for method in &callback_interface.methods {
+            let method_name = safe_dart_identifier(&to_lower_camel(&method.name));
+            out.push_str(&format!(
+                "      ..{method_name} = _{method_name}Native.nativeFunction\n"
+            ));
+        }
+        out.push_str("    ;\n");
+        out.push_str("    return vtablePtr;\n");
+        out.push_str("  }\n");
+        out.push_str("}\n\n");
+    }
+
+    out
+}
+
 fn render_bound_methods(
     functions: &[UdlFunction],
     objects: &[UdlObject],
+    callback_interfaces: &[UdlCallbackInterface],
     _ffi_class_name: &str,
     records: &[UdlRecord],
     enums: &[UdlEnum],
 ) -> String {
     let mut out = String::new();
+    let callback_runtime_interfaces =
+        callback_interfaces_used_for_runtime(functions, callback_interfaces, records, enums);
     let needs_async_rust_future =
         has_runtime_async_rust_future_support(functions, objects, records, enums);
     let needs_string_free = needs_async_rust_future
@@ -1029,14 +1324,134 @@ fn render_bound_methods(
         out.push('\n');
         out.push_str("  late final void Function(_RustBufferVec) _rustBytesVecFree = _lib.lookupFunction<ffi.Void Function(_RustBufferVec), void Function(_RustBufferVec)>('rust_bytes_vec_free');\n");
     }
+    for callback_interface in &callback_runtime_interfaces {
+        let callback_name = &callback_interface.name;
+        let vtable_name = callback_vtable_struct_name(callback_name);
+        let init_field = callback_init_field_name(callback_name);
+        let init_done_field = callback_init_done_field_name(callback_name);
+        let vtable_field = callback_vtable_field_name(callback_name);
+        let bridge_name = callback_bridge_class_name(callback_name);
+        let init_symbol = callback_init_symbol(callback_name);
+        out.push('\n');
+        out.push_str(&format!(
+            "  late final void Function(ffi.Pointer<{vtable_name}>) {init_field} = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<{vtable_name}>), void Function(ffi.Pointer<{vtable_name}>)>('{init_symbol}');\n"
+        ));
+        out.push_str(&format!(
+            "  late final ffi.Pointer<{vtable_name}> {vtable_field} = {bridge_name}.createVTable();\n"
+        ));
+        out.push_str(&format!(
+            "  late final bool {init_done_field} = (() {{\n    {init_field}({vtable_field});\n    return true;\n  }})();\n"
+        ));
+    }
 
     for function in functions {
-        if !is_runtime_ffi_compatible_function(function, records, enums) {
+        let is_runtime_supported = is_runtime_ffi_compatible_function(function, records, enums);
+        let is_callback_supported =
+            is_runtime_callback_compatible_function(function, callback_interfaces, records, enums);
+        if !is_runtime_supported && !is_callback_supported {
             continue;
         }
 
         let method_name = safe_dart_identifier(&to_lower_camel(&function.name));
         let field_name = format!("_{}", method_name);
+        if is_callback_supported {
+            let return_type = function
+                .return_type
+                .as_ref()
+                .map(map_uniffi_type_to_dart)
+                .unwrap_or_else(|| "void".to_string());
+            let native_return = function
+                .return_type
+                .as_ref()
+                .and_then(|t| map_runtime_native_ffi_type(t, records, enums))
+                .unwrap_or("ffi.Void");
+            let dart_ffi_return = function
+                .return_type
+                .as_ref()
+                .and_then(|t| map_runtime_dart_ffi_type(t, records, enums))
+                .unwrap_or("void");
+
+            let mut native_args = Vec::new();
+            let mut dart_ffi_args = Vec::new();
+            let mut dart_args = Vec::new();
+            let mut call_args = Vec::new();
+            let mut pre_call = Vec::new();
+            let mut post_call = Vec::new();
+
+            for arg in &function.args {
+                let arg_name = safe_dart_identifier(&to_lower_camel(&arg.name));
+                dart_args.push(format!(
+                    "{} {}",
+                    map_uniffi_type_to_dart(&arg.type_),
+                    arg_name
+                ));
+                if let Some(callback_name) = callback_interface_name_from_type(&arg.type_) {
+                    let init_done_field = callback_init_done_field_name(callback_name);
+                    let bridge_name = callback_bridge_class_name(callback_name);
+                    let handle_name = format!("{arg_name}Handle");
+                    native_args.push(format!("ffi.Uint64 {arg_name}"));
+                    dart_ffi_args.push(format!("int {arg_name}"));
+                    pre_call.push(format!("    {init_done_field};\n"));
+                    pre_call.push(format!(
+                        "    final int {handle_name} = {bridge_name}.instance.register({arg_name});\n"
+                    ));
+                    post_call.push(format!(
+                        "    {bridge_name}.instance.release({handle_name});\n"
+                    ));
+                    call_args.push(handle_name);
+                    continue;
+                }
+                let native_type = map_runtime_native_ffi_type(&arg.type_, records, enums)
+                    .expect("validated callback-compatible arg type");
+                let dart_ffi_type = map_runtime_dart_ffi_type(&arg.type_, records, enums)
+                    .expect("validated callback-compatible arg type");
+                native_args.push(format!("{native_type} {arg_name}"));
+                dart_ffi_args.push(format!("{dart_ffi_type} {arg_name}"));
+                if is_runtime_timestamp_type(&arg.type_) {
+                    call_args.push(format!("{arg_name}.toUtc().microsecondsSinceEpoch"));
+                } else if is_runtime_duration_type(&arg.type_) {
+                    call_args.push(format!("{arg_name}.inMicroseconds"));
+                } else {
+                    call_args.push(arg_name);
+                }
+            }
+
+            let native_sig = format!("{native_return} Function({})", native_args.join(", "));
+            let dart_ffi_sig = format!("{dart_ffi_return} Function({})", dart_ffi_args.join(", "));
+            let dart_sig = dart_args.join(", ");
+
+            out.push('\n');
+            out.push_str(&format!(
+                "  late final {dart_ffi_sig} {field_name} = _lib.lookupFunction<{native_sig}, {dart_ffi_sig}>('{}');\n",
+                function.name
+            ));
+            out.push('\n');
+            out.push_str(&format!("  {return_type} {method_name}({dart_sig}) {{\n"));
+            for line in &pre_call {
+                out.push_str(line);
+            }
+            if !post_call.is_empty() {
+                out.push_str("    try {\n");
+            }
+            let call = format!("{field_name}({})", call_args.join(", "));
+            match function.return_type.as_ref() {
+                None => out.push_str(&format!("    {call};\n")),
+                Some(ret_type) => {
+                    let decode = render_plain_ffi_decode_expr(ret_type, &call);
+                    out.push_str(&format!("    return {decode};\n"));
+                }
+            }
+            if !post_call.is_empty() {
+                out.push_str("    } finally {\n");
+                for line in &post_call {
+                    out.push_str(line);
+                }
+                out.push_str("    }\n");
+            }
+            out.push_str("  }\n");
+            continue;
+        }
+
         let return_type = function
             .return_type
             .as_ref()
@@ -2584,6 +2999,7 @@ fn render_object_classes(
 fn render_function_stubs(
     functions: &[UdlFunction],
     objects: &[UdlObject],
+    callback_interfaces: &[UdlCallbackInterface],
     ffi_class_name: &str,
     records: &[UdlRecord],
     enums: &[UdlEnum],
@@ -2593,10 +3009,10 @@ fn render_function_stubs(
     }
 
     let mut out = String::new();
-    let has_runtime_functions = functions
-        .iter()
-        .any(|f| is_runtime_ffi_compatible_function(f, records, enums))
-        || !objects.is_empty();
+    let has_runtime_functions = functions.iter().any(|f| {
+        is_runtime_ffi_compatible_function(f, records, enums)
+            || is_runtime_callback_compatible_function(f, callback_interfaces, records, enums)
+    }) || !objects.is_empty();
     out.push('\n');
     if has_runtime_functions {
         out.push_str(&format!("{ffi_class_name}? _defaultBindings;\n\n"));
@@ -2646,7 +3062,9 @@ fn render_function_stubs(
             .join(", ");
 
         out.push_str(&format!("{signature_return_type} {fn_name}({args}) {{\n"));
-        if is_runtime_ffi_compatible_function(f, records, enums) {
+        if is_runtime_ffi_compatible_function(f, records, enums)
+            || is_runtime_callback_compatible_function(f, callback_interfaces, records, enums)
+        {
             if f.is_async {
                 if is_runtime_async_rust_future_compatible_function(f, records, enums) {
                     out.push_str(&format!("  return _bindings().{fn_name}({arg_names});\n"));
@@ -2668,6 +3086,175 @@ fn render_function_stubs(
         out.push_str("}\n\n");
     }
     out
+}
+
+fn has_runtime_callback_support(
+    functions: &[UdlFunction],
+    callback_interfaces: &[UdlCallbackInterface],
+    records: &[UdlRecord],
+    enums: &[UdlEnum],
+) -> bool {
+    functions
+        .iter()
+        .any(|f| is_runtime_callback_compatible_function(f, callback_interfaces, records, enums))
+}
+
+fn is_runtime_callback_compatible_function(
+    function: &UdlFunction,
+    callback_interfaces: &[UdlCallbackInterface],
+    records: &[UdlRecord],
+    enums: &[UdlEnum],
+) -> bool {
+    if function.is_async || function.throws_type.is_some() {
+        return false;
+    }
+    let return_supported = function
+        .return_type
+        .as_ref()
+        .map(is_runtime_callback_primitive_compatible_type)
+        .unwrap_or(true);
+    if !return_supported {
+        return false;
+    }
+    let mut saw_callback = false;
+    for arg in &function.args {
+        if let Some(callback_name) = callback_interface_name_from_type(&arg.type_) {
+            saw_callback = true;
+            let Some(callback_interface) = callback_interfaces
+                .iter()
+                .find(|cb| cb.name == callback_name)
+            else {
+                return false;
+            };
+            if !is_runtime_callback_interface_compatible(callback_interface) {
+                return false;
+            }
+            continue;
+        }
+        if !is_runtime_ffi_compatible_type(&arg.type_, records, enums)
+            || !is_runtime_callback_primitive_compatible_type(&arg.type_)
+        {
+            return false;
+        }
+    }
+    saw_callback
+}
+
+fn callback_interfaces_used_for_runtime<'a>(
+    functions: &[UdlFunction],
+    callback_interfaces: &'a [UdlCallbackInterface],
+    records: &[UdlRecord],
+    enums: &[UdlEnum],
+) -> Vec<&'a UdlCallbackInterface> {
+    callback_interfaces
+        .iter()
+        .filter(|callback_interface| {
+            is_runtime_callback_interface_compatible(callback_interface)
+                && functions.iter().any(|function| {
+                    is_runtime_callback_compatible_function(
+                        function,
+                        callback_interfaces,
+                        records,
+                        enums,
+                    ) && function.args.iter().any(|arg| {
+                        callback_interface_name_from_type(&arg.type_)
+                            .is_some_and(|name| name == callback_interface.name)
+                    })
+                })
+        })
+        .collect()
+}
+
+fn callback_interface_name_from_type(type_: &Type) -> Option<&str> {
+    match type_ {
+        Type::CallbackInterface { name, .. } => Some(name.as_str()),
+        _ => None,
+    }
+}
+
+fn is_runtime_callback_interface_compatible(callback_interface: &UdlCallbackInterface) -> bool {
+    callback_interface
+        .methods
+        .iter()
+        .all(is_runtime_callback_method_compatible)
+}
+
+fn is_runtime_callback_method_compatible(method: &UdlCallbackMethod) -> bool {
+    !method.is_async
+        && method.throws_type.is_none()
+        && method
+            .return_type
+            .as_ref()
+            .map(is_runtime_callback_primitive_compatible_type)
+            .unwrap_or(true)
+        && method
+            .args
+            .iter()
+            .all(|arg| is_runtime_callback_primitive_compatible_type(&arg.type_))
+}
+
+fn is_runtime_callback_primitive_compatible_type(type_: &Type) -> bool {
+    matches!(
+        type_,
+        Type::UInt8
+            | Type::Int8
+            | Type::UInt16
+            | Type::Int16
+            | Type::UInt32
+            | Type::Int32
+            | Type::UInt64
+            | Type::Int64
+            | Type::Float32
+            | Type::Float64
+            | Type::Boolean
+            | Type::Timestamp
+            | Type::Duration
+    )
+}
+
+fn callback_bridge_class_name(callback_name: &str) -> String {
+    format!("_{}CallbackBridge", to_upper_camel(callback_name))
+}
+
+fn callback_vtable_struct_name(callback_name: &str) -> String {
+    format!("_{}VTable", to_upper_camel(callback_name))
+}
+
+fn callback_init_symbol(callback_name: &str) -> String {
+    format!("{}_callback_init", callback_name.to_ascii_lowercase())
+}
+
+fn callback_init_field_name(callback_name: &str) -> String {
+    safe_dart_identifier(&format!("_{}CallbackInit", to_lower_camel(callback_name)))
+}
+
+fn callback_init_done_field_name(callback_name: &str) -> String {
+    safe_dart_identifier(&format!(
+        "_{}CallbackInitDone",
+        to_lower_camel(callback_name)
+    ))
+}
+
+fn callback_vtable_field_name(callback_name: &str) -> String {
+    safe_dart_identifier(&format!("_{}CallbackVTable", to_lower_camel(callback_name)))
+}
+
+fn render_callback_arg_decode_expr(type_: &Type, arg_name: &str) -> String {
+    match type_ {
+        Type::Timestamp => {
+            format!("DateTime.fromMicrosecondsSinceEpoch({arg_name}, isUtc: true)")
+        }
+        Type::Duration => format!("Duration(microseconds: {arg_name})"),
+        _ => arg_name.to_string(),
+    }
+}
+
+fn render_callback_return_encode_expr(type_: &Type, value_expr: &str) -> String {
+    match type_ {
+        Type::Timestamp => format!("{value_expr}.toUtc().microsecondsSinceEpoch"),
+        Type::Duration => format!("{value_expr}.inMicroseconds"),
+        _ => value_expr.to_string(),
+    }
 }
 
 fn has_runtime_async_rust_future_support(
@@ -3369,6 +3956,46 @@ interface Counter {
         assert!(content.contains("Future<String> asyncDescribe() {"));
         assert!(content.contains("return _ffi.counterInvokeAsyncDescribe(_handle);"));
         assert!(content.contains("Future<int> asyncValue() {"));
+    }
+
+    #[test]
+    fn renders_runtime_callback_interface_bindings() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = temp.path().join("callbacks.udl");
+        let out_dir = temp.path().join("out");
+        fs::write(
+            &source,
+            r#"
+namespace callbacks {
+  u32 apply_adder(Adder adder, u32 left, u32 right);
+};
+
+callback interface Adder {
+  u32 add(u32 left, u32 right);
+};
+"#,
+        )
+        .expect("write source");
+
+        let args = GenerateArgs {
+            source,
+            out_dir: out_dir.clone(),
+            library: false,
+            config: None,
+            crate_name: None,
+            no_format: false,
+        };
+
+        generate_bindings(&args).expect("generate");
+        let content = fs::read_to_string(out_dir.join("callbacks.dart")).expect("read generated");
+        assert!(content.contains("abstract interface class Adder {"));
+        assert!(content.contains("int add(int left, int right);"));
+        assert!(content.contains("final class _AdderVTable extends ffi.Struct {"));
+        assert!(content.contains("final class _AdderCallbackBridge {"));
+        assert!(content.contains("lookupFunction<ffi.Void Function(ffi.Pointer<_AdderVTable>)"));
+        assert!(content.contains("'adder_callback_init'"));
+        assert!(content.contains("int applyAdder(Adder adder, int left, int right) {"));
+        assert!(content.contains("return _bindings().applyAdder(adder, left, right);"));
     }
 
     #[test]

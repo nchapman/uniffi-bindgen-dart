@@ -4,6 +4,14 @@ import 'dart:typed_data';
 import 'package:test/test.dart';
 import '../generated/simple_fns.dart';
 
+final class _TestAdder implements Adder {
+  const _TestAdder(this.offset);
+  final int offset;
+
+  @override
+  int add(int left, int right) => left + right + offset;
+}
+
 void main() {
   test('binding test scaffold is wired', () {
     expect(true, isTrue);
@@ -21,6 +29,7 @@ void main() {
     expect(contents, contains('class SimpleFnsBindings {'));
     expect(contents, contains("libraryName = 'uniffi_simple_fns';"));
     expect(contents, contains('int add(int left, int right) {'));
+    expect(contents, contains('int applyAdder(Adder adder, int left, int right) {'));
     expect(contents, contains('Person echoPerson(Person input) {'));
     expect(contents, contains('Outcome evolveOutcome(Outcome input) {'));
     expect(contents, contains('DateTime addSeconds(DateTime when_, int seconds) {'));
@@ -63,6 +72,10 @@ void main() {
     expect(contents, contains('void tick() {'));
     expect(contents, contains('int currentTick() {'));
     expect(contents, contains('late final int Function(int left, int right) _add ='));
+    expect(contents, contains("lookupFunction<ffi.Void Function(ffi.Pointer<_AdderVTable>)"));
+    expect(contents, contains("'adder_callback_init'"));
+    expect(contents, contains('final class _AdderVTable extends ffi.Struct {'));
+    expect(contents, contains('final class _AdderCallbackBridge {'));
     expect(contents, contains('late final int Function(int left, int right) _addU64 ='));
     expect(contents, contains('late final bool Function(int value) _isEven ='));
     expect(contents, contains('final class _RustBuffer extends ffi.Struct {'));
@@ -153,6 +166,7 @@ void main() {
     expect(bindings.bytesFreeCount(), 0);
     expect(bindings.bytesVecFreeCount(), 0);
     expect(bindings.add(20, 22), 42);
+    expect(bindings.applyAdder(const _TestAdder(5), 20, 22), 48);
     final echoed = bindings.echoPerson(const Person(name: 'Ada', age: 33));
     expect(echoed.name, 'Ada');
     expect(echoed.age, 33);
@@ -322,6 +336,7 @@ void main() {
     expect(bytesFreeCount(), 0);
     expect(bytesVecFreeCount(), 0);
     expect(add(1, 2), 3);
+    expect(applyAdder(const _TestAdder(2), 3, 4), 10);
     final echoedTop = echoPerson(const Person(name: 'Lin', age: 10));
     expect(echoedTop.name, 'Lin');
     expect(echoedTop.age, 10);

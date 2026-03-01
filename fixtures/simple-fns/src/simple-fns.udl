@@ -1,5 +1,6 @@
 namespace simple_fns {
   u32 add(u32 left, u32 right);
+  u32 apply_adder(Adder adder, u32 left, u32 right);
   Person echo_person(Person input);
   Outcome evolve_outcome(Outcome input);
   timestamp add_seconds(timestamp when, i64 seconds);
@@ -33,6 +34,10 @@ namespace simple_fns {
   f64 scale(f64 value, f64 factor);
   void tick();
   u32 current_tick();
+};
+
+callback interface Adder {
+  u32 add(u32 left, u32 right);
 };
 
 dictionary Person {

@@ -235,6 +235,98 @@ MathErrorException _decodeMathErrorException(Object? raw) {
   }
 }
 
+abstract interface class Adder {
+  int add(int left, int right);
+}
+
+final class _AdderVTable extends ffi.Struct {
+  external ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 handle)>> uniffiFree;
+
+  external ffi.Pointer<ffi.NativeFunction<ffi.Uint64 Function(ffi.Uint64 handle)>> uniffiClone;
+
+  external ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Uint32 left, ffi.Uint32 right, ffi.Pointer<ffi.Uint32> outReturn, ffi.Pointer<_RustCallStatus> outStatus)>> add;
+
+}
+
+final class _AdderCallbackBridge {
+  _AdderCallbackBridge._();
+  static final _AdderCallbackBridge instance = _AdderCallbackBridge._();
+
+  final Map<int, Adder> _callbacks = <int, Adder>{};
+  final Map<int, int> _refCounts = <int, int>{};
+  int _nextHandle = 1;
+
+  int register(Adder callback) {
+    final int handle = _nextHandle++;
+    _callbacks[handle] = callback;
+    _refCounts[handle] = 1;
+    return handle;
+  }
+
+  void release(int handle) {
+    final int? refs = _refCounts[handle];
+    if (refs == null) {
+      return;
+    }
+    if (refs <= 1) {
+      _refCounts.remove(handle);
+      _callbacks.remove(handle);
+      return;
+    }
+    _refCounts[handle] = refs - 1;
+  }
+
+  int cloneHandle(int handle) {
+    final int? refs = _refCounts[handle];
+    if (refs == null) {
+      return handle;
+    }
+    _refCounts[handle] = refs + 1;
+    return handle;
+  }
+
+  Adder? lookup(int handle) => _callbacks[handle];
+
+  static final ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle)> _freeNative = ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle)>.isolateLocal((int handle) {
+    instance.release(handle);
+  });
+
+  static final ffi.NativeCallable<ffi.Uint64 Function(ffi.Uint64 handle)> _cloneNative = ffi.NativeCallable<ffi.Uint64 Function(ffi.Uint64 handle)>.isolateLocal((int handle) {
+    return instance.cloneHandle(handle);
+  }, exceptionalReturn: 0);
+
+  static final ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle, ffi.Uint32 left, ffi.Uint32 right, ffi.Pointer<ffi.Uint32> outReturn, ffi.Pointer<_RustCallStatus> outStatus)> _addNative = ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle, ffi.Uint32 left, ffi.Uint32 right, ffi.Pointer<ffi.Uint32> outReturn, ffi.Pointer<_RustCallStatus> outStatus)>.isolateLocal((int handle, int left, int right, ffi.Pointer<ffi.Uint32> outReturn, ffi.Pointer<_RustCallStatus> outStatus) {
+    final Adder? callback = instance.lookup(handle);
+    if (callback == null) {
+      outStatus.ref
+        ..code = _rustCallStatusUnexpectedError
+        ..errorBuf = ffi.nullptr;
+      return;
+    }
+    try {
+      final result = callback.add(left, right);
+      outReturn.value = result;
+      outStatus.ref
+        ..code = _rustCallStatusSuccess
+        ..errorBuf = ffi.nullptr;
+    } catch (_) {
+      outStatus.ref
+        ..code = _rustCallStatusUnexpectedError
+        ..errorBuf = ffi.nullptr;
+    }
+  });
+
+  static ffi.Pointer<_AdderVTable> createVTable() {
+    final ffi.Pointer<_AdderVTable> vtablePtr = calloc<_AdderVTable>();
+    vtablePtr.ref
+      ..uniffiFree = _freeNative.nativeFunction
+      ..uniffiClone = _cloneNative.nativeFunction
+      ..add = _addNative.nativeFunction
+    ;
+    return vtablePtr;
+  }
+}
+
 class SimpleFnsBindings {
   SimpleFnsBindings({ffi.DynamicLibrary? dynamicLibrary, String? libraryPath})
       : _dynamicLibrary = dynamicLibrary,
@@ -261,6 +353,13 @@ class SimpleFnsBindings {
 
   late final void Function(_RustBufferVec) _rustBytesVecFree = _lib.lookupFunction<ffi.Void Function(_RustBufferVec), void Function(_RustBufferVec)>('rust_bytes_vec_free');
 
+  late final void Function(ffi.Pointer<_AdderVTable>) _adderCallbackInit = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<_AdderVTable>), void Function(ffi.Pointer<_AdderVTable>)>('adder_callback_init');
+  late final ffi.Pointer<_AdderVTable> _adderCallbackVTable = _AdderCallbackBridge.createVTable();
+  late final bool _adderCallbackInitDone = (() {
+    _adderCallbackInit(_adderCallbackVTable);
+    return true;
+  })();
+
   late final int Function(int left, int right) _add = _lib.lookupFunction<ffi.Uint32 Function(ffi.Uint32 left, ffi.Uint32 right), int Function(int left, int right)>('add');
 
   int add(int left, int right) {
@@ -278,6 +377,18 @@ class SimpleFnsBindings {
 
   int addU64(int left, int right) {
       return _addU64(left, right);
+  }
+
+  late final int Function(int adder, int left, int right) _applyAdder = _lib.lookupFunction<ffi.Uint32 Function(ffi.Uint64 adder, ffi.Uint32 left, ffi.Uint32 right), int Function(int adder, int left, int right)>('apply_adder');
+
+  int applyAdder(Adder adder, int left, int right) {
+    _adderCallbackInitDone;
+    final int adderHandle = _AdderCallbackBridge.instance.register(adder);
+    try {
+    return _applyAdder(adderHandle, left, right);
+    } finally {
+    _AdderCallbackBridge.instance.release(adderHandle);
+    }
   }
 
   late final int Function(int left, int right) _asyncAdd = _lib.lookupFunction<ffi.Uint64 Function(ffi.Uint32 left, ffi.Uint32 right), int Function(int left, int right)>('async_add');
@@ -1395,6 +1506,10 @@ DateTime addSeconds(DateTime when_, int seconds) {
 
 int addU64(int left, int right) {
   return _bindings().addU64(left, right);
+}
+
+int applyAdder(Adder adder, int left, int right) {
+  return _bindings().applyAdder(adder, left, right);
 }
 
 Future<int> asyncAdd(int left, int right) {

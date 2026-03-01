@@ -17,6 +17,7 @@ static COUNTER_LABELS: LazyLock<Mutex<HashMap<u64, String>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 static ASYNC_FUTURES: LazyLock<Mutex<HashMap<u64, AsyncFutureState>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
+static ADDER_VTABLE: LazyLock<Mutex<Option<AdderVTable>>> = LazyLock::new(|| Mutex::new(None));
 
 const RUST_CALL_STATUS_SUCCESS: i8 = 0;
 const RUST_CALL_STATUS_UNEXPECTED_ERROR: i8 = 2;
@@ -28,6 +29,14 @@ const RUST_FUTURE_POLL_WAKE: i8 = 1;
 pub struct RustCallStatus {
     pub code: i8,
     pub error_buf: *mut c_char,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct AdderVTable {
+    pub uniffi_free: extern "C" fn(u64),
+    pub uniffi_clone: extern "C" fn(u64) -> u64,
+    pub add: extern "C" fn(u64, u32, u32, *mut u32, *mut RustCallStatus),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -193,6 +202,35 @@ fn write_out_status(
 #[unsafe(no_mangle)]
 pub extern "C" fn add(left: u32, right: u32) -> u32 {
     left + right
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn adder_callback_init(vtable: *const AdderVTable) {
+    if vtable.is_null() {
+        return;
+    }
+    let value = unsafe { *vtable };
+    *ADDER_VTABLE.lock().expect("adder vtable lock") = Some(value);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn apply_adder(adder: u64, left: u32, right: u32) -> u32 {
+    let Some(vtable) = *ADDER_VTABLE.lock().expect("adder vtable lock") else {
+        return 0;
+    };
+    let callback_handle = (vtable.uniffi_clone)(adder);
+    let mut out = 0_u32;
+    let mut status = RustCallStatus {
+        code: RUST_CALL_STATUS_SUCCESS,
+        error_buf: std::ptr::null_mut(),
+    };
+    (vtable.add)(callback_handle, left, right, &mut out, &mut status);
+    (vtable.uniffi_free)(callback_handle);
+    if status.code == RUST_CALL_STATUS_SUCCESS {
+        out + 1
+    } else {
+        0
+    }
 }
 
 #[unsafe(no_mangle)]
