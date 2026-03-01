@@ -199,3 +199,16 @@ fn golden_keywords_demo() {
     generate(&source, &out_dir, None);
     assert_matches_expected(&out_dir.join("keywords_demo.dart"), &expected);
 }
+
+#[test]
+fn golden_type_limits_demo() {
+    let root = repo_root();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let out_dir = temp.path().join("out");
+
+    let source = root.join("fixtures/type-limits-demo/src/type-limits-demo.udl");
+    let expected = root.join("fixtures/type-limits-demo/expected/type_limits_demo.dart");
+
+    generate(&source, &out_dir, None);
+    assert_matches_expected(&out_dir.join("type_limits_demo.dart"), &expected);
+}
