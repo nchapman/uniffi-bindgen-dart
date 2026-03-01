@@ -1114,11 +1114,40 @@ fn render_callback_bridges(
         return String::new();
     }
     let mut out = String::new();
+    let has_async_callback_methods = used
+        .iter()
+        .any(|cb| cb.methods.iter().any(|method| method.is_async));
+    if has_async_callback_methods {
+        out.push_str("final class _ForeignFutureDroppedCallbackStruct extends ffi.Struct {\n");
+        out.push_str("  @ffi.Uint64()\n");
+        out.push_str("  external int handle;\n\n");
+        out.push_str(
+            "  external ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 handle)>> callback;\n",
+        );
+        out.push_str("}\n\n");
+    }
 
     for callback_interface in used {
         let class_name = to_upper_camel(&callback_interface.name);
         let vtable_name = callback_vtable_struct_name(&callback_interface.name);
         let bridge_name = callback_bridge_class_name(&callback_interface.name);
+        for method in &callback_interface.methods {
+            if !method.is_async {
+                continue;
+            }
+            let result_struct_name =
+                callback_async_result_struct_name(&callback_interface.name, &method.name);
+            out.push_str(&format!(
+                "final class {result_struct_name} extends ffi.Struct {{\n"
+            ));
+            if let Some(return_type) = method.return_type.as_ref() {
+                let return_field = render_callback_async_result_return_field(return_type)
+                    .expect("validated runtime callback async return type");
+                out.push_str(&return_field);
+            }
+            out.push_str("  external _RustCallStatus callStatus;\n");
+            out.push_str("}\n\n");
+        }
         out.push_str(&format!(
             "final class {vtable_name} extends ffi.Struct {{\n"
         ));
@@ -1137,14 +1166,27 @@ fn render_callback_bridges(
                     .expect("validated runtime callback arg type");
                 ffi_args.push(format!("{arg_native} {arg_name}"));
             }
-            if let Some(return_type) = method.return_type.as_ref() {
-                let out_type = map_runtime_native_ffi_type(return_type, records, enums)
-                    .expect("validated runtime callback return type");
-                ffi_args.push(format!("ffi.Pointer<{out_type}> outReturn"));
+            if method.is_async {
+                let result_struct_name =
+                    callback_async_result_struct_name(&callback_interface.name, &method.name);
+                ffi_args.push(format!(
+                    "ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, {result_struct_name} result)>> uniffiFutureCallback"
+                ));
+                ffi_args.push("ffi.Uint64 callbackData".to_string());
+                ffi_args.push(
+                    "ffi.Pointer<_ForeignFutureDroppedCallbackStruct> uniffiOutDroppedCallback"
+                        .to_string(),
+                );
             } else {
-                ffi_args.push("ffi.Pointer<ffi.Void> outReturn".to_string());
+                if let Some(return_type) = method.return_type.as_ref() {
+                    let out_type = map_runtime_native_ffi_type(return_type, records, enums)
+                        .expect("validated runtime callback return type");
+                    ffi_args.push(format!("ffi.Pointer<{out_type}> outReturn"));
+                } else {
+                    ffi_args.push("ffi.Pointer<ffi.Void> outReturn".to_string());
+                }
+                ffi_args.push("ffi.Pointer<_RustCallStatus> outStatus".to_string());
             }
-            ffi_args.push("ffi.Pointer<_RustCallStatus> outStatus".to_string());
             out.push_str(&format!(
                 "  external ffi.Pointer<ffi.NativeFunction<ffi.Void Function({})>> {method_name};\n\n",
                 ffi_args.join(", ")
@@ -1220,56 +1262,161 @@ fn render_callback_bridges(
                     &arg.type_, &arg_name, records, enums,
                 ));
             }
-            if let Some(return_type) = method.return_type.as_ref() {
-                let out_type = map_runtime_native_ffi_type(return_type, records, enums)
-                    .expect("validated runtime callback return type");
-                ffi_args.push(format!("ffi.Pointer<{out_type}> outReturn"));
-                dart_args.push(format!("ffi.Pointer<{out_type}> outReturn"));
-            } else {
-                ffi_args.push("ffi.Pointer<ffi.Void> outReturn".to_string());
-                dart_args.push("ffi.Pointer<ffi.Void> outReturn".to_string());
-            }
-            ffi_args.push("ffi.Pointer<_RustCallStatus> outStatus".to_string());
-            dart_args.push("ffi.Pointer<_RustCallStatus> outStatus".to_string());
+            if method.is_async {
+                let result_struct_name =
+                    callback_async_result_struct_name(&callback_interface.name, &method.name);
+                ffi_args.push(format!(
+                    "ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, {result_struct_name} result)>> uniffiFutureCallback"
+                ));
+                ffi_args.push("ffi.Uint64 callbackData".to_string());
+                ffi_args.push(
+                    "ffi.Pointer<_ForeignFutureDroppedCallbackStruct> uniffiOutDroppedCallback"
+                        .to_string(),
+                );
+                dart_args.push(format!(
+                    "ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, {result_struct_name} result)>> uniffiFutureCallback"
+                ));
+                dart_args.push("int callbackData".to_string());
+                dart_args.push(
+                    "ffi.Pointer<_ForeignFutureDroppedCallbackStruct> uniffiOutDroppedCallback"
+                        .to_string(),
+                );
 
-            out.push_str(&format!(
-                "  static final ffi.NativeCallable<ffi.Void Function({})> {native_callable_name} = ffi.NativeCallable<ffi.Void Function({})>.isolateLocal(({}) {{\n",
-                ffi_args.join(", "),
-                ffi_args.join(", "),
-                dart_args.join(", ")
-            ));
-            out.push_str(&format!(
-                "    final {class_name}? callback = instance.lookup(handle);\n"
-            ));
-            out.push_str("    if (callback == null) {\n");
-            out.push_str("      outStatus.ref\n");
-            out.push_str("        ..code = _rustCallStatusUnexpectedError\n");
-            out.push_str("        ..errorBuf = ffi.nullptr;\n");
-            out.push_str("      return;\n");
-            out.push_str("    }\n");
-            out.push_str("    try {\n");
-            if let Some(return_type) = method.return_type.as_ref() {
                 out.push_str(&format!(
-                    "      final result = callback.{method_name}({});\n",
-                    callback_args.join(", ")
+                    "  static final ffi.NativeCallable<ffi.Void Function({})> {native_callable_name} = ffi.NativeCallable<ffi.Void Function({})>.isolateLocal(({}) {{\n",
+                    ffi_args.join(", "),
+                    ffi_args.join(", "),
+                    dart_args.join(", ")
                 ));
-                let encoded =
-                    render_callback_return_encode_expr(return_type, "result", records, enums);
-                out.push_str(&format!("      outReturn.value = {encoded};\n"));
+                out.push_str(&format!(
+                    "    final {class_name}? callback = instance.lookup(handle);\n"
+                ));
+                out.push_str("    final complete = uniffiFutureCallback.asFunction<void Function(int callbackData, ");
+                out.push_str(&result_struct_name);
+                out.push_str(" result)>();\n");
+                out.push_str("    if (uniffiOutDroppedCallback != ffi.nullptr) {\n");
+                out.push_str("      uniffiOutDroppedCallback.ref\n");
+                out.push_str("        ..handle = 0\n");
+                out.push_str("        ..callback = ffi.nullptr;\n");
+                out.push_str("    }\n");
+                out.push_str("    if (callback == null) {\n");
+                out.push_str(&format!(
+                    "      final ffi.Pointer<{result_struct_name}> resultPtr = calloc<{result_struct_name}>();\n"
+                ));
+                if let Some(return_type) = method.return_type.as_ref() {
+                    let default_value = callback_async_default_return_expr(return_type);
+                    out.push_str(&format!(
+                        "      resultPtr.ref.returnValue = {default_value};\n"
+                    ));
+                }
+                out.push_str("      resultPtr.ref.callStatus\n");
+                out.push_str("        ..code = _rustCallStatusUnexpectedError\n");
+                out.push_str("        ..errorBuf = ffi.nullptr;\n");
+                out.push_str("      complete(callbackData, resultPtr.ref);\n");
+                out.push_str("      calloc.free(resultPtr);\n");
+                out.push_str("      return;\n");
+                out.push_str("    }\n");
+                out.push_str("    () async {\n");
+                out.push_str(&format!(
+                    "      final ffi.Pointer<{result_struct_name}> resultPtr = calloc<{result_struct_name}>();\n"
+                ));
+                if let Some(return_type) = method.return_type.as_ref() {
+                    let default_value = callback_async_default_return_expr(return_type);
+                    out.push_str(&format!(
+                        "      resultPtr.ref.returnValue = {default_value};\n"
+                    ));
+                }
+                out.push_str("      try {\n");
+                if let Some(return_type) = method.return_type.as_ref() {
+                    out.push_str(&format!(
+                        "        final result = await callback.{method_name}({});\n",
+                        callback_args.join(", ")
+                    ));
+                    let encoded =
+                        render_callback_return_encode_expr(return_type, "result", records, enums);
+                    out.push_str(&format!("        resultPtr.ref.returnValue = {encoded};\n"));
+                } else {
+                    out.push_str(&format!(
+                        "        await callback.{method_name}({});\n",
+                        callback_args.join(", ")
+                    ));
+                }
+                out.push_str("        resultPtr.ref.callStatus\n");
+                out.push_str("          ..code = _rustCallStatusSuccess\n");
+                out.push_str("          ..errorBuf = ffi.nullptr;\n");
+                out.push_str("      } catch (_) {\n");
+                if method.throws_type.is_some() {
+                    out.push_str("        resultPtr.ref.callStatus\n");
+                    out.push_str("          ..code = _rustCallStatusError\n");
+                    out.push_str("          ..errorBuf = ffi.nullptr;\n");
+                } else {
+                    out.push_str("        resultPtr.ref.callStatus\n");
+                    out.push_str("          ..code = _rustCallStatusUnexpectedError\n");
+                    out.push_str("          ..errorBuf = ffi.nullptr;\n");
+                }
+                out.push_str("      } finally {\n");
+                out.push_str("        complete(callbackData, resultPtr.ref);\n");
+                out.push_str("        calloc.free(resultPtr);\n");
+                out.push_str("      }\n");
+                out.push_str("    }();\n");
             } else {
+                if let Some(return_type) = method.return_type.as_ref() {
+                    let out_type = map_runtime_native_ffi_type(return_type, records, enums)
+                        .expect("validated runtime callback return type");
+                    ffi_args.push(format!("ffi.Pointer<{out_type}> outReturn"));
+                    dart_args.push(format!("ffi.Pointer<{out_type}> outReturn"));
+                } else {
+                    ffi_args.push("ffi.Pointer<ffi.Void> outReturn".to_string());
+                    dart_args.push("ffi.Pointer<ffi.Void> outReturn".to_string());
+                }
+                ffi_args.push("ffi.Pointer<_RustCallStatus> outStatus".to_string());
+                dart_args.push("ffi.Pointer<_RustCallStatus> outStatus".to_string());
+
                 out.push_str(&format!(
-                    "      callback.{method_name}({});\n",
-                    callback_args.join(", ")
+                    "  static final ffi.NativeCallable<ffi.Void Function({})> {native_callable_name} = ffi.NativeCallable<ffi.Void Function({})>.isolateLocal(({}) {{\n",
+                    ffi_args.join(", "),
+                    ffi_args.join(", "),
+                    dart_args.join(", ")
                 ));
+                out.push_str(&format!(
+                    "    final {class_name}? callback = instance.lookup(handle);\n"
+                ));
+                out.push_str("    if (callback == null) {\n");
+                out.push_str("      outStatus.ref\n");
+                out.push_str("        ..code = _rustCallStatusUnexpectedError\n");
+                out.push_str("        ..errorBuf = ffi.nullptr;\n");
+                out.push_str("      return;\n");
+                out.push_str("    }\n");
+                out.push_str("    try {\n");
+                if let Some(return_type) = method.return_type.as_ref() {
+                    out.push_str(&format!(
+                        "      final result = callback.{method_name}({});\n",
+                        callback_args.join(", ")
+                    ));
+                    let encoded =
+                        render_callback_return_encode_expr(return_type, "result", records, enums);
+                    out.push_str(&format!("      outReturn.value = {encoded};\n"));
+                } else {
+                    out.push_str(&format!(
+                        "      callback.{method_name}({});\n",
+                        callback_args.join(", ")
+                    ));
+                }
+                out.push_str("      outStatus.ref\n");
+                out.push_str("        ..code = _rustCallStatusSuccess\n");
+                out.push_str("        ..errorBuf = ffi.nullptr;\n");
+                out.push_str("    } catch (_) {\n");
+                if method.throws_type.is_some() {
+                    out.push_str("      outStatus.ref\n");
+                    out.push_str("        ..code = _rustCallStatusError\n");
+                    out.push_str("        ..errorBuf = ffi.nullptr;\n");
+                } else {
+                    out.push_str("      outStatus.ref\n");
+                    out.push_str("        ..code = _rustCallStatusUnexpectedError\n");
+                    out.push_str("        ..errorBuf = ffi.nullptr;\n");
+                }
+                out.push_str("    }\n");
             }
-            out.push_str("      outStatus.ref\n");
-            out.push_str("        ..code = _rustCallStatusSuccess\n");
-            out.push_str("        ..errorBuf = ffi.nullptr;\n");
-            out.push_str("    } catch (_) {\n");
-            out.push_str("      outStatus.ref\n");
-            out.push_str("        ..code = _rustCallStatusUnexpectedError\n");
-            out.push_str("        ..errorBuf = ffi.nullptr;\n");
-            out.push_str("    }\n");
             out.push_str("  });\n\n");
         }
 
@@ -3347,12 +3494,24 @@ fn is_runtime_callback_method_compatible(
     records: &[UdlRecord],
     enums: &[UdlEnum],
 ) -> bool {
-    !method.is_async
-        && method.throws_type.is_none()
+    method
+        .throws_type
+        .as_ref()
+        .map(|t| {
+            is_runtime_ffi_compatible_type(t, records, enums)
+                && is_runtime_error_enum_type(t, enums)
+        })
+        .unwrap_or(true)
         && method
             .return_type
             .as_ref()
-            .map(|t| is_runtime_callback_method_type_compatible(t, records, enums))
+            .map(|t| {
+                if method.is_async {
+                    is_runtime_callback_async_return_type_compatible(t)
+                } else {
+                    is_runtime_callback_method_type_compatible(t, records, enums)
+                }
+            })
             .unwrap_or(true)
         && method
             .args
@@ -3393,6 +3552,10 @@ fn is_runtime_callback_method_type_compatible(
         || is_runtime_enum_type(type_, enums)
 }
 
+fn is_runtime_callback_async_return_type_compatible(type_: &Type) -> bool {
+    is_runtime_callback_function_return_compatible_type(type_)
+}
+
 fn callback_bridge_class_name(callback_name: &str) -> String {
     format!("_{}CallbackBridge", to_upper_camel(callback_name))
 }
@@ -3418,6 +3581,41 @@ fn callback_init_done_field_name(callback_name: &str) -> String {
 
 fn callback_vtable_field_name(callback_name: &str) -> String {
     safe_dart_identifier(&format!("_{}CallbackVTable", to_lower_camel(callback_name)))
+}
+
+fn callback_async_result_struct_name(callback_name: &str, method_name: &str) -> String {
+    format!(
+        "_{}{}AsyncResult",
+        to_upper_camel(callback_name),
+        to_upper_camel(method_name)
+    )
+}
+
+fn render_callback_async_result_return_field(type_: &Type) -> Option<String> {
+    match type_ {
+        Type::UInt8 => Some("  @ffi.Uint8()\n  external int returnValue;\n\n".to_string()),
+        Type::Int8 => Some("  @ffi.Int8()\n  external int returnValue;\n\n".to_string()),
+        Type::UInt16 => Some("  @ffi.Uint16()\n  external int returnValue;\n\n".to_string()),
+        Type::Int16 => Some("  @ffi.Int16()\n  external int returnValue;\n\n".to_string()),
+        Type::UInt32 => Some("  @ffi.Uint32()\n  external int returnValue;\n\n".to_string()),
+        Type::Int32 => Some("  @ffi.Int32()\n  external int returnValue;\n\n".to_string()),
+        Type::UInt64 => Some("  @ffi.Uint64()\n  external int returnValue;\n\n".to_string()),
+        Type::Int64 => Some("  @ffi.Int64()\n  external int returnValue;\n\n".to_string()),
+        Type::Float32 => Some("  @ffi.Float()\n  external double returnValue;\n\n".to_string()),
+        Type::Float64 => Some("  @ffi.Double()\n  external double returnValue;\n\n".to_string()),
+        Type::Boolean => Some("  @ffi.Uint8()\n  external int returnValue;\n\n".to_string()),
+        Type::Timestamp | Type::Duration => {
+            Some("  @ffi.Int64()\n  external int returnValue;\n\n".to_string())
+        }
+        _ => None,
+    }
+}
+
+fn callback_async_default_return_expr(type_: &Type) -> &'static str {
+    match type_ {
+        Type::Float32 | Type::Float64 => "0.0",
+        _ => "0",
+    }
 }
 
 fn render_callback_arg_decode_expr(
@@ -3485,6 +3683,7 @@ fn render_callback_return_encode_expr(
         }
         Type::Timestamp => format!("{value_expr}.toUtc().microsecondsSinceEpoch"),
         Type::Duration => format!("{value_expr}.inMicroseconds"),
+        Type::Boolean => format!("{value_expr} ? 1 : 0"),
         _ => value_expr.to_string(),
     }
 }
@@ -4245,6 +4444,10 @@ namespace callbacks {
 
 callback interface Adder {
   u32 add(u32 left, u32 right);
+  [Async]
+  u32 add_async(u32 left, u32 right);
+  [Throws=MathError]
+  u32 checked_add(u32 left, u32 right);
 };
 
 callback interface Formatter {
@@ -4292,8 +4495,13 @@ interface MathError {
         let content = fs::read_to_string(out_dir.join("callbacks.dart")).expect("read generated");
         assert!(content.contains("abstract interface class Adder {"));
         assert!(content.contains("int add(int left, int right);"));
+        assert!(content.contains("Future<int> addAsync(int left, int right);"));
+        assert!(content.contains("int checkedAdd(int left, int right);"));
         assert!(content.contains("final class _AdderVTable extends ffi.Struct {"));
         assert!(content.contains("final class _AdderCallbackBridge {"));
+        assert!(content
+            .contains("final class _ForeignFutureDroppedCallbackStruct extends ffi.Struct {"));
+        assert!(content.contains("final class _AdderAddAsyncAsyncResult extends ffi.Struct {"));
         assert!(content.contains("lookupFunction<ffi.Void Function(ffi.Pointer<_AdderVTable>)"));
         assert!(content.contains("'adder_callback_init'"));
         assert!(content.contains("int applyAdder(Adder adder, int left, int right) {"));

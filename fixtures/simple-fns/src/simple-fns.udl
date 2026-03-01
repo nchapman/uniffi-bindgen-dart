@@ -43,6 +43,10 @@ namespace simple_fns {
 
 callback interface Adder {
   u32 add(u32 left, u32 right);
+  [Async]
+  u32 add_async(u32 left, u32 right);
+  [Throws=MathError]
+  u32 checked_add(u32 left, u32 right);
 };
 
 callback interface Formatter {

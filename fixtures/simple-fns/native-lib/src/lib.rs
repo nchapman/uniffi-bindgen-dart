@@ -17,6 +17,8 @@ static COUNTER_LABELS: LazyLock<Mutex<HashMap<u64, String>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 static ASYNC_FUTURES: LazyLock<Mutex<HashMap<u64, AsyncFutureState>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
+static ASYNC_ADDER_OFFSETS: LazyLock<Mutex<HashMap<u64, u32>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 static ADDER_VTABLE: LazyLock<Mutex<Option<AdderVTable>>> = LazyLock::new(|| Mutex::new(None));
 static FORMATTER_VTABLE: LazyLock<Mutex<Option<FormatterVTable>>> = LazyLock::new(|| Mutex::new(None));
 
@@ -27,9 +29,24 @@ const RUST_FUTURE_POLL_READY: i8 = 0;
 const RUST_FUTURE_POLL_WAKE: i8 = 1;
 
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct RustCallStatus {
     pub code: i8,
     pub error_buf: *mut c_char,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct ForeignFutureResultU32 {
+    pub return_value: u32,
+    pub call_status: RustCallStatus,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct ForeignFutureDroppedCallbackStruct {
+    pub handle: u64,
+    pub callback: Option<extern "C" fn(u64)>,
 }
 
 #[repr(C)]
@@ -38,6 +55,15 @@ pub struct AdderVTable {
     pub uniffi_free: extern "C" fn(u64),
     pub uniffi_clone: extern "C" fn(u64) -> u64,
     pub add: extern "C" fn(u64, u32, u32, *mut u32, *mut RustCallStatus),
+    pub add_async: extern "C" fn(
+        u64,
+        u32,
+        u32,
+        extern "C" fn(u64, ForeignFutureResultU32),
+        u64,
+        *mut ForeignFutureDroppedCallbackStruct,
+    ),
+    pub checked_add: extern "C" fn(u64, u32, u32, *mut u32, *mut RustCallStatus),
 }
 
 #[repr(C)]
@@ -59,6 +85,8 @@ enum AsyncFuturePollState {
 enum AsyncFutureResult {
     String(String),
     U32(u32),
+    PendingU32,
+    Failed(String),
     Void,
 }
 
@@ -66,6 +94,7 @@ enum AsyncFutureResult {
 struct AsyncFutureState {
     poll_state: AsyncFuturePollState,
     cancelled: bool,
+    ready: bool,
     result: AsyncFutureResult,
 }
 
@@ -136,7 +165,22 @@ fn enqueue_async_future(result: AsyncFutureResult) -> u64 {
         AsyncFutureState {
             poll_state: AsyncFuturePollState::PendingWake,
             cancelled: false,
+            ready: true,
             result,
+        },
+    );
+    handle
+}
+
+fn enqueue_pending_u32_future() -> u64 {
+    let handle = NEXT_ASYNC_FUTURE_HANDLE.fetch_add(1, Ordering::Relaxed);
+    ASYNC_FUTURES.lock().expect("async futures lock").insert(
+        handle,
+        AsyncFutureState {
+            poll_state: AsyncFuturePollState::PendingWake,
+            cancelled: false,
+            ready: false,
+            result: AsyncFutureResult::PendingU32,
         },
     );
     handle
@@ -164,6 +208,10 @@ fn poll_async_future(handle: u64, callback: extern "C" fn(u64, i8), callback_dat
         callback(callback_data, RUST_FUTURE_POLL_READY);
         return;
     }
+    if !state.ready {
+        callback(callback_data, RUST_FUTURE_POLL_WAKE);
+        return;
+    }
 
     match state.poll_state {
         AsyncFuturePollState::PendingWake => {
@@ -183,6 +231,7 @@ fn cancel_async_future(handle: u64) {
         .get_mut(&handle)
     {
         state.cancelled = true;
+        state.ready = true;
         state.poll_state = AsyncFuturePollState::Ready;
     }
 }
@@ -191,6 +240,10 @@ fn free_async_future(handle: u64) {
     ASYNC_FUTURES
         .lock()
         .expect("async futures lock")
+        .remove(&handle);
+    ASYNC_ADDER_OFFSETS
+        .lock()
+        .expect("async adder offsets lock")
         .remove(&handle);
 }
 
@@ -224,7 +277,9 @@ pub extern "C" fn adder_callback_init(vtable: *const AdderVTable) {
 }
 
 fn invoke_adder_callback(adder: u64, left: u32, right: u32) -> Option<u32> {
-    let vtable = (*ADDER_VTABLE.lock().expect("adder vtable lock"))?;
+    let Some(vtable) = *ADDER_VTABLE.lock().expect("adder vtable lock") else {
+        return None;
+    };
     let callback_handle = (vtable.uniffi_clone)(adder);
     let mut out = 0_u32;
     let mut status = RustCallStatus {
@@ -240,6 +295,50 @@ fn invoke_adder_callback(adder: u64, left: u32, right: u32) -> Option<u32> {
     }
 }
 
+fn invoke_checked_adder_callback(adder: u64, left: u32, right: u32) -> (Option<u32>, i8) {
+    let Some(vtable) = *ADDER_VTABLE.lock().expect("adder vtable lock") else {
+        return (None, RUST_CALL_STATUS_UNEXPECTED_ERROR);
+    };
+    let callback_handle = (vtable.uniffi_clone)(adder);
+    let mut out = 0_u32;
+    let mut status = RustCallStatus {
+        code: RUST_CALL_STATUS_SUCCESS,
+        error_buf: std::ptr::null_mut(),
+    };
+    (vtable.checked_add)(callback_handle, left, right, &mut out, &mut status);
+    (vtable.uniffi_free)(callback_handle);
+    if !status.error_buf.is_null() {
+        unsafe {
+            let _ = CString::from_raw(status.error_buf);
+        }
+    }
+    (Some(out), status.code)
+}
+
+extern "C" fn complete_async_adder(callback_data: u64, result: ForeignFutureResultU32) {
+    if !result.call_status.error_buf.is_null() {
+        unsafe {
+            let _ = CString::from_raw(result.call_status.error_buf);
+        }
+    }
+    let offset = ASYNC_ADDER_OFFSETS
+        .lock()
+        .expect("async adder offsets lock")
+        .remove(&callback_data)
+        .unwrap_or_default();
+    let mut futures = ASYNC_FUTURES.lock().expect("async futures lock");
+    let Some(state) = futures.get_mut(&callback_data) else {
+        return;
+    };
+    if result.call_status.code == RUST_CALL_STATUS_SUCCESS {
+        state.result = AsyncFutureResult::U32(result.return_value.saturating_add(offset));
+    } else {
+        state.result = AsyncFutureResult::Failed("async adder callback failed".to_string());
+    }
+    state.ready = true;
+    state.poll_state = AsyncFuturePollState::PendingWake;
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn apply_adder(adder: u64, left: u32, right: u32) -> u32 {
     invoke_adder_callback(adder, left, right).map(|out| out + 1).unwrap_or(0)
@@ -247,17 +346,37 @@ pub extern "C" fn apply_adder(adder: u64, left: u32, right: u32) -> u32 {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn async_apply_adder(adder: u64, left: u32, right: u32) -> u64 {
-    let result = invoke_adder_callback(adder, left, right).map(|out| out + 2).unwrap_or(0);
-    enqueue_u32_future(result)
+    let Some(vtable) = *ADDER_VTABLE.lock().expect("adder vtable lock") else {
+        return enqueue_u32_future(0);
+    };
+    let handle = enqueue_pending_u32_future();
+    ASYNC_ADDER_OFFSETS
+        .lock()
+        .expect("async adder offsets lock")
+        .insert(handle, 2);
+    let callback_handle = (vtable.uniffi_clone)(adder);
+    let mut dropped = ForeignFutureDroppedCallbackStruct {
+        handle: 0,
+        callback: None,
+    };
+    (vtable.add_async)(
+        callback_handle,
+        left,
+        right,
+        complete_async_adder,
+        handle,
+        &mut dropped,
+    );
+    (vtable.uniffi_free)(callback_handle);
+    handle
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn checked_apply_adder(adder: u64, left: u32, right: u32) -> *mut c_char {
-    let envelope = if right == 0 {
+    let (result, status_code) = invoke_checked_adder_callback(adder, left, right);
+    let envelope = if status_code == RUST_CALL_STATUS_SUCCESS {
         serde_json::json!({
-            "err": {
-                "tag": "divisionByZero"
-            }
+            "ok": result.unwrap_or(0)
         })
     } else if left == 0 {
         serde_json::json!({
@@ -268,7 +387,9 @@ pub extern "C" fn checked_apply_adder(adder: u64, left: u32, right: u32) -> *mut
         })
     } else {
         serde_json::json!({
-            "ok": invoke_adder_callback(adder, left, right).unwrap_or(0)
+            "err": {
+                "tag": "divisionByZero"
+            }
         })
     };
     CString::new(envelope.to_string())
@@ -657,10 +778,28 @@ pub extern "C" fn rust_future_complete_u32(handle: u64, out_status: *mut RustCal
         write_out_status(out_status, RUST_CALL_STATUS_CANCELLED, std::ptr::null_mut());
         return 0;
     }
-    match state.result {
+    match &state.result {
         AsyncFutureResult::U32(value) => {
             write_out_status(out_status, RUST_CALL_STATUS_SUCCESS, std::ptr::null_mut());
-            value
+            *value
+        }
+        AsyncFutureResult::Failed(message) => {
+            write_out_status(
+                out_status,
+                RUST_CALL_STATUS_UNEXPECTED_ERROR,
+                CString::new(message.as_str()).expect("valid CString").into_raw(),
+            );
+            0
+        }
+        AsyncFutureResult::PendingU32 => {
+            write_out_status(
+                out_status,
+                RUST_CALL_STATUS_UNEXPECTED_ERROR,
+                CString::new("u32 callback future not completed")
+                    .expect("valid CString")
+                    .into_raw(),
+            );
+            0
         }
         _ => {
             write_out_status(
@@ -828,7 +967,35 @@ pub extern "C" fn counter_apply_adder_with(handle: u64, adder: u64, left: u32, r
 
 #[unsafe(no_mangle)]
 pub extern "C" fn counter_async_apply_adder_with(handle: u64, adder: u64, left: u32, right: u32) -> u64 {
-    enqueue_u32_future(counter_apply_adder_with(handle, adder, left, right))
+    let Some(vtable) = *ADDER_VTABLE.lock().expect("adder vtable lock") else {
+        return enqueue_u32_future(0);
+    };
+    let base = COUNTERS
+        .lock()
+        .expect("counter map lock")
+        .get(&handle)
+        .copied()
+        .unwrap_or_default() as u32;
+    let future_handle = enqueue_pending_u32_future();
+    ASYNC_ADDER_OFFSETS
+        .lock()
+        .expect("async adder offsets lock")
+        .insert(future_handle, base);
+    let callback_handle = (vtable.uniffi_clone)(adder);
+    let mut dropped = ForeignFutureDroppedCallbackStruct {
+        handle: 0,
+        callback: None,
+    };
+    (vtable.add_async)(
+        callback_handle,
+        left,
+        right,
+        complete_async_adder,
+        future_handle,
+        &mut dropped,
+    );
+    (vtable.uniffi_free)(callback_handle);
+    future_handle
 }
 
 #[unsafe(no_mangle)]
@@ -838,7 +1005,18 @@ pub extern "C" fn counter_checked_apply_adder_with(
     left: u32,
     right: u32,
 ) -> *mut c_char {
-    let envelope = if right == 0 {
+    let (result, status_code) = invoke_checked_adder_callback(adder, left, right);
+    let base = COUNTERS
+        .lock()
+        .expect("counter map lock")
+        .get(&handle)
+        .copied()
+        .unwrap_or_default() as u32;
+    let envelope = if status_code == RUST_CALL_STATUS_SUCCESS {
+        serde_json::json!({
+            "ok": base + result.unwrap_or(0)
+        })
+    } else if right == 0 {
         serde_json::json!({
             "err": { "tag": "divisionByZero" }
         })
@@ -847,9 +1025,7 @@ pub extern "C" fn counter_checked_apply_adder_with(
             "err": { "tag": "negativeInput", "value": -1 }
         })
     } else {
-        serde_json::json!({
-            "ok": counter_apply_adder_with(handle, adder, left, right)
-        })
+        serde_json::json!({ "err": { "tag": "divisionByZero" } })
     };
     CString::new(envelope.to_string())
         .expect("valid CString")

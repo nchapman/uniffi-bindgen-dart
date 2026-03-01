@@ -181,6 +181,15 @@ Use this ledger as the execution checklist for full parity. This is the operatio
 3. A row is not complete until all required gates and docs updates pass.
 4. If a bug is found, add a regression row before implementing the fix.
 
+### Row Checklist (Formulaic, Required Per Row)
+Use this checklist in the row notes before changing status to `Done`:
+- `[]` Rust semantics cross-checked against `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` (file/module recorded).
+- `[]` Failing runtime test added first.
+- `[]` Failing generator test added first (unit or golden).
+- `[]` Implementation merged with idiomatic target-language API surface review completed.
+- `[]` Required gates passed (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test --workspace`, host analyze/test script).
+- `[]` Docs and plan status updated with evidence links.
+
 ### Row Execution Playbook (Formulaic)
 1. Select next `Not started` row from this ledger.
 2. Add/extend fixture and write failing runtime test for that row.

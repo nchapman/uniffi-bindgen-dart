@@ -237,10 +237,26 @@ MathErrorException _decodeMathErrorException(Object? raw) {
 
 abstract interface class Adder {
   int add(int left, int right);
+  Future<int> addAsync(int left, int right);
+  int checkedAdd(int left, int right);
 }
 
 abstract interface class Formatter {
   String format(String? prefix, Person person, Outcome outcome);
+}
+
+final class _ForeignFutureDroppedCallbackStruct extends ffi.Struct {
+  @ffi.Uint64()
+  external int handle;
+
+  external ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 handle)>> callback;
+}
+
+final class _AdderAddAsyncAsyncResult extends ffi.Struct {
+  @ffi.Uint32()
+  external int returnValue;
+
+  external _RustCallStatus callStatus;
 }
 
 final class _AdderVTable extends ffi.Struct {
@@ -249,6 +265,10 @@ final class _AdderVTable extends ffi.Struct {
   external ffi.Pointer<ffi.NativeFunction<ffi.Uint64 Function(ffi.Uint64 handle)>> uniffiClone;
 
   external ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Uint32 left, ffi.Uint32 right, ffi.Pointer<ffi.Uint32> outReturn, ffi.Pointer<_RustCallStatus> outStatus)>> add;
+
+  external ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Uint32 left, ffi.Uint32 right, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, _AdderAddAsyncAsyncResult result)>> uniffiFutureCallback, ffi.Uint64 callbackData, ffi.Pointer<_ForeignFutureDroppedCallbackStruct> uniffiOutDroppedCallback)>> addAsync;
+
+  external ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Uint32 left, ffi.Uint32 right, ffi.Pointer<ffi.Uint32> outReturn, ffi.Pointer<_RustCallStatus> outStatus)>> checkedAdd;
 
 }
 
@@ -320,12 +340,73 @@ final class _AdderCallbackBridge {
     }
   });
 
+  static final ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle, ffi.Uint32 left, ffi.Uint32 right, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, _AdderAddAsyncAsyncResult result)>> uniffiFutureCallback, ffi.Uint64 callbackData, ffi.Pointer<_ForeignFutureDroppedCallbackStruct> uniffiOutDroppedCallback)> _addAsyncNative = ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle, ffi.Uint32 left, ffi.Uint32 right, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, _AdderAddAsyncAsyncResult result)>> uniffiFutureCallback, ffi.Uint64 callbackData, ffi.Pointer<_ForeignFutureDroppedCallbackStruct> uniffiOutDroppedCallback)>.isolateLocal((int handle, int left, int right, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, _AdderAddAsyncAsyncResult result)>> uniffiFutureCallback, int callbackData, ffi.Pointer<_ForeignFutureDroppedCallbackStruct> uniffiOutDroppedCallback) {
+    final Adder? callback = instance.lookup(handle);
+    final complete = uniffiFutureCallback.asFunction<void Function(int callbackData, _AdderAddAsyncAsyncResult result)>();
+    if (uniffiOutDroppedCallback != ffi.nullptr) {
+      uniffiOutDroppedCallback.ref
+        ..handle = 0
+        ..callback = ffi.nullptr;
+    }
+    if (callback == null) {
+      final ffi.Pointer<_AdderAddAsyncAsyncResult> resultPtr = calloc<_AdderAddAsyncAsyncResult>();
+      resultPtr.ref.returnValue = 0;
+      resultPtr.ref.callStatus
+        ..code = _rustCallStatusUnexpectedError
+        ..errorBuf = ffi.nullptr;
+      complete(callbackData, resultPtr.ref);
+      calloc.free(resultPtr);
+      return;
+    }
+    () async {
+      final ffi.Pointer<_AdderAddAsyncAsyncResult> resultPtr = calloc<_AdderAddAsyncAsyncResult>();
+      resultPtr.ref.returnValue = 0;
+      try {
+        final result = await callback.addAsync(left, right);
+        resultPtr.ref.returnValue = result;
+        resultPtr.ref.callStatus
+          ..code = _rustCallStatusSuccess
+          ..errorBuf = ffi.nullptr;
+      } catch (_) {
+        resultPtr.ref.callStatus
+          ..code = _rustCallStatusUnexpectedError
+          ..errorBuf = ffi.nullptr;
+      } finally {
+        complete(callbackData, resultPtr.ref);
+        calloc.free(resultPtr);
+      }
+    }();
+  });
+
+  static final ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle, ffi.Uint32 left, ffi.Uint32 right, ffi.Pointer<ffi.Uint32> outReturn, ffi.Pointer<_RustCallStatus> outStatus)> _checkedAddNative = ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle, ffi.Uint32 left, ffi.Uint32 right, ffi.Pointer<ffi.Uint32> outReturn, ffi.Pointer<_RustCallStatus> outStatus)>.isolateLocal((int handle, int left, int right, ffi.Pointer<ffi.Uint32> outReturn, ffi.Pointer<_RustCallStatus> outStatus) {
+    final Adder? callback = instance.lookup(handle);
+    if (callback == null) {
+      outStatus.ref
+        ..code = _rustCallStatusUnexpectedError
+        ..errorBuf = ffi.nullptr;
+      return;
+    }
+    try {
+      final result = callback.checkedAdd(left, right);
+      outReturn.value = result;
+      outStatus.ref
+        ..code = _rustCallStatusSuccess
+        ..errorBuf = ffi.nullptr;
+    } catch (_) {
+      outStatus.ref
+        ..code = _rustCallStatusError
+        ..errorBuf = ffi.nullptr;
+    }
+  });
+
   static ffi.Pointer<_AdderVTable> createVTable() {
     final ffi.Pointer<_AdderVTable> vtablePtr = calloc<_AdderVTable>();
     vtablePtr.ref
       ..uniffiFree = _freeNative.nativeFunction
       ..uniffiClone = _cloneNative.nativeFunction
       ..add = _addNative.nativeFunction
+      ..addAsync = _addAsyncNative.nativeFunction
+      ..checkedAdd = _checkedAddNative.nativeFunction
     ;
     return vtablePtr;
   }

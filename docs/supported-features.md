@@ -19,7 +19,7 @@ Legend:
 | Optionals/sequences/maps | Partial | covered in top-level and selected object paths; broader nesting parity still pending |
 | Builtins | Implemented | int/float/bool/string/bytes/timestamp/duration |
 | Async futures | Partial | `[Async]` maps to idiomatic `Future<...>` APIs with rust-future poll/cancel/complete/free runtime flow for string-backed async returns; broader return-type parity still pending |
-| Callback interfaces | Planned | pending |
+| Callback interfaces | Partial | sync/async/throws callback argument paths for top-level + object methods are implemented, including callback-interface method-level async/throws for primitive return families |
 | Custom types | Planned | pending |
 | External/remote types | Planned | pending |
 | Rename/exclude/docstrings | Planned | pending |

@@ -10,6 +10,20 @@ final class _TestAdder implements Adder {
 
   @override
   int add(int left, int right) => left + right + offset;
+
+  @override
+  Future<int> addAsync(int left, int right) async => left + right + offset;
+
+  @override
+  int checkedAdd(int left, int right) {
+    if (right == 0) {
+      throw const MathErrorExceptionDivisionByZero();
+    }
+    if (left == 0) {
+      throw const MathErrorExceptionNegativeInput(value: -1);
+    }
+    return left + right + offset;
+  }
 }
 
 final class _TestFormatter implements Formatter {
@@ -93,6 +107,10 @@ void main() {
     expect(contents, contains("'adder_callback_init'"));
     expect(contents, contains('final class _AdderVTable extends ffi.Struct {'));
     expect(contents, contains('final class _AdderCallbackBridge {'));
+    expect(contents, contains('Future<int> addAsync(int left, int right);'));
+    expect(contents, contains('int checkedAdd(int left, int right);'));
+    expect(contents, contains('final class _ForeignFutureDroppedCallbackStruct extends ffi.Struct {'));
+    expect(contents, contains('final class _AdderAddAsyncAsyncResult extends ffi.Struct {'));
     expect(contents, contains('abstract interface class Formatter {'));
     expect(contents, contains('String format(String? prefix, Person person, Outcome outcome);'));
     expect(contents, contains("'formatter_callback_init'"));
