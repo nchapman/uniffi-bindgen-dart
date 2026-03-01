@@ -106,7 +106,8 @@ struct UdlArg {
 
 impl UdlFunction {
     fn uses_bytes(&self) -> bool {
-        self.return_type == "bytes" || self.args.iter().any(|a| a.type_name == "bytes")
+        udl_type_uses_bytes(&self.return_type)
+            || self.args.iter().any(|a| udl_type_uses_bytes(&a.type_name))
     }
 }
 
@@ -156,8 +157,8 @@ fn parse_udl_functions_from_str(udl: &str) -> Vec<UdlFunction> {
         let args = if args_part.is_empty() {
             Vec::new()
         } else {
-            args_part
-                .split(',')
+            split_top_level_generic_args(args_part)
+                .into_iter()
                 .filter_map(|arg| parse_udl_arg(arg.trim()))
                 .collect::<Vec<_>>()
         };
@@ -267,16 +268,81 @@ fn render_function_stubs(functions: &[UdlFunction]) -> String {
     out
 }
 
-fn map_udl_type_to_dart(udl_type: &str) -> &'static str {
-    match udl_type.trim() {
-        "void" => "void",
-        "u8" | "u16" | "u32" | "u64" | "i8" | "i16" | "i32" | "i64" => "int",
-        "f32" | "f64" => "double",
-        "boolean" => "bool",
-        "string" => "String",
-        "bytes" => "Uint8List",
-        _ => "dynamic",
+fn map_udl_type_to_dart(udl_type: &str) -> String {
+    let t = udl_type.trim();
+    if let Some(inner) = t.strip_suffix('?') {
+        return format!("{}?", map_udl_type_to_dart(inner));
     }
+    if let Some(inner) = t
+        .strip_prefix("sequence<")
+        .and_then(|s| s.strip_suffix('>'))
+    {
+        return format!("List<{}>", map_udl_type_to_dart(inner));
+    }
+    if let Some(inner) = t.strip_prefix("record<").and_then(|s| s.strip_suffix('>')) {
+        let args = split_top_level_generic_args(inner);
+        if args.len() == 2 {
+            return format!(
+                "Map<{}, {}>",
+                map_udl_type_to_dart(args[0]),
+                map_udl_type_to_dart(args[1])
+            );
+        }
+        return "Map<dynamic, dynamic>".to_string();
+    }
+
+    match t {
+        "void" => "void".to_string(),
+        "u8" | "u16" | "u32" | "u64" | "i8" | "i16" | "i32" | "i64" => "int".to_string(),
+        "f32" | "f64" => "double".to_string(),
+        "boolean" => "bool".to_string(),
+        "string" => "String".to_string(),
+        "bytes" => "Uint8List".to_string(),
+        _ => t.to_string(),
+    }
+}
+
+fn udl_type_uses_bytes(udl_type: &str) -> bool {
+    let t = udl_type.trim();
+    if t == "bytes" {
+        return true;
+    }
+    if let Some(inner) = t.strip_suffix('?') {
+        return udl_type_uses_bytes(inner);
+    }
+    if let Some(inner) = t
+        .strip_prefix("sequence<")
+        .and_then(|s| s.strip_suffix('>'))
+    {
+        return udl_type_uses_bytes(inner);
+    }
+    if let Some(inner) = t.strip_prefix("record<").and_then(|s| s.strip_suffix('>')) {
+        return split_top_level_generic_args(inner)
+            .into_iter()
+            .any(udl_type_uses_bytes);
+    }
+    false
+}
+
+fn split_top_level_generic_args(input: &str) -> Vec<&str> {
+    let mut out = Vec::new();
+    let mut depth = 0i32;
+    let mut start = 0usize;
+    for (i, c) in input.char_indices() {
+        match c {
+            '<' => depth += 1,
+            '>' => depth -= 1,
+            ',' if depth == 0 => {
+                out.push(input[start..i].trim());
+                start = i + 1;
+            }
+            _ => {}
+        }
+    }
+    if start < input.len() {
+        out.push(input[start..].trim());
+    }
+    out.into_iter().filter(|s| !s.is_empty()).collect()
 }
 
 fn to_upper_camel(input: &str) -> String {
@@ -486,6 +552,43 @@ namespace bytes_demo {
         let content = fs::read_to_string(out_dir.join("bytes_demo.dart")).expect("read generated");
         assert!(content.contains("import 'dart:typed_data';"));
         assert!(content.contains("Uint8List echoBytes(Uint8List input) {"));
+    }
+
+    #[test]
+    fn renders_compound_udl_types_to_idiomatic_dart() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = temp.path().join("compound_demo.udl");
+        let out_dir = temp.path().join("out");
+        fs::write(
+            &source,
+            r#"
+namespace compound_demo {
+  sequence<u32> listify(sequence<u32> values);
+  record<string, u64> counts(record<string, u64> items);
+  string? maybe_name(string? value);
+  sequence<bytes> chunk(sequence<bytes> input);
+};
+"#,
+        )
+        .expect("write source");
+
+        let args = GenerateArgs {
+            source,
+            out_dir: out_dir.clone(),
+            library: false,
+            config: None,
+            crate_name: None,
+            no_format: false,
+        };
+
+        generate_bindings(&args).expect("generate");
+        let content =
+            fs::read_to_string(out_dir.join("compound_demo.dart")).expect("read generated file");
+        assert!(content.contains("List<int> listify(List<int> values) {"));
+        assert!(content.contains("Map<String, int> counts(Map<String, int> items) {"));
+        assert!(content.contains("String? maybeName(String? value) {"));
+        assert!(content.contains("List<Uint8List> chunk(List<Uint8List> input) {"));
+        assert!(content.contains("import 'dart:typed_data';"));
     }
 
     #[test]
