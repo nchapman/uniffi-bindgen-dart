@@ -138,6 +138,9 @@ void main() {
     expect(contents, contains('Future<String> asyncGreet(String name) {'));
     expect(contents, contains('Future<int> asyncAdd(int left, int right) {'));
     expect(contents, contains('Future<void> asyncTick() {'));
+    expect(contents, contains('Future<Uint8List> asyncBytesEcho(Uint8List input) {'));
+    expect(contents, contains('Future<List<Uint8List>> asyncBytesChunksEcho(List<Uint8List> input) {'));
+    expect(contents, contains('Future<Uint8List?> asyncBytesMaybeEcho(Uint8List? input) {'));
     expect(contents, contains('rust_future_poll_string'));
     expect(contents, contains('rust_future_cancel_string'));
     expect(contents, contains('rust_future_complete_string'));
@@ -146,6 +149,12 @@ void main() {
     expect(contents, contains('rust_future_complete_u32'));
     expect(contents, contains('rust_future_poll_void'));
     expect(contents, contains('rust_future_complete_void'));
+    expect(contents, contains('rust_future_poll_bytes'));
+    expect(contents, contains('rust_future_complete_bytes'));
+    expect(contents, contains('rust_future_poll_bytes_opt'));
+    expect(contents, contains('rust_future_complete_bytes_opt'));
+    expect(contents, contains('rust_future_poll_bytes_vec'));
+    expect(contents, contains('rust_future_complete_bytes_vec'));
     expect(contents, contains('final class _RustCallStatus extends ffi.Struct {'));
     expect(
       contents,
@@ -255,6 +264,7 @@ void main() {
     expect(contents, contains('String describe() {'));
     expect(contents, contains('Future<String> asyncDescribe() {'));
     expect(contents, contains('Future<int> asyncValue() {'));
+    expect(contents, contains('Future<Uint8List> asyncSnapshotBytes() {'));
     expect(contents, contains('Person snapshotPerson() {'));
     expect(contents, contains('Outcome snapshotOutcome() {'));
     expect(contents, contains('Uint8List snapshotBytes() {'));
@@ -401,6 +411,34 @@ void main() {
     expect(bindings.bytesVecFreeCount(), 1);
     expect(bindings.bytesChunksEcho(<Uint8List>[]), <Uint8List>[]);
     expect(bindings.bytesVecFreeCount(), 1);
+    final bytesFreeBeforeAsync = bindings.bytesFreeCount();
+    final bytesVecFreeBeforeAsync = bindings.bytesVecFreeCount();
+    expect(
+      await bindings.asyncBytesEcho(Uint8List.fromList([6, 7, 8])),
+      Uint8List.fromList([6, 7, 8]),
+    );
+    expect(await bindings.asyncBytesEcho(Uint8List(0)), Uint8List(0));
+    expect(
+      await bindings.asyncBytesMaybeEcho(Uint8List.fromList([9, 10])),
+      Uint8List.fromList([9, 10]),
+    );
+    expect(await bindings.asyncBytesMaybeEcho(Uint8List(0)), Uint8List(0));
+    expect(await bindings.asyncBytesMaybeEcho(null), isNull);
+    expect(
+      await bindings.asyncBytesChunksEcho([
+        Uint8List.fromList([2]),
+        Uint8List(0),
+        Uint8List.fromList([3, 4]),
+      ]),
+      [
+        Uint8List.fromList([2]),
+        Uint8List(0),
+        Uint8List.fromList([3, 4]),
+      ],
+    );
+    expect(await bindings.asyncBytesChunksEcho(<Uint8List>[]), <Uint8List>[]);
+    expect(bindings.bytesFreeCount(), bytesFreeBeforeAsync + 4);
+    expect(bindings.bytesVecFreeCount(), bytesVecFreeBeforeAsync + 1);
     expect(bindings.negate(7), -7);
     expect(
       bindings.subtractI64(9000000000000000000, 1000000000000000000),
@@ -495,6 +533,9 @@ void main() {
     final bytesBeforeSnapshot = bindings.bytesFreeCount();
     expect(counter.snapshotBytes(), Uint8List.fromList('bytes:9'.codeUnits));
     expect(bindings.bytesFreeCount(), bytesBeforeSnapshot + 1);
+    final bytesBeforeAsyncSnapshot = bindings.bytesFreeCount();
+    expect(await counter.asyncSnapshotBytes(), Uint8List.fromList('async-bytes:9'.codeUnits));
+    expect(bindings.bytesFreeCount(), bytesBeforeAsyncSnapshot + 1);
     final risky = counter.riskyOutcome(5);
     expect(risky, isA<OutcomeSuccess>());
     final riskySuccess = risky as OutcomeSuccess;
@@ -645,6 +686,20 @@ void main() {
     expect(bytesVecFreeCount(), 1);
     expect(bytesChunksEcho(<Uint8List>[]), <Uint8List>[]);
     expect(bytesVecFreeCount(), 1);
+    final topBytesFreeBeforeAsync = bytesFreeCount();
+    final topBytesVecFreeBeforeAsync = bytesVecFreeCount();
+    expect(await asyncBytesEcho(Uint8List.fromList([5, 4])), Uint8List.fromList([5, 4]));
+    expect(await asyncBytesEcho(Uint8List(0)), Uint8List(0));
+    expect(await asyncBytesMaybeEcho(Uint8List.fromList([3])), Uint8List.fromList([3]));
+    expect(await asyncBytesMaybeEcho(Uint8List(0)), Uint8List(0));
+    expect(await asyncBytesMaybeEcho(null), isNull);
+    expect(
+      await asyncBytesChunksEcho([Uint8List.fromList([8]), Uint8List(0)]),
+      [Uint8List.fromList([8]), Uint8List(0)],
+    );
+    expect(await asyncBytesChunksEcho(<Uint8List>[]), <Uint8List>[]);
+    expect(bytesFreeCount(), topBytesFreeBeforeAsync + 3);
+    expect(bytesVecFreeCount(), topBytesVecFreeBeforeAsync + 1);
     expect(negate(5), -5);
     expect(subtractI64(5000000000, 2000000000), 3000000000);
     expect(

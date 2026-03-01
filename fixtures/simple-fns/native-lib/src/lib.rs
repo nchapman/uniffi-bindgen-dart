@@ -129,6 +129,9 @@ enum AsyncFuturePollState {
 enum AsyncFutureResult {
     String(String),
     U32(u32),
+    Bytes(Vec<u8>),
+    BytesOpt(Option<Vec<u8>>),
+    BytesVec(Vec<Vec<u8>>),
     PendingString,
     PendingU32,
     Failed(String),
@@ -164,12 +167,30 @@ pub struct RustBufferVec {
     pub len: u64,
 }
 
+fn empty_rust_buffer() -> RustBuffer {
+    RustBuffer {
+        data: std::ptr::null_mut(),
+        len: 0,
+    }
+}
+
+fn empty_rust_buffer_opt() -> RustBufferOpt {
+    RustBufferOpt {
+        is_some: 0,
+        value: empty_rust_buffer(),
+    }
+}
+
+fn empty_rust_buffer_vec() -> RustBufferVec {
+    RustBufferVec {
+        data: std::ptr::null_mut(),
+        len: 0,
+    }
+}
+
 fn vec_into_rust_buffer(mut data: Vec<u8>) -> RustBuffer {
     if data.is_empty() {
-        return RustBuffer {
-            data: std::ptr::null_mut(),
-            len: 0,
-        };
+        return empty_rust_buffer();
     }
 
     let out = RustBuffer {
@@ -190,10 +211,7 @@ fn rust_buffer_to_vec(buf: RustBuffer) -> Vec<u8> {
 
 fn vec_into_rust_buffer_vec(mut items: Vec<RustBuffer>) -> RustBufferVec {
     if items.is_empty() {
-        return RustBufferVec {
-            data: std::ptr::null_mut(),
-            len: 0,
-        };
+        return empty_rust_buffer_vec();
     }
     let out = RustBufferVec {
         data: items.as_mut_ptr(),
@@ -251,6 +269,18 @@ fn enqueue_string_future(result: String) -> u64 {
 
 fn enqueue_u32_future(result: u32) -> u64 {
     enqueue_async_future(AsyncFutureResult::U32(result))
+}
+
+fn enqueue_bytes_future(result: Vec<u8>) -> u64 {
+    enqueue_async_future(AsyncFutureResult::Bytes(result))
+}
+
+fn enqueue_bytes_opt_future(result: Option<Vec<u8>>) -> u64 {
+    enqueue_async_future(AsyncFutureResult::BytesOpt(result))
+}
+
+fn enqueue_bytes_vec_future(result: Vec<Vec<u8>>) -> u64 {
+    enqueue_async_future(AsyncFutureResult::BytesVec(result))
 }
 
 fn enqueue_void_future() -> u64 {
@@ -733,13 +763,7 @@ pub extern "C" fn bytes_echo(input: RustBuffer) -> RustBuffer {
 #[unsafe(no_mangle)]
 pub extern "C" fn bytes_maybe_echo(input: RustBufferOpt) -> RustBufferOpt {
     if input.is_some == 0 {
-        return RustBufferOpt {
-            is_some: 0,
-            value: RustBuffer {
-                data: std::ptr::null_mut(),
-                len: 0,
-            },
-        };
+        return empty_rust_buffer_opt();
     }
     RustBufferOpt {
         is_some: 1,
@@ -750,10 +774,7 @@ pub extern "C" fn bytes_maybe_echo(input: RustBufferOpt) -> RustBufferOpt {
 #[unsafe(no_mangle)]
 pub extern "C" fn bytes_chunks_echo(input: RustBufferVec) -> RustBufferVec {
     if input.data.is_null() || input.len == 0 {
-        return RustBufferVec {
-            data: std::ptr::null_mut(),
-            len: 0,
-        };
+        return empty_rust_buffer_vec();
     }
     let in_items = unsafe { std::slice::from_raw_parts(input.data, input.len as usize) };
     let out_items = in_items
@@ -763,6 +784,34 @@ pub extern "C" fn bytes_chunks_echo(input: RustBufferVec) -> RustBufferVec {
         .map(vec_into_rust_buffer)
         .collect::<Vec<_>>();
     vec_into_rust_buffer_vec(out_items)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn async_bytes_echo(input: RustBuffer) -> u64 {
+    enqueue_bytes_future(rust_buffer_to_vec(input))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn async_bytes_maybe_echo(input: RustBufferOpt) -> u64 {
+    if input.is_some == 0 {
+        enqueue_bytes_opt_future(None)
+    } else {
+        enqueue_bytes_opt_future(Some(rust_buffer_to_vec(input.value)))
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn async_bytes_chunks_echo(input: RustBufferVec) -> u64 {
+    if input.data.is_null() || input.len == 0 {
+        return enqueue_bytes_vec_future(Vec::new());
+    }
+    let in_items = unsafe { std::slice::from_raw_parts(input.data, input.len as usize) };
+    let out_items = in_items
+        .iter()
+        .copied()
+        .map(rust_buffer_to_vec)
+        .collect::<Vec<_>>();
+    enqueue_bytes_vec_future(out_items)
 }
 
 #[unsafe(no_mangle)]
@@ -1093,6 +1142,213 @@ pub extern "C" fn rust_future_complete_u32(handle: u64, out_status: *mut RustCal
 
 #[unsafe(no_mangle)]
 pub extern "C" fn rust_future_free_u32(handle: u64) {
+    free_async_future(handle);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_future_poll_bytes(
+    handle: u64,
+    callback: extern "C" fn(u64, i8),
+    callback_data: u64,
+) {
+    poll_async_future(handle, callback, callback_data);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_future_cancel_bytes(handle: u64) {
+    cancel_async_future(handle);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_future_complete_bytes(
+    handle: u64,
+    out_status: *mut RustCallStatus,
+) -> RustBuffer {
+    let futures = ASYNC_FUTURES.lock().expect("async futures lock");
+    let Some(state) = futures.get(&handle) else {
+        write_out_status(
+            out_status,
+            RUST_CALL_STATUS_UNEXPECTED_ERROR,
+            CString::new("missing bytes future handle")
+                .expect("valid CString")
+                .into_raw(),
+        );
+        return empty_rust_buffer();
+    };
+    if state.cancelled {
+        write_out_status(out_status, RUST_CALL_STATUS_CANCELLED, std::ptr::null_mut());
+        return empty_rust_buffer();
+    }
+    match &state.result {
+        AsyncFutureResult::Bytes(value) => {
+            write_out_status(out_status, RUST_CALL_STATUS_SUCCESS, std::ptr::null_mut());
+            vec_into_rust_buffer(value.clone())
+        }
+        AsyncFutureResult::Failed(message) => {
+            write_out_status(
+                out_status,
+                RUST_CALL_STATUS_UNEXPECTED_ERROR,
+                CString::new(message.as_str()).expect("valid CString").into_raw(),
+            );
+            empty_rust_buffer()
+        }
+        _ => {
+            write_out_status(
+                out_status,
+                RUST_CALL_STATUS_UNEXPECTED_ERROR,
+                CString::new("invalid async result type for bytes")
+                    .expect("valid CString")
+                    .into_raw(),
+            );
+            empty_rust_buffer()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_future_free_bytes(handle: u64) {
+    free_async_future(handle);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_future_poll_bytes_opt(
+    handle: u64,
+    callback: extern "C" fn(u64, i8),
+    callback_data: u64,
+) {
+    poll_async_future(handle, callback, callback_data);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_future_cancel_bytes_opt(handle: u64) {
+    cancel_async_future(handle);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_future_complete_bytes_opt(
+    handle: u64,
+    out_status: *mut RustCallStatus,
+) -> RustBufferOpt {
+    let futures = ASYNC_FUTURES.lock().expect("async futures lock");
+    let Some(state) = futures.get(&handle) else {
+        write_out_status(
+            out_status,
+            RUST_CALL_STATUS_UNEXPECTED_ERROR,
+            CString::new("missing bytes_opt future handle")
+                .expect("valid CString")
+                .into_raw(),
+        );
+        return empty_rust_buffer_opt();
+    };
+    if state.cancelled {
+        write_out_status(out_status, RUST_CALL_STATUS_CANCELLED, std::ptr::null_mut());
+        return empty_rust_buffer_opt();
+    }
+    match &state.result {
+        AsyncFutureResult::BytesOpt(Some(value)) => {
+            write_out_status(out_status, RUST_CALL_STATUS_SUCCESS, std::ptr::null_mut());
+            RustBufferOpt {
+                is_some: 1,
+                value: vec_into_rust_buffer(value.clone()),
+            }
+        }
+        AsyncFutureResult::BytesOpt(None) => {
+            write_out_status(out_status, RUST_CALL_STATUS_SUCCESS, std::ptr::null_mut());
+            empty_rust_buffer_opt()
+        }
+        AsyncFutureResult::Failed(message) => {
+            write_out_status(
+                out_status,
+                RUST_CALL_STATUS_UNEXPECTED_ERROR,
+                CString::new(message.as_str()).expect("valid CString").into_raw(),
+            );
+            empty_rust_buffer_opt()
+        }
+        _ => {
+            write_out_status(
+                out_status,
+                RUST_CALL_STATUS_UNEXPECTED_ERROR,
+                CString::new("invalid async result type for bytes_opt")
+                    .expect("valid CString")
+                    .into_raw(),
+            );
+            empty_rust_buffer_opt()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_future_free_bytes_opt(handle: u64) {
+    free_async_future(handle);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_future_poll_bytes_vec(
+    handle: u64,
+    callback: extern "C" fn(u64, i8),
+    callback_data: u64,
+) {
+    poll_async_future(handle, callback, callback_data);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_future_cancel_bytes_vec(handle: u64) {
+    cancel_async_future(handle);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_future_complete_bytes_vec(
+    handle: u64,
+    out_status: *mut RustCallStatus,
+) -> RustBufferVec {
+    let futures = ASYNC_FUTURES.lock().expect("async futures lock");
+    let Some(state) = futures.get(&handle) else {
+        write_out_status(
+            out_status,
+            RUST_CALL_STATUS_UNEXPECTED_ERROR,
+            CString::new("missing bytes_vec future handle")
+                .expect("valid CString")
+                .into_raw(),
+        );
+        return empty_rust_buffer_vec();
+    };
+    if state.cancelled {
+        write_out_status(out_status, RUST_CALL_STATUS_CANCELLED, std::ptr::null_mut());
+        return empty_rust_buffer_vec();
+    }
+    match &state.result {
+        AsyncFutureResult::BytesVec(values) => {
+            write_out_status(out_status, RUST_CALL_STATUS_SUCCESS, std::ptr::null_mut());
+            let out = values
+                .iter()
+                .cloned()
+                .map(vec_into_rust_buffer)
+                .collect::<Vec<_>>();
+            vec_into_rust_buffer_vec(out)
+        }
+        AsyncFutureResult::Failed(message) => {
+            write_out_status(
+                out_status,
+                RUST_CALL_STATUS_UNEXPECTED_ERROR,
+                CString::new(message.as_str()).expect("valid CString").into_raw(),
+            );
+            empty_rust_buffer_vec()
+        }
+        _ => {
+            write_out_status(
+                out_status,
+                RUST_CALL_STATUS_UNEXPECTED_ERROR,
+                CString::new("invalid async result type for bytes_vec")
+                    .expect("valid CString")
+                    .into_raw(),
+            );
+            empty_rust_buffer_vec()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_future_free_bytes_vec(handle: u64) {
     free_async_future(handle);
 }
 
@@ -1520,6 +1776,17 @@ pub extern "C" fn counter_async_value(handle: u64) -> u64 {
         .copied()
         .unwrap_or_default();
     enqueue_u32_future(value.max(0) as u32)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_async_snapshot_bytes(handle: u64) -> u64 {
+    let value = COUNTERS
+        .lock()
+        .expect("counter map lock")
+        .get(&handle)
+        .copied()
+        .unwrap_or_default();
+    enqueue_bytes_future(format!("async-bytes:{value}").into_bytes())
 }
 
 #[unsafe(no_mangle)]

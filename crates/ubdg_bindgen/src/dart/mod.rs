@@ -1650,12 +1650,24 @@ fn render_bound_methods(
         });
     let needs_bytes_free = functions.iter().any(|f| {
         is_runtime_ffi_compatible_function(f, records, enums) && f.returns_runtime_bytes()
+    }) || objects.iter().any(|o| {
+        o.methods.iter().any(|m| {
+            m.return_type
+                .as_ref()
+                .is_some_and(is_runtime_bytes_like_type)
+        })
     });
     let needs_bytes_vec_free = functions.iter().any(|f| {
         is_runtime_ffi_compatible_function(f, records, enums)
             && f.return_type
                 .as_ref()
                 .is_some_and(is_runtime_sequence_bytes_type)
+    }) || objects.iter().any(|o| {
+        o.methods.iter().any(|m| {
+            m.return_type
+                .as_ref()
+                .is_some_and(is_runtime_sequence_bytes_type)
+        })
     });
 
     if needs_string_free {
@@ -2225,6 +2237,102 @@ fn render_bound_methods(
                     ));
                     out.push_str("          } finally {\n");
                     out.push_str("            _rustStringFree(resultPtr);\n");
+                    out.push_str("          }\n");
+                } else if is_runtime_bytes_type(ret_type) {
+                    out.push_str("          final _RustBuffer resultBuf = resultValue;\n");
+                    out.push_str(
+                        "          final ffi.Pointer<ffi.Uint8> resultData = resultBuf.data;\n",
+                    );
+                    out.push_str("          final int resultLen = resultBuf.len;\n");
+                    out.push_str("          if (resultData == ffi.nullptr) {\n");
+                    out.push_str("            if (resultLen == 0) {\n");
+                    out.push_str("              _rustBytesFree(resultBuf);\n");
+                    out.push_str("              return Uint8List(0);\n");
+                    out.push_str("            }\n");
+                    out.push_str(&format!(
+                        "            throw StateError('Rust returned invalid buffer for {}');\n",
+                        function.name
+                    ));
+                    out.push_str("          }\n");
+                    out.push_str("          try {\n");
+                    out.push_str(
+                        "            return Uint8List.fromList(resultData.asTypedList(resultLen));\n",
+                    );
+                    out.push_str("          } finally {\n");
+                    out.push_str("            _rustBytesFree(resultBuf);\n");
+                    out.push_str("          }\n");
+                } else if is_runtime_optional_bytes_type(ret_type) {
+                    out.push_str("          final _RustBufferOpt resultOpt = resultValue;\n");
+                    out.push_str("          if (resultOpt.isSome == 0) {\n");
+                    out.push_str("            return null;\n");
+                    out.push_str("          }\n");
+                    out.push_str("          final _RustBuffer resultBuf = resultOpt.value;\n");
+                    out.push_str(
+                        "          final ffi.Pointer<ffi.Uint8> resultData = resultBuf.data;\n",
+                    );
+                    out.push_str("          final int resultLen = resultBuf.len;\n");
+                    out.push_str("          if (resultData == ffi.nullptr) {\n");
+                    out.push_str("            if (resultLen == 0) {\n");
+                    out.push_str("              _rustBytesFree(resultBuf);\n");
+                    out.push_str("              return Uint8List(0);\n");
+                    out.push_str("            }\n");
+                    out.push_str(&format!(
+                        "            throw StateError('Rust returned invalid optional buffer for {}');\n",
+                        function.name
+                    ));
+                    out.push_str("          }\n");
+                    out.push_str("          try {\n");
+                    out.push_str(
+                        "            return Uint8List.fromList(resultData.asTypedList(resultLen));\n",
+                    );
+                    out.push_str("          } finally {\n");
+                    out.push_str("            _rustBytesFree(resultBuf);\n");
+                    out.push_str("          }\n");
+                } else if is_runtime_sequence_bytes_type(ret_type) {
+                    out.push_str("          final _RustBufferVec resultVec = resultValue;\n");
+                    out.push_str(
+                        "          final ffi.Pointer<_RustBuffer> resultData = resultVec.data;\n",
+                    );
+                    out.push_str("          final int resultLen = resultVec.len;\n");
+                    out.push_str("          if (resultData == ffi.nullptr) {\n");
+                    out.push_str("            if (resultLen == 0) {\n");
+                    out.push_str("              _rustBytesVecFree(resultVec);\n");
+                    out.push_str("              return <Uint8List>[];\n");
+                    out.push_str("            }\n");
+                    out.push_str(&format!(
+                        "            throw StateError('Rust returned invalid byte vector for {}');\n",
+                        function.name
+                    ));
+                    out.push_str("          }\n");
+                    out.push_str("          try {\n");
+                    out.push_str("            final out = <Uint8List>[];\n");
+                    out.push_str("            for (var i = 0; i < resultLen; i++) {\n");
+                    out.push_str("              final _RustBuffer item = (resultData + i).ref;\n");
+                    out.push_str(
+                        "              final ffi.Pointer<ffi.Uint8> itemData = item.data;\n",
+                    );
+                    out.push_str("              final int itemLen = item.len;\n");
+                    out.push_str("              if (itemData == ffi.nullptr) {\n");
+                    out.push_str("                if (itemLen == 0) {\n");
+                    out.push_str("                  out.add(Uint8List(0));\n");
+                    out.push_str("                  continue;\n");
+                    out.push_str("                }\n");
+                    out.push_str(&format!(
+                        "                throw StateError('Rust returned invalid nested buffer for {}');\n",
+                        function.name
+                    ));
+                    out.push_str("              }\n");
+                    out.push_str("              try {\n");
+                    out.push_str(
+                        "                out.add(Uint8List.fromList(itemData.asTypedList(itemLen)));\n",
+                    );
+                    out.push_str("              } finally {\n");
+                    out.push_str("                _rustBytesFree(item);\n");
+                    out.push_str("              }\n");
+                    out.push_str("            }\n");
+                    out.push_str("            return out;\n");
+                    out.push_str("          } finally {\n");
+                    out.push_str("            _rustBytesVecFree(resultVec);\n");
                     out.push_str("          }\n");
                 } else if is_runtime_timestamp_type(ret_type) {
                     out.push_str(
@@ -3022,6 +3130,114 @@ fn render_bound_methods(
                     ));
                     out.push_str("          } finally {\n");
                     out.push_str("            _rustStringFree(resultPtr);\n");
+                    out.push_str("          }\n");
+                } else if method
+                    .return_type
+                    .as_ref()
+                    .is_some_and(is_runtime_bytes_type)
+                {
+                    out.push_str("          final _RustBuffer resultBuf = resultValue;\n");
+                    out.push_str(
+                        "          final ffi.Pointer<ffi.Uint8> resultData = resultBuf.data;\n",
+                    );
+                    out.push_str("          final int resultLen = resultBuf.len;\n");
+                    out.push_str("          if (resultData == ffi.nullptr) {\n");
+                    out.push_str("            if (resultLen == 0) {\n");
+                    out.push_str("              _rustBytesFree(resultBuf);\n");
+                    out.push_str("              return Uint8List(0);\n");
+                    out.push_str("            }\n");
+                    out.push_str(&format!(
+                        "            throw StateError('Rust returned invalid buffer for {}');\n",
+                        method_symbol
+                    ));
+                    out.push_str("          }\n");
+                    out.push_str("          try {\n");
+                    out.push_str(
+                        "            return Uint8List.fromList(resultData.asTypedList(resultLen));\n",
+                    );
+                    out.push_str("          } finally {\n");
+                    out.push_str("            _rustBytesFree(resultBuf);\n");
+                    out.push_str("          }\n");
+                } else if method
+                    .return_type
+                    .as_ref()
+                    .is_some_and(is_runtime_optional_bytes_type)
+                {
+                    out.push_str("          final _RustBufferOpt resultOpt = resultValue;\n");
+                    out.push_str("          if (resultOpt.isSome == 0) {\n");
+                    out.push_str("            return null;\n");
+                    out.push_str("          }\n");
+                    out.push_str("          final _RustBuffer resultBuf = resultOpt.value;\n");
+                    out.push_str(
+                        "          final ffi.Pointer<ffi.Uint8> resultData = resultBuf.data;\n",
+                    );
+                    out.push_str("          final int resultLen = resultBuf.len;\n");
+                    out.push_str("          if (resultData == ffi.nullptr) {\n");
+                    out.push_str("            if (resultLen == 0) {\n");
+                    out.push_str("              _rustBytesFree(resultBuf);\n");
+                    out.push_str("              return Uint8List(0);\n");
+                    out.push_str("            }\n");
+                    out.push_str(&format!(
+                        "            throw StateError('Rust returned invalid optional buffer for {}');\n",
+                        method_symbol
+                    ));
+                    out.push_str("          }\n");
+                    out.push_str("          try {\n");
+                    out.push_str(
+                        "            return Uint8List.fromList(resultData.asTypedList(resultLen));\n",
+                    );
+                    out.push_str("          } finally {\n");
+                    out.push_str("            _rustBytesFree(resultBuf);\n");
+                    out.push_str("          }\n");
+                } else if method
+                    .return_type
+                    .as_ref()
+                    .is_some_and(is_runtime_sequence_bytes_type)
+                {
+                    out.push_str("          final _RustBufferVec resultVec = resultValue;\n");
+                    out.push_str(
+                        "          final ffi.Pointer<_RustBuffer> resultData = resultVec.data;\n",
+                    );
+                    out.push_str("          final int resultLen = resultVec.len;\n");
+                    out.push_str("          if (resultData == ffi.nullptr) {\n");
+                    out.push_str("            if (resultLen == 0) {\n");
+                    out.push_str("              _rustBytesVecFree(resultVec);\n");
+                    out.push_str("              return <Uint8List>[];\n");
+                    out.push_str("            }\n");
+                    out.push_str(&format!(
+                        "            throw StateError('Rust returned invalid byte vector for {}');\n",
+                        method_symbol
+                    ));
+                    out.push_str("          }\n");
+                    out.push_str("          try {\n");
+                    out.push_str("            final out = <Uint8List>[];\n");
+                    out.push_str("            for (var i = 0; i < resultLen; i++) {\n");
+                    out.push_str("              final _RustBuffer item = (resultData + i).ref;\n");
+                    out.push_str(
+                        "              final ffi.Pointer<ffi.Uint8> itemData = item.data;\n",
+                    );
+                    out.push_str("              final int itemLen = item.len;\n");
+                    out.push_str("              if (itemData == ffi.nullptr) {\n");
+                    out.push_str("                if (itemLen == 0) {\n");
+                    out.push_str("                  out.add(Uint8List(0));\n");
+                    out.push_str("                  continue;\n");
+                    out.push_str("                }\n");
+                    out.push_str(&format!(
+                        "                throw StateError('Rust returned invalid nested buffer for {}');\n",
+                        method_symbol
+                    ));
+                    out.push_str("              }\n");
+                    out.push_str("              try {\n");
+                    out.push_str(
+                        "                out.add(Uint8List.fromList(itemData.asTypedList(itemLen)));\n",
+                    );
+                    out.push_str("              } finally {\n");
+                    out.push_str("                _rustBytesFree(item);\n");
+                    out.push_str("              }\n");
+                    out.push_str("            }\n");
+                    out.push_str("            return out;\n");
+                    out.push_str("          } finally {\n");
+                    out.push_str("            _rustBytesVecFree(resultVec);\n");
                     out.push_str("          }\n");
                 } else if method
                     .return_type
@@ -3991,6 +4207,25 @@ fn async_rust_future_spec(
             complete_native_type: "ffi.Pointer<Utf8>",
             complete_dart_type: "ffi.Pointer<Utf8>",
         }),
+        Some(Type::Bytes) => Some(AsyncRustFutureSpec {
+            suffix: "bytes",
+            complete_native_type: "_RustBuffer",
+            complete_dart_type: "_RustBuffer",
+        }),
+        Some(Type::Optional { inner_type }) if is_runtime_bytes_type(inner_type) => {
+            Some(AsyncRustFutureSpec {
+                suffix: "bytes_opt",
+                complete_native_type: "_RustBufferOpt",
+                complete_dart_type: "_RustBufferOpt",
+            })
+        }
+        Some(Type::Sequence { inner_type }) if is_runtime_bytes_type(inner_type) => {
+            Some(AsyncRustFutureSpec {
+                suffix: "bytes_vec",
+                complete_native_type: "_RustBufferVec",
+                complete_dart_type: "_RustBufferVec",
+            })
+        }
         Some(Type::UInt8) => Some(AsyncRustFutureSpec {
             suffix: "u8",
             complete_native_type: "ffi.Uint8",
@@ -4650,6 +4885,12 @@ namespace async_demo {
   u32 add_async(u32 left, u32 right);
   [Async]
   void tick_async();
+  [Async]
+  bytes echo_bytes_async(bytes input);
+  [Async]
+  bytes? maybe_echo_bytes_async(bytes? input);
+  [Async]
+  sequence<bytes> chunks_echo_bytes_async(sequence<bytes> input);
 };
 
 interface Counter {
@@ -4658,6 +4899,8 @@ interface Counter {
   string async_describe();
   [Async]
   u32 async_value();
+  [Async]
+  bytes async_snapshot_bytes();
 };
 "#,
         )
@@ -4678,17 +4921,29 @@ interface Counter {
         assert!(content.contains("return _bindings().greetAsync(name);"));
         assert!(content.contains("Future<int> addAsync(int left, int right) {"));
         assert!(content.contains("Future<void> tickAsync() {"));
+        assert!(content.contains("Future<Uint8List> echoBytesAsync(Uint8List input) {"));
+        assert!(content.contains("Future<Uint8List?> maybeEchoBytesAsync(Uint8List? input) {"));
+        assert!(content
+            .contains("Future<List<Uint8List>> chunksEchoBytesAsync(List<Uint8List> input) {"));
         assert!(content.contains("rust_future_poll_string"));
         assert!(content.contains("rust_future_complete_string"));
         assert!(content.contains("rust_future_poll_u32"));
         assert!(content.contains("rust_future_complete_u32"));
         assert!(content.contains("rust_future_poll_void"));
         assert!(content.contains("rust_future_complete_void"));
+        assert!(content.contains("rust_future_poll_bytes"));
+        assert!(content.contains("rust_future_complete_bytes"));
+        assert!(content.contains("rust_future_poll_bytes_opt"));
+        assert!(content.contains("rust_future_complete_bytes_opt"));
+        assert!(content.contains("rust_future_poll_bytes_vec"));
+        assert!(content.contains("rust_future_complete_bytes_vec"));
         assert!(content.contains("rust_future_free_string"));
         assert!(content.contains("final class _RustCallStatus extends ffi.Struct {"));
         assert!(content.contains("Future<String> asyncDescribe() {"));
         assert!(content.contains("return _ffi.counterInvokeAsyncDescribe(_handle);"));
         assert!(content.contains("Future<int> asyncValue() {"));
+        assert!(content.contains("Future<Uint8List> asyncSnapshotBytes() {"));
+        assert!(content.contains("return _ffi.counterInvokeAsyncSnapshotBytes(_handle);"));
     }
 
     #[test]
