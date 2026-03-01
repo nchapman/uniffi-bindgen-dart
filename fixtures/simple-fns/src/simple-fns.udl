@@ -1,3 +1,8 @@
 namespace simple_fns {
   u32 add(u32 left, u32 right);
+  i32 negate(i32 value);
+  boolean is_even(i32 value);
+  f64 scale(f64 value, f64 factor);
+  void tick();
+  u32 current_tick();
 };

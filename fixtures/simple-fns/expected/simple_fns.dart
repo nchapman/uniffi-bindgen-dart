@@ -28,6 +28,36 @@ class SimpleFnsBindings {
   int add(int left, int right) {
     return _add(left, right);
   }
+
+  late final int Function() _currentTick = _lib.lookupFunction<ffi.Uint32 Function(), int Function()>('current_tick');
+
+  int currentTick() {
+    return _currentTick();
+  }
+
+  late final bool Function(int value) _isEven = _lib.lookupFunction<ffi.Bool Function(ffi.Int32 value), bool Function(int value)>('is_even');
+
+  bool isEven(int value) {
+    return _isEven(value);
+  }
+
+  late final int Function(int value) _negate = _lib.lookupFunction<ffi.Int32 Function(ffi.Int32 value), int Function(int value)>('negate');
+
+  int negate(int value) {
+    return _negate(value);
+  }
+
+  late final double Function(double value, double factor) _scale = _lib.lookupFunction<ffi.Double Function(ffi.Double value, ffi.Double factor), double Function(double value, double factor)>('scale');
+
+  double scale(double value, double factor) {
+    return _scale(value, factor);
+  }
+
+  late final void Function() _tick = _lib.lookupFunction<ffi.Void Function(), void Function()>('tick');
+
+  void tick() {
+    _tick();
+  }
 }
 
 SimpleFnsBindings? _defaultBindings;
@@ -44,5 +74,25 @@ void resetDefaultBindings() {
 
 int add(int left, int right) {
   return _bindings().add(left, right);
+}
+
+int currentTick() {
+  return _bindings().currentTick();
+}
+
+bool isEven(int value) {
+  return _bindings().isEven(value);
+}
+
+int negate(int value) {
+  return _bindings().negate(value);
+}
+
+double scale(double value, double factor) {
+  return _bindings().scale(value, factor);
+}
+
+void tick() {
+  _bindings().tick();
 }
 
