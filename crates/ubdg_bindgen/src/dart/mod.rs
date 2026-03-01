@@ -1194,6 +1194,33 @@ fn render_data_models(records: &[UdlRecord], enums: &[UdlEnum]) -> String {
         out.push_str("}\n\n");
     }
 
+    for enum_ in enums {
+        let enum_name = to_upper_camel(&enum_.name);
+        out.push_str(&format!("final class {enum_name}FfiCodec {{\n"));
+        out.push_str(&format!("  const {enum_name}FfiCodec._();\n\n"));
+        out.push_str(&format!(
+            "  static String encode({enum_name} value) => _encode{enum_name}(value);\n\n"
+        ));
+        out.push_str(&format!(
+            "  static {enum_name} decode(String raw) => _decode{enum_name}(raw);\n"
+        ));
+        out.push_str("}\n\n");
+    }
+
+    for enum_ in enums {
+        if !enum_.is_error {
+            continue;
+        }
+        let enum_name = to_upper_camel(&enum_.name);
+        let exception_name = format!("{enum_name}Exception");
+        out.push_str(&format!("final class {exception_name}FfiCodec {{\n"));
+        out.push_str(&format!("  const {exception_name}FfiCodec._();\n\n"));
+        out.push_str(&format!(
+            "  static {exception_name} decode(Object? raw) => _decode{exception_name}(raw);\n"
+        ));
+        out.push_str("}\n\n");
+    }
+
     out
 }
 
@@ -1219,7 +1246,9 @@ fn render_json_encode_expr(value_expr: &str, type_: &Type) -> String {
         }
         Type::Custom { builtin, .. } => render_json_encode_expr(value_expr, builtin),
         Type::Record { .. } => format!("{value_expr}.toJson()"),
-        Type::Enum { name, .. } => format!("_encode{}({value_expr})", to_upper_camel(name)),
+        Type::Enum { name, .. } => {
+            format!("{}FfiCodec.encode({value_expr})", to_upper_camel(name))
+        }
         _ => value_expr.to_string(),
     }
 }
@@ -1263,7 +1292,10 @@ fn render_json_decode_expr(value_expr: &str, type_: &Type) -> String {
             to_upper_camel(name)
         ),
         Type::Enum { name, .. } => {
-            format!("_decode{}({value_expr} as String)", to_upper_camel(name))
+            format!(
+                "{}FfiCodec.decode({value_expr} as String)",
+                to_upper_camel(name)
+            )
         }
         _ => "throw UnimplementedError('unsupported json decode type')".to_string(),
     }
@@ -1420,7 +1452,7 @@ fn append_runtime_arg_marshalling(
         let native_name = format!("{arg_name}Native");
         let enum_name = enum_name_from_type(type_).unwrap_or("Enum");
         pre_call.push(format!(
-            "    final String {native_name}Json = _encode{}({arg_name});\n",
+            "    final String {native_name}Json = {}FfiCodec.encode({arg_name});\n",
             to_upper_camel(enum_name)
         ));
         pre_call.push(format!(
@@ -2336,7 +2368,7 @@ fn render_bound_methods(
                     out.push_str("          try {\n");
                     out.push_str("            final String payload = resultPtr.toDartString();\n");
                     out.push_str(&format!(
-                        "            return _decode{}(payload);\n",
+                        "            return {}FfiCodec.decode(payload);\n",
                         to_upper_camel(enum_name)
                     ));
                     out.push_str("          } finally {\n");
@@ -2553,7 +2585,7 @@ fn render_bound_methods(
             out.push_str("      final Object? errRaw = envelope['err'];\n");
             out.push_str("      if (errRaw != null) {\n");
             out.push_str(&format!(
-                "        throw _decode{}Exception(errRaw);\n",
+                "        throw {}ExceptionFfiCodec.decode(errRaw);\n",
                 throws_name
             ));
             out.push_str("      }\n");
@@ -2748,7 +2780,7 @@ fn render_bound_methods(
                     out.push_str("      try {\n");
                     out.push_str("        final String payload = resultPtr.toDartString();\n");
                     out.push_str(&format!(
-                        "        return _decode{}(payload);\n",
+                        "        return {}FfiCodec.decode(payload);\n",
                         to_upper_camel(enum_name)
                     ));
                     out.push_str("      } finally {\n");
@@ -2910,7 +2942,7 @@ fn render_bound_methods(
                 out.push_str("    final Object? errRaw = envelope['err'];\n");
                 out.push_str("    if (errRaw != null) {\n");
                 out.push_str(&format!(
-                    "      throw _decode{}Exception(errRaw);\n",
+                    "      throw {}ExceptionFfiCodec.decode(errRaw);\n",
                     throws_name
                 ));
                 out.push_str("    }\n");
@@ -3260,7 +3292,7 @@ fn render_bound_methods(
                     out.push_str("          try {\n");
                     out.push_str("            final String payload = resultPtr.toDartString();\n");
                     out.push_str(&format!(
-                        "            return _decode{}(payload);\n",
+                        "            return {}FfiCodec.decode(payload);\n",
                         to_upper_camel(enum_name)
                     ));
                     out.push_str("          } finally {\n");
@@ -3499,7 +3531,7 @@ fn render_bound_methods(
                 out.push_str("    final Object? errRaw = envelope['err'];\n");
                 out.push_str("    if (errRaw != null) {\n");
                 out.push_str(&format!(
-                    "      throw _decode{}Exception(errRaw);\n",
+                    "      throw {}ExceptionFfiCodec.decode(errRaw);\n",
                     throws_name
                 ));
                 out.push_str("    }\n");
@@ -3573,7 +3605,7 @@ fn render_bound_methods(
                     out.push_str("    try {\n");
                     out.push_str("      final String payload = resultPtr.toDartString();\n");
                     out.push_str(&format!(
-                        "      return _decode{}(payload);\n",
+                        "      return {}FfiCodec.decode(payload);\n",
                         to_upper_camel(enum_name)
                     ));
                     out.push_str("    } finally {\n");
@@ -4524,7 +4556,7 @@ fn render_callback_arg_decode_expr(
         Type::Enum { .. } if is_runtime_enum_type(type_, enums) => {
             let enum_name = enum_name_from_type(type_).unwrap_or("Enum");
             format!(
-                "{arg_name} == ffi.nullptr ? (throw StateError('Rust passed null enum callback arg')) : _decode{}({arg_name}.toDartString())",
+                "{arg_name} == ffi.nullptr ? (throw StateError('Rust passed null enum callback arg')) : {}FfiCodec.decode({arg_name}.toDartString())",
                 to_upper_camel(enum_name)
             )
         }
@@ -4557,7 +4589,7 @@ fn render_callback_return_encode_expr(
         Type::Enum { .. } if is_runtime_enum_type(type_, enums) => {
             let enum_name = enum_name_from_type(type_).unwrap_or("Enum");
             format!(
-                "_encode{}({value_expr}).toNativeUtf8()",
+                "{}FfiCodec.encode({value_expr}).toNativeUtf8()",
                 to_upper_camel(enum_name)
             )
         }
@@ -4811,10 +4843,10 @@ fn is_runtime_ffi_compatible_type(type_: &Type, records: &[UdlRecord], enums: &[
 fn map_runtime_native_ffi_type(
     type_: &Type,
     _records: &[UdlRecord],
-    enums: &[UdlEnum],
+    _enums: &[UdlEnum],
 ) -> Option<&'static str> {
     if let Type::Custom { builtin, .. } = type_ {
-        return map_runtime_native_ffi_type(builtin, _records, enums);
+        return map_runtime_native_ffi_type(builtin, _records, _enums);
     }
 
     match type_ {
@@ -4844,9 +4876,7 @@ fn map_runtime_native_ffi_type(
             Some("ffi.Pointer<Utf8>")
         }
         Type::Record { .. } => Some("ffi.Pointer<Utf8>"),
-        Type::Enum { name, .. } if enums.iter().any(|e| e.name == *name) => {
-            Some("ffi.Pointer<Utf8>")
-        }
+        Type::Enum { .. } => Some("ffi.Pointer<Utf8>"),
         _ => None,
     }
 }
@@ -4854,10 +4884,10 @@ fn map_runtime_native_ffi_type(
 fn map_runtime_dart_ffi_type(
     type_: &Type,
     _records: &[UdlRecord],
-    enums: &[UdlEnum],
+    _enums: &[UdlEnum],
 ) -> Option<&'static str> {
     if let Type::Custom { builtin, .. } = type_ {
-        return map_runtime_dart_ffi_type(builtin, _records, enums);
+        return map_runtime_dart_ffi_type(builtin, _records, _enums);
     }
 
     match type_ {
@@ -4885,9 +4915,7 @@ fn map_runtime_dart_ffi_type(
             Some("ffi.Pointer<Utf8>")
         }
         Type::Record { .. } => Some("ffi.Pointer<Utf8>"),
-        Type::Enum { name, .. } if enums.iter().any(|e| e.name == *name) => {
-            Some("ffi.Pointer<Utf8>")
-        }
+        Type::Enum { .. } => Some("ffi.Pointer<Utf8>"),
         _ => None,
     }
 }
@@ -4912,11 +4940,8 @@ fn is_runtime_record_type(type_: &Type) -> bool {
     matches!(runtime_unwrapped_type(type_), Type::Record { .. })
 }
 
-fn is_runtime_enum_type(type_: &Type, enums: &[UdlEnum]) -> bool {
-    let Some(name) = enum_name_from_type(type_) else {
-        return false;
-    };
-    enums.iter().any(|e| e.name == name)
+fn is_runtime_enum_type(type_: &Type, _enums: &[UdlEnum]) -> bool {
+    matches!(runtime_unwrapped_type(type_), Type::Enum { .. })
 }
 
 fn is_runtime_error_enum_type(type_: &Type, enums: &[UdlEnum]) -> bool {
@@ -5355,7 +5380,7 @@ exclude = ["skip_top_level", "Counter.hidden_value"]
     }
 
     #[test]
-    fn imports_external_package_and_binds_external_record_type() {
+    fn imports_external_package_and_binds_external_record_and_enum_types() {
         let temp = tempfile::tempdir().expect("tempdir");
         let source = temp.path().join("ext_demo.udl");
         let out_dir = temp.path().join("out");
@@ -5365,9 +5390,12 @@ exclude = ["skip_top_level", "Counter.hidden_value"]
             r#"
 [External="other_crate"]
 typedef dictionary RemoteThing;
+[External="other_crate"]
+typedef enum RemoteState;
 
 namespace ext_demo {
   RemoteThing echo_remote(RemoteThing input);
+  RemoteState echo_remote_state(RemoteState input);
 };
 "#,
         )
@@ -5395,6 +5423,9 @@ external_packages = { other_crate = "package:other_bindings/other_bindings.dart"
         assert!(content.contains("import 'package:other_bindings/other_bindings.dart';"));
         assert!(content.contains("RemoteThing echoRemote(RemoteThing input) {"));
         assert!(content.contains("return _bindings().echoRemote(input);"));
+        assert!(content.contains("RemoteState echoRemoteState(RemoteState input) {"));
+        assert!(content.contains("RemoteStateFfiCodec.encode(input)"));
+        assert!(content.contains("RemoteStateFfiCodec.decode(payload)"));
         assert!(!content.contains("TODO: bind to Rust FFI"));
     }
 
@@ -6068,7 +6099,7 @@ interface MathError {
         assert!(content
             .contains("final class MathErrorExceptionNegativeInput extends MathErrorException {"));
         assert!(content.contains("MathErrorException _decodeMathErrorException(Object? raw) {"));
-        assert!(content.contains("throw _decodeMathErrorException(errRaw);"));
+        assert!(content.contains("throw MathErrorExceptionFfiCodec.decode(errRaw);"));
         assert!(content.contains("_rustStringFree(resultPtr);"));
     }
 
@@ -6166,7 +6197,7 @@ interface Counter {
         assert!(content.contains("late final void Function(int handle) _counterFree ="));
         assert!(content.contains("Counter counterCreateNew(int initial) {"));
         assert!(content.contains("int counterInvokeCurrentValue(int handle) {"));
-        assert!(content.contains("throw _decodeMathErrorException(errRaw);"));
+        assert!(content.contains("throw MathErrorExceptionFfiCodec.decode(errRaw);"));
     }
 
     #[test]

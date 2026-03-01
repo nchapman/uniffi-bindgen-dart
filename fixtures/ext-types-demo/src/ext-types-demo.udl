@@ -1,6 +1,9 @@
 [External="other_crate"]
 typedef dictionary RemoteThing;
+[External="other_crate"]
+typedef enum RemoteState;
 
 namespace ext_types_demo {
   RemoteThing echo_remote(RemoteThing input);
+  RemoteState echo_remote_state(RemoteState input);
 };

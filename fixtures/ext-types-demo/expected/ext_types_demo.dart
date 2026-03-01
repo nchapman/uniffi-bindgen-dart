@@ -49,6 +49,27 @@ class ExtTypesDemoFfi {
     calloc.free(inputNative);
     }
   }
+
+  late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> input) _echoRemoteState = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> input), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> input)>('echo_remote_state');
+
+  RemoteState echoRemoteState(RemoteState input) {
+    final String inputNativeJson = RemoteStateFfiCodec.encode(input);
+    final ffi.Pointer<Utf8> inputNative = inputNativeJson.toNativeUtf8();
+    try {
+      final ffi.Pointer<Utf8> resultPtr = _echoRemoteState(inputNative);
+      if (resultPtr == ffi.nullptr) {
+        throw StateError('Rust returned null for echo_remote_state');
+      }
+      try {
+        final String payload = resultPtr.toDartString();
+        return RemoteStateFfiCodec.decode(payload);
+      } finally {
+        _rustStringFree(resultPtr);
+      }
+    } finally {
+    calloc.free(inputNative);
+    }
+  }
 }
 
 ExtTypesDemoFfi? _defaultBindings;
@@ -65,5 +86,9 @@ void resetDefaultBindings() {
 
 RemoteThing echoRemote(RemoteThing input) {
   return _bindings().echoRemote(input);
+}
+
+RemoteState echoRemoteState(RemoteState input) {
+  return _bindings().echoRemoteState(input);
 }
 

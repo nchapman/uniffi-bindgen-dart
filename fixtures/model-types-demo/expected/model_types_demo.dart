@@ -127,6 +127,22 @@ Outcome _decodeOutcome(String raw) {
   }
 }
 
+final class ColorFfiCodec {
+  const ColorFfiCodec._();
+
+  static String encode(Color value) => _encodeColor(value);
+
+  static Color decode(String raw) => _decodeColor(raw);
+}
+
+final class OutcomeFfiCodec {
+  const OutcomeFfiCodec._();
+
+  static String encode(Outcome value) => _encodeOutcome(value);
+
+  static Outcome decode(String raw) => _decodeOutcome(raw);
+}
+
 class ModelTypesDemoFfi {
   ModelTypesDemoFfi({ffi.DynamicLibrary? dynamicLibrary, String? libraryPath})
       : _dynamicLibrary = dynamicLibrary,

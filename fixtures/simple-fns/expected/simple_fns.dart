@@ -235,6 +235,36 @@ MathErrorException _decodeMathErrorException(Object? raw) {
   }
 }
 
+final class ColorFfiCodec {
+  const ColorFfiCodec._();
+
+  static String encode(Color value) => _encodeColor(value);
+
+  static Color decode(String raw) => _decodeColor(raw);
+}
+
+final class MathErrorFfiCodec {
+  const MathErrorFfiCodec._();
+
+  static String encode(MathError value) => _encodeMathError(value);
+
+  static MathError decode(String raw) => _decodeMathError(raw);
+}
+
+final class OutcomeFfiCodec {
+  const OutcomeFfiCodec._();
+
+  static String encode(Outcome value) => _encodeOutcome(value);
+
+  static Outcome decode(String raw) => _decodeOutcome(raw);
+}
+
+final class MathErrorExceptionFfiCodec {
+  const MathErrorExceptionFfiCodec._();
+
+  static MathErrorException decode(Object? raw) => _decodeMathErrorException(raw);
+}
+
 abstract interface class Adder {
   int add(int left, int right);
   Future<int> addAsync(int left, int right);
@@ -513,7 +543,7 @@ final class _FormatterCallbackBridge {
       return;
     }
     try {
-      final result = callback.format(prefix == ffi.nullptr ? null : prefix.toDartString(), person == ffi.nullptr ? (throw StateError('Rust passed null record callback arg')) : Person.fromJson(jsonDecode(person.toDartString()) as Map<String, dynamic>), outcome == ffi.nullptr ? (throw StateError('Rust passed null enum callback arg')) : _decodeOutcome(outcome.toDartString()));
+      final result = callback.format(prefix == ffi.nullptr ? null : prefix.toDartString(), person == ffi.nullptr ? (throw StateError('Rust passed null record callback arg')) : Person.fromJson(jsonDecode(person.toDartString()) as Map<String, dynamic>), outcome == ffi.nullptr ? (throw StateError('Rust passed null enum callback arg')) : OutcomeFfiCodec.decode(outcome.toDartString()));
       outReturn.value = result.toNativeUtf8();
       outStatus.ref
         ..code = _rustCallStatusSuccess
@@ -547,7 +577,7 @@ final class _FormatterCallbackBridge {
       final ffi.Pointer<_FormatterFormatAsyncAsyncResult> resultPtr = calloc<_FormatterFormatAsyncAsyncResult>();
       resultPtr.ref.returnValue = ffi.nullptr;
       try {
-        final result = await callback.formatAsync(prefix == ffi.nullptr ? null : prefix.toDartString(), person == ffi.nullptr ? (throw StateError('Rust passed null record callback arg')) : Person.fromJson(jsonDecode(person.toDartString()) as Map<String, dynamic>), outcome == ffi.nullptr ? (throw StateError('Rust passed null enum callback arg')) : _decodeOutcome(outcome.toDartString()));
+        final result = await callback.formatAsync(prefix == ffi.nullptr ? null : prefix.toDartString(), person == ffi.nullptr ? (throw StateError('Rust passed null record callback arg')) : Person.fromJson(jsonDecode(person.toDartString()) as Map<String, dynamic>), outcome == ffi.nullptr ? (throw StateError('Rust passed null enum callback arg')) : OutcomeFfiCodec.decode(outcome.toDartString()));
         resultPtr.ref.returnValue = result.toNativeUtf8();
         resultPtr.ref.callStatus
           ..code = _rustCallStatusSuccess
@@ -585,7 +615,7 @@ final class _FormatterCallbackBridge {
       final ffi.Pointer<_FormatterFormatAsyncOptionalAsyncResult> resultPtr = calloc<_FormatterFormatAsyncOptionalAsyncResult>();
       resultPtr.ref.returnValue = ffi.nullptr;
       try {
-        final result = await callback.formatAsyncOptional(prefix == ffi.nullptr ? null : prefix.toDartString(), person == ffi.nullptr ? (throw StateError('Rust passed null record callback arg')) : Person.fromJson(jsonDecode(person.toDartString()) as Map<String, dynamic>), outcome == ffi.nullptr ? (throw StateError('Rust passed null enum callback arg')) : _decodeOutcome(outcome.toDartString()));
+        final result = await callback.formatAsyncOptional(prefix == ffi.nullptr ? null : prefix.toDartString(), person == ffi.nullptr ? (throw StateError('Rust passed null record callback arg')) : Person.fromJson(jsonDecode(person.toDartString()) as Map<String, dynamic>), outcome == ffi.nullptr ? (throw StateError('Rust passed null enum callback arg')) : OutcomeFfiCodec.decode(outcome.toDartString()));
         resultPtr.ref.returnValue = result == null ? ffi.nullptr : result.toNativeUtf8();
         resultPtr.ref.callStatus
           ..code = _rustCallStatusSuccess
@@ -623,7 +653,7 @@ final class _FormatterCallbackBridge {
       final ffi.Pointer<_FormatterFormatAsyncPersonAsyncResult> resultPtr = calloc<_FormatterFormatAsyncPersonAsyncResult>();
       resultPtr.ref.returnValue = ffi.nullptr;
       try {
-        final result = await callback.formatAsyncPerson(prefix == ffi.nullptr ? null : prefix.toDartString(), person == ffi.nullptr ? (throw StateError('Rust passed null record callback arg')) : Person.fromJson(jsonDecode(person.toDartString()) as Map<String, dynamic>), outcome == ffi.nullptr ? (throw StateError('Rust passed null enum callback arg')) : _decodeOutcome(outcome.toDartString()));
+        final result = await callback.formatAsyncPerson(prefix == ffi.nullptr ? null : prefix.toDartString(), person == ffi.nullptr ? (throw StateError('Rust passed null record callback arg')) : Person.fromJson(jsonDecode(person.toDartString()) as Map<String, dynamic>), outcome == ffi.nullptr ? (throw StateError('Rust passed null enum callback arg')) : OutcomeFfiCodec.decode(outcome.toDartString()));
         resultPtr.ref.returnValue = jsonEncode(result.toJson()).toNativeUtf8();
         resultPtr.ref.callStatus
           ..code = _rustCallStatusSuccess
@@ -661,8 +691,8 @@ final class _FormatterCallbackBridge {
       final ffi.Pointer<_FormatterFormatAsyncOutcomeAsyncResult> resultPtr = calloc<_FormatterFormatAsyncOutcomeAsyncResult>();
       resultPtr.ref.returnValue = ffi.nullptr;
       try {
-        final result = await callback.formatAsyncOutcome(prefix == ffi.nullptr ? null : prefix.toDartString(), person == ffi.nullptr ? (throw StateError('Rust passed null record callback arg')) : Person.fromJson(jsonDecode(person.toDartString()) as Map<String, dynamic>), outcome == ffi.nullptr ? (throw StateError('Rust passed null enum callback arg')) : _decodeOutcome(outcome.toDartString()));
-        resultPtr.ref.returnValue = _encodeOutcome(result).toNativeUtf8();
+        final result = await callback.formatAsyncOutcome(prefix == ffi.nullptr ? null : prefix.toDartString(), person == ffi.nullptr ? (throw StateError('Rust passed null record callback arg')) : Person.fromJson(jsonDecode(person.toDartString()) as Map<String, dynamic>), outcome == ffi.nullptr ? (throw StateError('Rust passed null enum callback arg')) : OutcomeFfiCodec.decode(outcome.toDartString()));
+        resultPtr.ref.returnValue = OutcomeFfiCodec.encode(result).toNativeUtf8();
         resultPtr.ref.callStatus
           ..code = _rustCallStatusSuccess
           ..errorBuf = ffi.nullptr;
@@ -771,7 +801,7 @@ class SimpleFnsBindings {
     final ffi.Pointer<Utf8> prefixNative = prefix == null ? ffi.nullptr : prefix.toNativeUtf8();
     final String personNativeJson = jsonEncode(person.toJson());
     final ffi.Pointer<Utf8> personNative = personNativeJson.toNativeUtf8();
-    final String outcomeNativeJson = _encodeOutcome(outcome);
+    final String outcomeNativeJson = OutcomeFfiCodec.encode(outcome);
     final ffi.Pointer<Utf8> outcomeNative = outcomeNativeJson.toNativeUtf8();
     try {
     return _applyFormatter(formatterHandle, prefixNative, personNative, outcomeNative);
@@ -917,7 +947,7 @@ class SimpleFnsBindings {
     final ffi.Pointer<Utf8> prefixNative = prefix == null ? ffi.nullptr : prefix.toNativeUtf8();
     final String personNativeJson = jsonEncode(person.toJson());
     final ffi.Pointer<Utf8> personNative = personNativeJson.toNativeUtf8();
-    final String outcomeNativeJson = _encodeOutcome(outcome);
+    final String outcomeNativeJson = OutcomeFfiCodec.encode(outcome);
     final ffi.Pointer<Utf8> outcomeNative = outcomeNativeJson.toNativeUtf8();
     final int futureHandle;
     try {
@@ -996,7 +1026,7 @@ class SimpleFnsBindings {
     final ffi.Pointer<Utf8> prefixNative = prefix == null ? ffi.nullptr : prefix.toNativeUtf8();
     final String personNativeJson = jsonEncode(person.toJson());
     final ffi.Pointer<Utf8> personNative = personNativeJson.toNativeUtf8();
-    final String outcomeNativeJson = _encodeOutcome(outcome);
+    final String outcomeNativeJson = OutcomeFfiCodec.encode(outcome);
     final ffi.Pointer<Utf8> outcomeNative = outcomeNativeJson.toNativeUtf8();
     final int futureHandle;
     try {
@@ -1068,7 +1098,7 @@ class SimpleFnsBindings {
     final ffi.Pointer<Utf8> prefixNative = prefix == null ? ffi.nullptr : prefix.toNativeUtf8();
     final String personNativeJson = jsonEncode(person.toJson());
     final ffi.Pointer<Utf8> personNative = personNativeJson.toNativeUtf8();
-    final String outcomeNativeJson = _encodeOutcome(outcome);
+    final String outcomeNativeJson = OutcomeFfiCodec.encode(outcome);
     final ffi.Pointer<Utf8> outcomeNative = outcomeNativeJson.toNativeUtf8();
     final int futureHandle;
     try {
@@ -1140,7 +1170,7 @@ class SimpleFnsBindings {
     final ffi.Pointer<Utf8> prefixNative = prefix == null ? ffi.nullptr : prefix.toNativeUtf8();
     final String personNativeJson = jsonEncode(person.toJson());
     final ffi.Pointer<Utf8> personNative = personNativeJson.toNativeUtf8();
-    final String outcomeNativeJson = _encodeOutcome(outcome);
+    final String outcomeNativeJson = OutcomeFfiCodec.encode(outcome);
     final ffi.Pointer<Utf8> outcomeNative = outcomeNativeJson.toNativeUtf8();
     final int futureHandle;
     try {
@@ -2485,7 +2515,7 @@ class SimpleFnsBindings {
       final Map<String, dynamic> envelope = jsonDecode(payload) as Map<String, dynamic>;
       final Object? errRaw = envelope['err'];
       if (errRaw != null) {
-        throw _decodeMathErrorException(errRaw);
+        throw MathErrorExceptionFfiCodec.decode(errRaw);
       }
       if (!envelope.containsKey('ok')) {
         throw StateError('Rust returned malformed result for checked_apply_adder');
@@ -2513,7 +2543,7 @@ class SimpleFnsBindings {
       final Map<String, dynamic> envelope = jsonDecode(payload) as Map<String, dynamic>;
       final Object? errRaw = envelope['err'];
       if (errRaw != null) {
-        throw _decodeMathErrorException(errRaw);
+        throw MathErrorExceptionFfiCodec.decode(errRaw);
       }
       if (!envelope.containsKey('ok')) {
         throw StateError('Rust returned malformed result for checked_divide');
@@ -2558,7 +2588,7 @@ class SimpleFnsBindings {
   late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> input) _cycleColor = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> input), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> input)>('cycle_color');
 
   Color cycleColor(Color input) {
-    final String inputNativeJson = _encodeColor(input);
+    final String inputNativeJson = ColorFfiCodec.encode(input);
     final ffi.Pointer<Utf8> inputNative = inputNativeJson.toNativeUtf8();
     try {
       final ffi.Pointer<Utf8> resultPtr = _cycleColor(inputNative);
@@ -2567,7 +2597,7 @@ class SimpleFnsBindings {
       }
       try {
         final String payload = resultPtr.toDartString();
-        return _decodeColor(payload);
+        return ColorFfiCodec.decode(payload);
       } finally {
         _rustStringFree(resultPtr);
       }
@@ -2600,7 +2630,7 @@ class SimpleFnsBindings {
   late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> input) _evolveOutcome = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> input), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> input)>('evolve_outcome');
 
   Outcome evolveOutcome(Outcome input) {
-    final String inputNativeJson = _encodeOutcome(input);
+    final String inputNativeJson = OutcomeFfiCodec.encode(input);
     final ffi.Pointer<Utf8> inputNative = inputNativeJson.toNativeUtf8();
     try {
       final ffi.Pointer<Utf8> resultPtr = _evolveOutcome(inputNative);
@@ -2609,7 +2639,7 @@ class SimpleFnsBindings {
       }
       try {
         final String payload = resultPtr.toDartString();
-        return _decodeOutcome(payload);
+        return OutcomeFfiCodec.decode(payload);
       } finally {
         _rustStringFree(resultPtr);
       }
@@ -3594,7 +3624,7 @@ class SimpleFnsBindings {
     final Map<String, dynamic> envelope = jsonDecode(payload) as Map<String, dynamic>;
     final Object? errRaw = envelope['err'];
     if (errRaw != null) {
-      throw _decodeMathErrorException(errRaw);
+      throw MathErrorExceptionFfiCodec.decode(errRaw);
     }
     final Object? okRaw = envelope['ok'];
     return (okRaw as num).toInt();
@@ -3701,7 +3731,7 @@ class SimpleFnsBindings {
     final Map<String, dynamic> envelope = jsonDecode(payload) as Map<String, dynamic>;
     final Object? errRaw = envelope['err'];
     if (errRaw != null) {
-      throw _decodeMathErrorException(errRaw);
+      throw MathErrorExceptionFfiCodec.decode(errRaw);
     }
     final Object? okRaw = envelope['ok'];
     return (okRaw as num).toInt();
@@ -3710,7 +3740,7 @@ class SimpleFnsBindings {
   late final ffi.Pointer<Utf8> Function(int handle, ffi.Pointer<Utf8> input) _counterFlipOutcome = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle, ffi.Pointer<Utf8> input), ffi.Pointer<Utf8> Function(int handle, ffi.Pointer<Utf8> input)>('counter_flip_outcome');
 
   Outcome counterInvokeFlipOutcome(int handle, Outcome input) {
-    final String inputNativeJson = _encodeOutcome(input);
+    final String inputNativeJson = OutcomeFfiCodec.encode(input);
     final ffi.Pointer<Utf8> inputNative = inputNativeJson.toNativeUtf8();
     try {
     final ffi.Pointer<Utf8> resultPtr = _counterFlipOutcome(handle, inputNative);
@@ -3719,7 +3749,7 @@ class SimpleFnsBindings {
     }
     try {
       final String payload = resultPtr.toDartString();
-      return _decodeOutcome(payload);
+      return OutcomeFfiCodec.decode(payload);
     } finally {
       _rustStringFree(resultPtr);
     }
@@ -3800,10 +3830,10 @@ class SimpleFnsBindings {
     final Map<String, dynamic> envelope = jsonDecode(payload) as Map<String, dynamic>;
     final Object? errRaw = envelope['err'];
     if (errRaw != null) {
-      throw _decodeMathErrorException(errRaw);
+      throw MathErrorExceptionFfiCodec.decode(errRaw);
     }
     final Object? okRaw = envelope['ok'];
-    return _decodeOutcome(okRaw as String);
+    return OutcomeFfiCodec.decode(okRaw as String);
   }
 
   late final void Function(int handle, ffi.Pointer<Utf8> label) _counterSetLabel = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<Utf8> label), void Function(int handle, ffi.Pointer<Utf8> label)>('counter_set_label');
@@ -3846,7 +3876,7 @@ class SimpleFnsBindings {
     }
     try {
       final String payload = resultPtr.toDartString();
-      return _decodeOutcome(payload);
+      return OutcomeFfiCodec.decode(payload);
     } finally {
       _rustStringFree(resultPtr);
     }

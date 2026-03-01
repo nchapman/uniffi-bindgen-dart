@@ -72,6 +72,14 @@ Mood _decodeMood(String raw) {
   }
 }
 
+final class MoodFfiCodec {
+  const MoodFfiCodec._();
+
+  static String encode(Mood value) => _encodeMood(value);
+
+  static Mood decode(String raw) => _decodeMood(raw);
+}
+
 /// Callback reporter.
 abstract interface class Reporter {
   /// Reports a message.
