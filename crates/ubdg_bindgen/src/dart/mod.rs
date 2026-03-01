@@ -4440,6 +4440,7 @@ fn is_runtime_callback_method_compatible(
 }
 
 fn is_runtime_callback_function_return_compatible_type(type_: &Type) -> bool {
+    let type_ = runtime_unwrapped_type(type_);
     matches!(
         type_,
         Type::UInt8
@@ -4520,6 +4521,7 @@ fn render_callback_async_result_return_field(
     records: &[UdlRecord],
     enums: &[UdlEnum],
 ) -> Option<String> {
+    let type_ = runtime_unwrapped_type(type_);
     match type_ {
         Type::UInt8 => Some("  @ffi.Uint8()\n  external int returnValue;\n\n".to_string()),
         Type::Int8 => Some("  @ffi.Int8()\n  external int returnValue;\n\n".to_string()),
@@ -4558,6 +4560,7 @@ fn callback_async_default_return_expr(
     records: &[UdlRecord],
     enums: &[UdlEnum],
 ) -> &'static str {
+    let type_ = runtime_unwrapped_type(type_);
     match type_ {
         Type::Float32 | Type::Float64 => "0.0",
         Type::String => "ffi.nullptr",
@@ -4580,6 +4583,7 @@ fn render_callback_arg_decode_expr(
     records: &[UdlRecord],
     enums: &[UdlEnum],
 ) -> String {
+    let type_ = runtime_unwrapped_type(type_);
     match type_ {
         Type::String => format!(
             "{arg_name} == ffi.nullptr ? (throw StateError('Rust passed null string callback arg')) : {arg_name}.toDartString()"
@@ -4618,6 +4622,7 @@ fn render_callback_return_encode_expr(
     records: &[UdlRecord],
     enums: &[UdlEnum],
 ) -> String {
+    let type_ = runtime_unwrapped_type(type_);
     match type_ {
         Type::String => format!("{value_expr}.toNativeUtf8()"),
         Type::Optional { inner_type } if is_runtime_string_type(inner_type) => {

@@ -1,0 +1,13 @@
+[External="other_crate"]
+typedef interface RemoteCounter;
+
+namespace async_object_lift_demo {
+  [Async]
+  RemoteCounter echo_remote_counter_async(RemoteCounter input);
+};
+
+interface Counter {
+  constructor(u32 initial);
+  [Async]
+  Counter spawn_next();
+};

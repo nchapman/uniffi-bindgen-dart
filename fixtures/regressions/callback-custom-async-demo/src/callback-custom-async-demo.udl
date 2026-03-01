@@ -1,0 +1,12 @@
+[Custom]
+typedef string Label;
+
+namespace callback_custom_async_demo {
+  [Async]
+  Label apply_label_async(Labeller labeller, Label input);
+};
+
+callback interface Labeller {
+  [Async]
+  Label label_async(Label input);
+};

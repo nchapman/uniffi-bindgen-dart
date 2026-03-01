@@ -154,3 +154,35 @@ fn golden_regression_custom_shadow_demo() {
     generate(&source, &out_dir, None);
     assert_matches_expected(&out_dir.join("custom_shadow_demo.dart"), &expected);
 }
+
+#[test]
+fn golden_regression_async_object_lift_demo() {
+    let root = repo_root();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let out_dir = temp.path().join("out");
+
+    let source =
+        root.join("fixtures/regressions/async-object-lift-demo/src/async-object-lift-demo.udl");
+    let config = root.join("fixtures/regressions/async-object-lift-demo/uniffi.toml");
+    let expected = root
+        .join("fixtures/regressions/async-object-lift-demo/expected/async_object_lift_demo.dart");
+
+    generate(&source, &out_dir, Some(&config));
+    assert_matches_expected(&out_dir.join("async_object_lift_demo.dart"), &expected);
+}
+
+#[test]
+fn golden_regression_callback_custom_async_demo() {
+    let root = repo_root();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let out_dir = temp.path().join("out");
+
+    let source = root
+        .join("fixtures/regressions/callback-custom-async-demo/src/callback-custom-async-demo.udl");
+    let expected = root.join(
+        "fixtures/regressions/callback-custom-async-demo/expected/callback_custom_async_demo.dart",
+    );
+
+    generate(&source, &out_dir, None);
+    assert_matches_expected(&out_dir.join("callback_custom_async_demo.dart"), &expected);
+}
