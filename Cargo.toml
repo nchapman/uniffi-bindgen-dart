@@ -10,6 +10,10 @@ resolver = "2"
 version = "0.1.0"
 edition = "2021"
 license = "MPL-2.0"
+authors = ["Nick Chapman <nchapman@fastmail.com>"]
+repository = "https://github.com/aspect-build/uniffi-bindgen-dart"
+keywords = ["uniffi", "dart", "ffi", "codegen", "bindings"]
+categories = ["development-tools::ffi"]
 
 [workspace.dependencies]
 anyhow = "1.0.98"

@@ -1,8 +1,9 @@
 # uniffi-bindgen-dart
 
-Generate idiomatic [Dart](https://dart.dev/) bindings for [UniFFI](https://github.com/mozilla/uniffi-rs) components.
-
 [![CI](https://github.com/aspect-build/uniffi-bindgen-dart/actions/workflows/ci.yml/badge.svg)](https://github.com/aspect-build/uniffi-bindgen-dart/actions/workflows/ci.yml)
+[![License: MPL-2.0](https://img.shields.io/badge/License-MPL_2.0-blue.svg)](https://opensource.org/licenses/MPL-2.0)
+
+Generate idiomatic [Dart](https://dart.dev/) bindings for [UniFFI](https://github.com/mozilla/uniffi-rs) components.
 
 `uniffi-bindgen-dart` is a third-party bindings generator that produces
 production-grade Dart code from UniFFI interface definitions. It targets

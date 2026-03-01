@@ -1,7 +1,12 @@
 [package]
 name = "ubdg_runtime"
+description = "Runtime support library for uniffi-bindgen-dart generated bindings"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+authors.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [dependencies]

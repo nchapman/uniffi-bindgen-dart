@@ -1,0 +1,8 @@
+namespace example {
+  string greet(string name);
+};
+
+dictionary TodoEntry {
+  string title;
+  boolean done;
+};

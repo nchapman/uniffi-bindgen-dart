@@ -4,6 +4,9 @@ set -euo pipefail
 cargo test --workspace
 FIXTURE_LIB="$(./scripts/build_fixture.sh)"
 RECORD_ENUM_METHODS_LIB="$(./scripts/build_record_enum_methods_fixture.sh)"
+COMPOUND_DEMO_LIB="$(./scripts/build_compound_demo_fixture.sh)"
+COVERALL_DEMO_LIB="$(./scripts/build_coverall_demo_fixture.sh)"
+KEYWORDS_DEMO_LIB="$(./scripts/build_keywords_demo_fixture.sh)"
 UBDG_RECORD_ENUM_METHODS_LIB="$RECORD_ENUM_METHODS_LIB" ./scripts/build_bindings.sh
 
 resolve_dart_bin() {
@@ -36,6 +39,9 @@ if DART_CMD="$(resolve_dart_bin)"; then
     "$DART_CMD" analyze
     UBDG_SIMPLE_FNS_LIB="$FIXTURE_LIB" \
       UBDG_RECORD_ENUM_METHODS_LIB="$RECORD_ENUM_METHODS_LIB" \
+      UBDG_COMPOUND_DEMO_LIB="$COMPOUND_DEMO_LIB" \
+      UBDG_COVERALL_DEMO_LIB="$COVERALL_DEMO_LIB" \
+      UBDG_KEYWORDS_DEMO_LIB="$KEYWORDS_DEMO_LIB" \
       "$DART_CMD" test
   )
 else

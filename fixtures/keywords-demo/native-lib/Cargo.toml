@@ -1,0 +1,10 @@
+[package]
+name = "uniffi_keywords_demo"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[workspace]
