@@ -21,6 +21,7 @@ Use this as the source template for any UniFFI language backend. Create an insta
 | `HOST_ANALYZE_CMD` | `<host static analysis command>` | Static analysis |
 | `HOST_TEST_CMD` | `<host test command>` | Runtime/behavior tests |
 | `HOST_PACKAGE_FILE` | `<host package manifest>` | Host package manifest |
+| `OFFICIAL_INTEROP_REF` | `<language official native interop docs/repo>` | Primary source for host-native interop conventions |
 
 ## Outcomes
 ### Primary Outcome
@@ -49,6 +50,13 @@ All must be true before stable release:
 3. Runtime fixture suite green on required platforms.
 4. No known unsound lifetime/memory behavior in object/callback paths.
 5. Clear compatibility mapping to target `uniffi-rs` version.
+6. Generated code is idiomatic for the target language and passes host style/lint checks.
+
+## Idiomatic Code Contract
+- Generated bindings must look and behave like hand-written host-language code, not Rust transliterations.
+- Follow host language naming, visibility, error, async, and resource-lifecycle conventions.
+- Prefer host standard library types and patterns over custom wrapper types when semantics allow.
+- Host formatter and analyzer/linter checks are required quality gates.
 
 ## Reference Baselines
 - `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs`
@@ -57,6 +65,8 @@ All must be true before stable release:
   - External generator structure, CLI composition, test utility patterns.
 - `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-bindgen-go`
   - Host-language integration-test package layout, artifact-split CI, compatibility versioning strategy.
+- `OFFICIAL_INTEROP_REF`
+  - Authoritative host-language interop and native-asset guidance; use as primary style/packaging reference.
 
 ## Repository Blueprint
 ```text

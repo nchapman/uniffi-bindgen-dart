@@ -20,6 +20,7 @@ This plan is the implementation template for building production-grade UniFFI la
 | `HOST_ANALYZE_CMD` | `dart analyze` | Static analysis |
 | `HOST_TEST_CMD` | `dart test` | Runtime/behavior tests |
 | `HOST_PACKAGE_FILE` | `pubspec.yaml` | Host package manifest |
+| `OFFICIAL_INTEROP_REF` | `https://github.com/dart-lang/native` | Primary reference for Dart native interop conventions |
 
 ## Outcomes
 ### Primary Outcome
@@ -48,6 +49,13 @@ All must be true before stable release:
 3. Runtime fixture suite green on required platforms.
 4. No known unsound lifetime/memory behavior in object/callback paths.
 5. Clear compatibility mapping to target `uniffi-rs` version.
+6. Generated Dart is idiomatic and passes Dart formatting and analysis gates.
+
+## Idiomatic Code Contract
+- Generated bindings must read like native Dart code, not Rust-shaped code translated into Dart syntax.
+- Follow Dart naming/style conventions and common API ergonomics.
+- Use Dart-standard async/error/resource patterns where semantics allow.
+- `dart format` and `dart analyze` are required quality gates for generated output.
 
 ## Reference Baselines
 - `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs`
@@ -56,6 +64,8 @@ All must be true before stable release:
   - External generator structure, CLI composition, test utility patterns.
 - `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-bindgen-go`
   - Host-language integration-test package layout, artifact-split CI, compatibility versioning strategy.
+- [dart-lang/native](https://github.com/dart-lang/native)
+  - Official Dart-language native interop ecosystem reference (FFI/native assets/code generation patterns).
 
 ## Repository Blueprint
 ```text
