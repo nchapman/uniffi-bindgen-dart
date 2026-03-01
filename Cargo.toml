@@ -1,0 +1,17 @@
+[workspace]
+members = [
+  "crates/ubdg_bindgen",
+  "crates/ubdg_runtime",
+  "crates/ubdg_testing",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MPL-2.0"
+
+[workspace.dependencies]
+anyhow = "1.0.98"
+clap = { version = "4.5.32", features = ["derive"] }
+tempfile = "3.19.0"
