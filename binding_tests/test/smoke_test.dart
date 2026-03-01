@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -140,6 +141,11 @@ void main() {
     expect(contents, contains('Future<void> asyncTick() {'));
     expect(contents, contains('Future<Map<String, int>> asyncCounts(Map<String, int> items) {'));
     expect(contents, contains('Future<String> asyncLabelEcho(String input) {'));
+    expect(contents, contains('Future<String> asyncFailString() {'));
+    expect(contents, contains('Future<String> asyncNeverString() {'));
+    expect(contents, contains('int asyncCancelCount() {'));
+    expect(contents, contains('int asyncFreeCount() {'));
+    expect(contents, contains('void resetAsyncFutureCounts() {'));
     expect(contents, contains('Future<Uint8List> asyncBytesEcho(Uint8List input) {'));
     expect(contents, contains('Future<List<Uint8List>> asyncBytesChunksEcho(List<Uint8List> input) {'));
     expect(contents, contains('Future<Uint8List?> asyncBytesMaybeEcho(Uint8List? input) {'));
@@ -302,9 +308,12 @@ void main() {
     bindings.resetFreeCount();
     bindings.resetBytesFreeCount();
     bindings.resetBytesVecFreeCount();
+    bindings.resetAsyncFutureCounts();
     expect(bindings.freeCount(), 0);
     expect(bindings.bytesFreeCount(), 0);
     expect(bindings.bytesVecFreeCount(), 0);
+    expect(bindings.asyncCancelCount(), 0);
+    expect(bindings.asyncFreeCount(), 0);
     expect(bindings.add(20, 22), 42);
     expect(bindings.applyAdder(const _TestAdder(5), 20, 22), 48);
     expect(await bindings.asyncApplyAdder(const _TestAdder(3), 20, 22), 47);
@@ -463,7 +472,20 @@ void main() {
     expect(asyncCountsResult['beta'], 3);
     expect(asyncCountsResult['total'], 5);
     expect(await bindings.asyncLabelEcho('dart'), 'label:dart');
-    expect(bindings.freeCount(), 9);
+    final cancelBeforeFail = bindings.asyncCancelCount();
+    final freeBeforeFail = bindings.asyncFreeCount();
+    await expectLater(bindings.asyncFailString(), throwsA(isA<StateError>()));
+    expect(bindings.asyncCancelCount(), cancelBeforeFail + 1);
+    expect(bindings.asyncFreeCount(), freeBeforeFail + 1);
+    final cancelBeforeTimeout = bindings.asyncCancelCount();
+    final freeBeforeTimeout = bindings.asyncFreeCount();
+    await expectLater(
+      bindings.asyncNeverString().timeout(const Duration(milliseconds: 100)),
+      throwsA(isA<TimeoutException>()),
+    );
+    expect(bindings.asyncCancelCount(), cancelBeforeTimeout);
+    expect(bindings.asyncFreeCount(), freeBeforeTimeout);
+    expect(bindings.freeCount(), 10);
     expect(bindings.checkedDivide(12, 3), 4);
     expect(
       () => bindings.checkedDivide(10, 0),
@@ -479,7 +501,7 @@ void main() {
         ),
       ),
     );
-    expect(bindings.freeCount(), 12);
+    expect(bindings.freeCount(), 13);
     final counter = bindings.counterCreateNew(10);
     expect(counter.currentValue(), 10);
     counter.addValue(5);
@@ -607,9 +629,12 @@ void main() {
     resetFreeCount();
     resetBytesFreeCount();
     resetBytesVecFreeCount();
+    resetAsyncFutureCounts();
     expect(freeCount(), 0);
     expect(bytesFreeCount(), 0);
     expect(bytesVecFreeCount(), 0);
+    expect(asyncCancelCount(), 0);
+    expect(asyncFreeCount(), 0);
     expect(add(1, 2), 3);
     expect(applyAdder(const _TestAdder(2), 3, 4), 10);
     expect(await asyncApplyAdder(const _TestAdder(1), 3, 4), 10);
@@ -730,7 +755,20 @@ void main() {
     expect(asyncTopCounts['n'], 1);
     expect(asyncTopCounts['total'], 5);
     expect(await asyncLabelEcho('ffi'), 'label:ffi');
-    expect(freeCount(), 9);
+    final topCancelBeforeFail = asyncCancelCount();
+    final topFreeBeforeFail = asyncFreeCount();
+    await expectLater(asyncFailString(), throwsA(isA<StateError>()));
+    expect(asyncCancelCount(), topCancelBeforeFail + 1);
+    expect(asyncFreeCount(), topFreeBeforeFail + 1);
+    final topCancelBeforeTimeout = asyncCancelCount();
+    final topFreeBeforeTimeout = asyncFreeCount();
+    await expectLater(
+      asyncNeverString().timeout(const Duration(milliseconds: 100)),
+      throwsA(isA<TimeoutException>()),
+    );
+    expect(asyncCancelCount(), topCancelBeforeTimeout);
+    expect(asyncFreeCount(), topFreeBeforeTimeout);
+    expect(freeCount(), 10);
     expect(checkedDivide(20, 4), 5);
     expect(
       () => checkedDivide(7, 0),
@@ -746,13 +784,13 @@ void main() {
         ),
       ),
     );
-    expect(freeCount(), 12);
+    expect(freeCount(), 13);
     expect(maybeGreet('ffi'), 'maybe, ffi');
-    expect(freeCount(), 13);
+    expect(freeCount(), 14);
     expect(maybeGreet(null), isNull);
-    expect(freeCount(), 13);
+    expect(freeCount(), 14);
     expect(() => brokenGreet(), throwsA(isA<StateError>()));
-    expect(freeCount(), 13);
+    expect(freeCount(), 14);
     expect(isEven(10), isTrue);
     expect(cycleColor(Color.red), Color.green);
     final freeBeforeTopOutcome = freeCount();

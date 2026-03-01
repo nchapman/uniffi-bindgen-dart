@@ -73,3 +73,16 @@ fn golden_model_types_demo() {
     generate(&source, &out_dir, None);
     assert_matches_expected(&out_dir.join("model_types_demo.dart"), &expected);
 }
+
+#[test]
+fn golden_futures_stress() {
+    let root = repo_root();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let out_dir = temp.path().join("out");
+
+    let source = root.join("fixtures/futures-stress/src/futures-stress.udl");
+    let expected = root.join("fixtures/futures-stress/expected/futures_stress.dart");
+
+    generate(&source, &out_dir, None);
+    assert_matches_expected(&out_dir.join("futures_stress.dart"), &expected);
+}

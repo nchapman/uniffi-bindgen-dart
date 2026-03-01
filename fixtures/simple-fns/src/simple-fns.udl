@@ -35,6 +35,13 @@ namespace simple_fns {
   record<string, u32> async_counts(record<string, u32> items);
   [Async]
   Label async_label_echo(Label input);
+  [Async]
+  string async_fail_string();
+  [Async]
+  string async_never_string();
+  u32 async_cancel_count();
+  u32 async_free_count();
+  void reset_async_future_counts();
   u32 bytes_free_count();
   u32 bytes_vec_free_count();
   u32 free_count();

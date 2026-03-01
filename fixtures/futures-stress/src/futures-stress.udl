@@ -1,0 +1,33 @@
+[Custom]
+typedef string Label;
+
+namespace futures_stress {
+  [Async]
+  string greet_async(string name);
+  [Async]
+  u32 add_async(u32 left, u32 right);
+  [Async]
+  void tick_async();
+  [Async]
+  bytes echo_bytes_async(bytes input);
+  [Async]
+  bytes? maybe_echo_bytes_async(bytes? input);
+  [Async]
+  sequence<bytes> chunks_echo_bytes_async(sequence<bytes> input);
+  [Async]
+  record<string, u32> summarize_async(record<string, u32> values);
+  [Async]
+  Label label_echo_async(Label input);
+};
+
+interface Worker {
+  constructor();
+  [Async]
+  string async_describe();
+  [Async]
+  u32 async_value();
+  [Async]
+  record<string, u32> async_counts(record<string, u32> items);
+  [Async]
+  Label async_label_echo(Label input);
+};

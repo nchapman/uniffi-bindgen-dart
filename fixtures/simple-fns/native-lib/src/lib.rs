@@ -11,6 +11,8 @@ static TICK_COUNT: AtomicU32 = AtomicU32::new(0);
 static FREE_COUNT: AtomicU32 = AtomicU32::new(0);
 static BYTES_FREE_COUNT: AtomicU32 = AtomicU32::new(0);
 static BYTES_VEC_FREE_COUNT: AtomicU32 = AtomicU32::new(0);
+static ASYNC_CANCEL_COUNT: AtomicU32 = AtomicU32::new(0);
+static ASYNC_FREE_COUNT: AtomicU32 = AtomicU32::new(0);
 static NEXT_COUNTER_HANDLE: AtomicU32 = AtomicU32::new(1);
 static NEXT_ASYNC_FUTURE_HANDLE: AtomicU64 = AtomicU64::new(1);
 static COUNTERS: LazyLock<Mutex<HashMap<u64, i32>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -322,14 +324,18 @@ fn cancel_async_future(handle: u64) {
         state.cancelled = true;
         state.ready = true;
         state.poll_state = AsyncFuturePollState::Ready;
+        ASYNC_CANCEL_COUNT.fetch_add(1, Ordering::Relaxed);
     }
 }
 
 fn free_async_future(handle: u64) {
-    ASYNC_FUTURES
+    let removed = ASYNC_FUTURES
         .lock()
         .expect("async futures lock")
         .remove(&handle);
+    if removed.is_some() {
+        ASYNC_FREE_COUNT.fetch_add(1, Ordering::Relaxed);
+    }
     ASYNC_ADDER_OFFSETS
         .lock()
         .expect("async adder offsets lock")
@@ -840,6 +846,34 @@ pub extern "C" fn async_label_echo(input: *const c_char) -> u64 {
             .into_owned()
     };
     enqueue_string_future(format!("label:{label}"))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn async_fail_string() -> u64 {
+    enqueue_async_future(AsyncFutureResult::Failed(
+        "forced async failure".to_string(),
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn async_never_string() -> u64 {
+    enqueue_pending_string_future()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn async_cancel_count() -> u32 {
+    ASYNC_CANCEL_COUNT.load(Ordering::Relaxed)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn async_free_count() -> u32 {
+    ASYNC_FREE_COUNT.load(Ordering::Relaxed)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn reset_async_future_counts() {
+    ASYNC_CANCEL_COUNT.store(0, Ordering::Relaxed);
+    ASYNC_FREE_COUNT.store(0, Ordering::Relaxed);
 }
 
 #[unsafe(no_mangle)]
