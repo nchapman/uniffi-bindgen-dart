@@ -1,0 +1,17 @@
+[Custom]
+typedef bytes Blob;
+[Custom]
+typedef record<string, Blob?> MaybeBlobMap;
+
+namespace custom_shadow_demo {
+  MaybeBlobMap echo_map(MaybeBlobMap input);
+  [Async]
+  MaybeBlobMap async_echo_map(MaybeBlobMap input);
+};
+
+interface Holder {
+  constructor();
+  MaybeBlobMap echo_map(MaybeBlobMap input);
+  [Async]
+  MaybeBlobMap async_echo_map(MaybeBlobMap input);
+};

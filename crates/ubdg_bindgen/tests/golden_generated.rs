@@ -140,3 +140,17 @@ fn golden_docstrings_demo() {
     generate(&source, &out_dir, None);
     assert_matches_expected(&out_dir.join("docstrings_demo.dart"), &expected);
 }
+
+#[test]
+fn golden_regression_custom_shadow_demo() {
+    let root = repo_root();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let out_dir = temp.path().join("out");
+
+    let source = root.join("fixtures/regressions/custom-shadow-demo/src/custom-shadow-demo.udl");
+    let expected =
+        root.join("fixtures/regressions/custom-shadow-demo/expected/custom_shadow_demo.dart");
+
+    generate(&source, &out_dir, None);
+    assert_matches_expected(&out_dir.join("custom_shadow_demo.dart"), &expected);
+}
