@@ -54,6 +54,29 @@ final class _LabellerCallbackBridge {
   final Map<int, int> _refCounts = <int, int>{};
   int _nextHandle = 1;
 
+  final Map<int, bool> _droppedFutures = <int, bool>{};
+  int _nextDroppedFutureHandle = 1;
+
+  int beginDroppedFutureTracking() {
+    final int handle = _nextDroppedFutureHandle++;
+    _droppedFutures[handle] = false;
+    return handle;
+  }
+
+  void markDroppedFuture(int handle) {
+    if (_droppedFutures.containsKey(handle)) {
+      _droppedFutures[handle] = true;
+    }
+  }
+
+  bool isDroppedFuture(int handle) {
+    return _droppedFutures[handle] ?? true;
+  }
+
+  void finishDroppedFuture(int handle) {
+    _droppedFutures.remove(handle);
+  }
+
   int register(Labeller callback) {
     final int handle = _nextHandle++;
     _callbacks[handle] = callback;
@@ -77,7 +100,7 @@ final class _LabellerCallbackBridge {
   int cloneHandle(int handle) {
     final int? refs = _refCounts[handle];
     if (refs == null) {
-      return handle;
+      throw StateError('Invalid callback handle: $handle');
     }
     _refCounts[handle] = refs + 1;
     return handle;
@@ -93,21 +116,37 @@ final class _LabellerCallbackBridge {
     return instance.cloneHandle(handle);
   }, exceptionalReturn: 0);
 
+  static final ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle)> _futureDroppedNative = ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle)>.isolateLocal((int handle) {
+    instance.markDroppedFuture(handle);
+  });
+
   static final ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<Utf8> input, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, _LabellerLabelAsyncAsyncResult result)>> uniffiFutureCallback, ffi.Uint64 callbackData, ffi.Pointer<_ForeignFutureDroppedCallbackStruct> uniffiOutDroppedCallback)> _labelAsyncNative = ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<Utf8> input, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, _LabellerLabelAsyncAsyncResult result)>> uniffiFutureCallback, ffi.Uint64 callbackData, ffi.Pointer<_ForeignFutureDroppedCallbackStruct> uniffiOutDroppedCallback)>.isolateLocal((int handle, ffi.Pointer<Utf8> input, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, _LabellerLabelAsyncAsyncResult result)>> uniffiFutureCallback, int callbackData, ffi.Pointer<_ForeignFutureDroppedCallbackStruct> uniffiOutDroppedCallback) {
     final Labeller? callback = instance.lookup(handle);
     final complete = uniffiFutureCallback.asFunction<void Function(int callbackData, _LabellerLabelAsyncAsyncResult result)>();
+    final int droppedHandle = instance.beginDroppedFutureTracking();
     if (uniffiOutDroppedCallback != ffi.nullptr) {
       uniffiOutDroppedCallback.ref
-        ..handle = 0
-        ..callback = ffi.nullptr;
+        ..handle = droppedHandle
+        ..callback = _futureDroppedNative.nativeFunction;
     }
     if (callback == null) {
       final ffi.Pointer<_LabellerLabelAsyncAsyncResult> resultPtr = calloc<_LabellerLabelAsyncAsyncResult>();
       resultPtr.ref.returnValue = ffi.nullptr;
       resultPtr.ref.callStatus
         ..code = _rustCallStatusUnexpectedError
-        ..errorBuf = ffi.nullptr;
-      complete(callbackData, resultPtr.ref);
+        ..errorBuf = 'Invalid callback handle'.toNativeUtf8();
+      final bool dropped = instance.isDroppedFuture(droppedHandle);
+      if (!dropped) {
+        complete(callbackData, resultPtr.ref);
+      } else {
+        if (resultPtr.ref.callStatus.errorBuf != ffi.nullptr) {
+          calloc.free(resultPtr.ref.callStatus.errorBuf);
+        }
+        if (resultPtr.ref.returnValue != ffi.nullptr) {
+          calloc.free(resultPtr.ref.returnValue);
+        }
+      }
+      instance.finishDroppedFuture(droppedHandle);
       calloc.free(resultPtr);
       return;
     }
@@ -120,12 +159,23 @@ final class _LabellerCallbackBridge {
         resultPtr.ref.callStatus
           ..code = _rustCallStatusSuccess
           ..errorBuf = ffi.nullptr;
-      } catch (_) {
+      } catch (err) {
         resultPtr.ref.callStatus
           ..code = _rustCallStatusUnexpectedError
-          ..errorBuf = ffi.nullptr;
+          ..errorBuf = err.toString().toNativeUtf8();
       } finally {
-        complete(callbackData, resultPtr.ref);
+        final bool dropped = instance.isDroppedFuture(droppedHandle);
+        if (!dropped) {
+          complete(callbackData, resultPtr.ref);
+        } else {
+          if (resultPtr.ref.callStatus.errorBuf != ffi.nullptr) {
+            calloc.free(resultPtr.ref.callStatus.errorBuf);
+          }
+          if (resultPtr.ref.returnValue != ffi.nullptr) {
+            calloc.free(resultPtr.ref.returnValue);
+          }
+        }
+        instance.finishDroppedFuture(droppedHandle);
         calloc.free(resultPtr);
       }
     }();

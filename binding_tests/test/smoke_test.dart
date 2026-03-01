@@ -523,17 +523,28 @@ void main() {
       isNot(contains(
           "throw UnsupportedError('runtime invocation for this UniFFI ABI (RustCallStatus out-arg) is not implemented yet (methodoutcome_async_label)');")),
     );
-    expect(contents, contains('_uniffiLiftMethodErrorException(Uint8List bytes)'));
-    expect(contents,
-        contains('uniffi_ffibuffer_uniffi_record_enum_methods_fn_func_method_point_new'));
-    expect(contents,
-        contains('uniffi_ffibuffer_uniffi_record_enum_methods_fn_func_method_state_busy'));
-    expect(contents,
-        contains('uniffi_ffibuffer_uniffi_record_enum_methods_fn_func_method_outcome_ok'));
-    expect(contents,
-        contains('uniffi_ffibuffer_uniffi_record_enum_methods_fn_method_methodpoint_async_label'));
-    expect(contents,
-        contains('ffi_uniffi_record_enum_methods_rust_future_complete_rust_buffer'));
+    expect(
+        contents, contains('_uniffiLiftMethodErrorException(Uint8List bytes)'));
+    expect(
+        contents,
+        contains(
+            'uniffi_ffibuffer_uniffi_record_enum_methods_fn_func_method_point_new'));
+    expect(
+        contents,
+        contains(
+            'uniffi_ffibuffer_uniffi_record_enum_methods_fn_func_method_state_busy'));
+    expect(
+        contents,
+        contains(
+            'uniffi_ffibuffer_uniffi_record_enum_methods_fn_func_method_outcome_ok'));
+    expect(
+        contents,
+        contains(
+            'uniffi_ffibuffer_uniffi_record_enum_methods_fn_method_methodpoint_async_label'));
+    expect(
+        contents,
+        contains(
+            'ffi_uniffi_record_enum_methods_rust_future_complete_rust_buffer'));
     expect(contents, contains('class RecordEnumMethodsFfi {'));
   });
 

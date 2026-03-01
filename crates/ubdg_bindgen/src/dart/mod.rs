@@ -52,6 +52,9 @@ pub fn generate_bindings(args: &GenerateArgs) -> Result<()> {
         &library_name,
         metadata.namespace_docstring.as_deref(),
         &metadata.local_module_path,
+        metadata.uniffi_contract_version,
+        metadata.ffi_uniffi_contract_version_symbol.as_deref(),
+        &metadata.api_checksums,
         &cfg.external_packages,
         &cfg.rename,
         &cfg.exclude,
@@ -225,6 +228,12 @@ struct UdlEnumVariant {
     fields: Vec<UdlArg>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct UdlApiChecksum {
+    symbol: String,
+    expected: u16,
+}
+
 impl UdlFunction {
     fn uses_bytes(&self) -> bool {
         self.return_type
@@ -271,6 +280,9 @@ struct UdlMetadata {
     namespace: Option<String>,
     local_module_path: String,
     namespace_docstring: Option<String>,
+    uniffi_contract_version: Option<u32>,
+    ffi_uniffi_contract_version_symbol: Option<String>,
+    api_checksums: Vec<UdlApiChecksum>,
     functions: Vec<UdlFunction>,
     objects: Vec<UdlObject>,
     callback_interfaces: Vec<UdlCallbackInterface>,
@@ -289,6 +301,9 @@ fn parse_udl_metadata(
                 namespace: None,
                 local_module_path: String::new(),
                 namespace_docstring: None,
+                uniffi_contract_version: None,
+                ffi_uniffi_contract_version_symbol: None,
+                api_checksums: Vec::new(),
                 ..UdlMetadata::default()
             });
         }
@@ -341,15 +356,19 @@ fn component_interface_to_metadata(
         .map(|f| UdlFunction {
             name: f.name().to_string(),
             ffi_symbol: include_ffi_symbols.then(|| f.ffi_func().name().to_string()),
-            ffi_arg_types: include_ffi_symbols
-                .then(|| f.ffi_func().arguments().iter().map(|a| a.type_()).collect())
-                .unwrap_or_default(),
+            ffi_arg_types: if include_ffi_symbols {
+                f.ffi_func().arguments().iter().map(|a| a.type_()).collect()
+            } else {
+                Vec::new()
+            },
             ffi_return_type: include_ffi_symbols
                 .then(|| f.ffi_func().return_type().cloned())
                 .flatten(),
-            ffi_has_rust_call_status: include_ffi_symbols
-                .then(|| f.ffi_func().has_rust_call_status_arg())
-                .unwrap_or(false),
+            ffi_has_rust_call_status: if include_ffi_symbols {
+                f.ffi_func().has_rust_call_status_arg()
+            } else {
+                false
+            },
             runtime_unsupported: include_ffi_symbols
                 .then(|| runtime_unsupported_reason_for_ffi_func(f.ffi_func()))
                 .flatten(),
@@ -398,15 +417,19 @@ fn component_interface_to_metadata(
                 .map(|m| UdlObjectMethod {
                     name: m.name().to_string(),
                     ffi_symbol: include_ffi_symbols.then(|| m.ffi_func().name().to_string()),
-                    ffi_arg_types: include_ffi_symbols
-                        .then(|| m.ffi_func().arguments().iter().map(|a| a.type_()).collect())
-                        .unwrap_or_default(),
+                    ffi_arg_types: if include_ffi_symbols {
+                        m.ffi_func().arguments().iter().map(|a| a.type_()).collect()
+                    } else {
+                        Vec::new()
+                    },
                     ffi_return_type: include_ffi_symbols
                         .then(|| m.ffi_func().return_type().cloned())
                         .flatten(),
-                    ffi_has_rust_call_status: include_ffi_symbols
-                        .then(|| m.ffi_func().has_rust_call_status_arg())
-                        .unwrap_or(false),
+                    ffi_has_rust_call_status: if include_ffi_symbols {
+                        m.ffi_func().has_rust_call_status_arg()
+                    } else {
+                        false
+                    },
                     runtime_unsupported: include_ffi_symbols
                         .then(|| runtime_unsupported_reason_for_ffi_func(m.ffi_func()))
                         .flatten(),
@@ -459,15 +482,19 @@ fn component_interface_to_metadata(
                 .map(|m| UdlObjectMethod {
                     name: m.name().to_string(),
                     ffi_symbol: include_ffi_symbols.then(|| m.ffi_func().name().to_string()),
-                    ffi_arg_types: include_ffi_symbols
-                        .then(|| m.ffi_func().arguments().iter().map(|a| a.type_()).collect())
-                        .unwrap_or_default(),
+                    ffi_arg_types: if include_ffi_symbols {
+                        m.ffi_func().arguments().iter().map(|a| a.type_()).collect()
+                    } else {
+                        Vec::new()
+                    },
                     ffi_return_type: include_ffi_symbols
                         .then(|| m.ffi_func().return_type().cloned())
                         .flatten(),
-                    ffi_has_rust_call_status: include_ffi_symbols
-                        .then(|| m.ffi_func().has_rust_call_status_arg())
-                        .unwrap_or(false),
+                    ffi_has_rust_call_status: if include_ffi_symbols {
+                        m.ffi_func().has_rust_call_status_arg()
+                    } else {
+                        false
+                    },
                     runtime_unsupported: include_ffi_symbols
                         .then(|| runtime_unsupported_reason_for_ffi_func(m.ffi_func()))
                         .flatten(),
@@ -499,15 +526,19 @@ fn component_interface_to_metadata(
                 .map(|m| UdlObjectMethod {
                     name: m.name().to_string(),
                     ffi_symbol: include_ffi_symbols.then(|| m.ffi_func().name().to_string()),
-                    ffi_arg_types: include_ffi_symbols
-                        .then(|| m.ffi_func().arguments().iter().map(|a| a.type_()).collect())
-                        .unwrap_or_default(),
+                    ffi_arg_types: if include_ffi_symbols {
+                        m.ffi_func().arguments().iter().map(|a| a.type_()).collect()
+                    } else {
+                        Vec::new()
+                    },
                     ffi_return_type: include_ffi_symbols
                         .then(|| m.ffi_func().return_type().cloned())
                         .flatten(),
-                    ffi_has_rust_call_status: include_ffi_symbols
-                        .then(|| m.ffi_func().has_rust_call_status_arg())
-                        .unwrap_or(false),
+                    ffi_has_rust_call_status: if include_ffi_symbols {
+                        m.ffi_func().has_rust_call_status_arg()
+                    } else {
+                        false
+                    },
                     runtime_unsupported: include_ffi_symbols
                         .then(|| runtime_unsupported_reason_for_ffi_func(m.ffi_func()))
                         .flatten(),
@@ -666,21 +697,23 @@ fn component_interface_to_metadata(
                     .map(|ctor| UdlObjectConstructor {
                         name: ctor.name().to_string(),
                         ffi_symbol: include_ffi_symbols.then(|| ctor.ffi_func().name().to_string()),
-                        ffi_arg_types: include_ffi_symbols
-                            .then(|| {
-                                ctor.ffi_func()
-                                    .arguments()
-                                    .iter()
-                                    .map(|a| a.type_())
-                                    .collect()
-                            })
-                            .unwrap_or_default(),
+                        ffi_arg_types: if include_ffi_symbols {
+                            ctor.ffi_func()
+                                .arguments()
+                                .iter()
+                                .map(|a| a.type_())
+                                .collect()
+                        } else {
+                            Vec::new()
+                        },
                         ffi_return_type: include_ffi_symbols
                             .then(|| ctor.ffi_func().return_type().cloned())
                             .flatten(),
-                        ffi_has_rust_call_status: include_ffi_symbols
-                            .then(|| ctor.ffi_func().has_rust_call_status_arg())
-                            .unwrap_or(false),
+                        ffi_has_rust_call_status: if include_ffi_symbols {
+                            ctor.ffi_func().has_rust_call_status_arg()
+                        } else {
+                            false
+                        },
                         runtime_unsupported: include_ffi_symbols
                             .then(|| runtime_unsupported_reason_for_ffi_func(ctor.ffi_func()))
                             .flatten(),
@@ -738,6 +771,16 @@ fn component_interface_to_metadata(
         namespace: Some(ci.namespace().to_string()),
         local_module_path: ci.crate_name().to_string(),
         namespace_docstring: ci.namespace_docstring().map(ToString::to_string),
+        uniffi_contract_version: include_ffi_symbols.then(|| ci.uniffi_contract_version()),
+        ffi_uniffi_contract_version_symbol: include_ffi_symbols
+            .then(|| ci.ffi_uniffi_contract_version().name().to_string()),
+        api_checksums: if include_ffi_symbols {
+            ci.iter_checksums()
+                .map(|(symbol, expected)| UdlApiChecksum { symbol, expected })
+                .collect()
+        } else {
+            Vec::new()
+        },
         functions,
         objects,
         callback_interfaces,
@@ -1074,6 +1117,9 @@ fn render_dart_scaffold(
     library_name: &str,
     namespace_docstring: Option<&str>,
     local_module_path: &str,
+    uniffi_contract_version: Option<u32>,
+    ffi_uniffi_contract_version_symbol: Option<&str>,
+    api_checksums: &[UdlApiChecksum],
     external_packages: &HashMap<String, String>,
     rename: &HashMap<String, String>,
     exclude: &[String],
@@ -1409,14 +1455,72 @@ fn render_dart_scaffold(
     out.push_str("    }\n");
     out.push_str("    return ffi.DynamicLibrary.open(_libraryPath ?? libraryName);\n");
     out.push_str("  }\n\n");
-    out.push_str("  late final ffi.DynamicLibrary _lib = open();\n");
+    let has_uniffi_init_checks =
+        uniffi_contract_version.is_some() && ffi_uniffi_contract_version_symbol.is_some();
+    if has_uniffi_init_checks {
+        let bindings_contract_version = uniffi_contract_version.unwrap_or_default();
+        let contract_symbol = ffi_uniffi_contract_version_symbol.unwrap_or_default();
+        out.push_str("  void _ensureApiIntegrity(ffi.DynamicLibrary lib) {\n");
+        out.push_str(&format!(
+            "    const int bindingsContractVersion = {bindings_contract_version};\n"
+        ));
+        out.push_str("    final int scaffoldingContractVersion;\n");
+        out.push_str("    try {\n");
+        out.push_str(&format!(
+            "      final int Function() ffiContractVersion = lib.lookupFunction<ffi.Uint32 Function(), int Function()>('{contract_symbol}');\n"
+        ));
+        out.push_str("      scaffoldingContractVersion = ffiContractVersion();\n");
+        out.push_str("    } catch (err) {\n");
+        out.push_str(&format!(
+            "      throw StateError('Missing or invalid UniFFI contract-version symbol `{contract_symbol}`: $err');\n"
+        ));
+        out.push_str("    }\n");
+        out.push_str("    if (bindingsContractVersion != scaffoldingContractVersion) {\n");
+        out.push_str(
+            "      throw StateError('UniFFI contract version mismatch: expected $bindingsContractVersion, got $scaffoldingContractVersion');\n",
+        );
+        out.push_str("    }\n");
+        for checksum in api_checksums {
+            let checksum_field =
+                safe_dart_identifier(&format!("_checksum_{}", dart_identifier(&checksum.symbol)));
+            out.push_str(&format!("    final int {checksum_field};\n"));
+            out.push_str("    try {\n");
+            out.push_str(&format!(
+                "      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('{}');\n",
+                checksum.symbol
+            ));
+            out.push_str(&format!("      {checksum_field} = checksumFn();\n"));
+            out.push_str("    } catch (err) {\n");
+            out.push_str(&format!(
+                "      throw StateError('Missing or invalid UniFFI checksum symbol `{}`: $err');\n",
+                checksum.symbol
+            ));
+            out.push_str("    }\n");
+            out.push_str(&format!(
+                "    if ({checksum_field} != {}) {{\n",
+                checksum.expected
+            ));
+            out.push_str(&format!(
+                "      throw StateError('UniFFI API checksum mismatch for `{}`: expected {}, got ${checksum_field}');\n",
+                checksum.symbol, checksum.expected
+            ));
+            out.push_str("    }\n");
+        }
+        out.push_str("  }\n\n");
+        out.push_str("  late final ffi.DynamicLibrary _lib = (() {\n");
+        out.push_str("    final ffi.DynamicLibrary lib = open();\n");
+        out.push_str("    _ensureApiIntegrity(lib);\n");
+        out.push_str("    return lib;\n");
+        out.push_str("  })();\n");
+    } else {
+        out.push_str("  late final ffi.DynamicLibrary _lib = open();\n");
+    }
     out.push_str(&render_bound_methods(
         functions,
         objects,
         callback_interfaces,
         library_name,
         local_module_path,
-        ffi_class_name,
         records,
         enums,
     ));
@@ -2050,6 +2154,30 @@ fn render_data_models(
         let enum_name = to_upper_camel(&enum_.name);
         let exception_name = format!("{enum_name}Exception");
         out.push_str(&format!(
+            "String _encode{exception_name}({exception_name} value) {{\n"
+        ));
+        for variant in &enum_.variants {
+            let variant_tag = safe_dart_identifier(&to_lower_camel(&variant.name));
+            let variant_name = to_upper_camel(&variant.name);
+            let variant_exception = format!("{exception_name}{variant_name}");
+            out.push_str(&format!("  if (value is {variant_exception}) {{\n"));
+            out.push_str("    return jsonEncode({\n");
+            out.push_str(&format!("      'tag': '{variant_tag}',\n"));
+            for field in &variant.fields {
+                let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
+                let expr = render_json_encode_expr(&format!("value.{field_name}"), &field.type_);
+                out.push_str(&format!("      '{field_name}': {expr},\n"));
+            }
+            out.push_str("    });\n");
+            out.push_str("  }\n");
+        }
+        out.push_str(&format!(
+            "  throw StateError('Unknown {} exception instance: $value');\n",
+            exception_name
+        ));
+        out.push_str("}\n\n");
+
+        out.push_str(&format!(
             "{exception_name} _decode{exception_name}(Object? raw) {{\n"
         ));
         out.push_str(
@@ -2105,6 +2233,9 @@ fn render_data_models(
         let exception_name = format!("{enum_name}Exception");
         out.push_str(&format!("final class {exception_name}FfiCodec {{\n"));
         out.push_str(&format!("  const {exception_name}FfiCodec._();\n\n"));
+        out.push_str(&format!(
+            "  static String encode({exception_name} value) => _encode{exception_name}(value);\n\n"
+        ));
         out.push_str(&format!(
             "  static {exception_name} decode(Object? raw) => _decode{exception_name}(raw);\n"
         ));
@@ -2503,10 +2634,16 @@ fn render_uniffi_binary_write_statement(
             )
         }
         Type::Record { name, .. } => {
-            format!("{indent}{writer}.writeBytes(_uniffiEncode{}({value_expr}));\n", to_upper_camel(name))
+            let record_name = to_upper_camel(name);
+            format!(
+                "{indent}final Uint8List __encoded = _uniffiEncode{record_name}({value_expr});\n{indent}{writer}.writeI32(__encoded.length);\n{indent}{writer}.writeBytes(__encoded);\n"
+            )
         }
         Type::Enum { name, .. } if is_runtime_enum_type(type_, enums) => {
-            format!("{indent}{writer}.writeBytes(_uniffiEncode{}({value_expr}));\n", to_upper_camel(name))
+            let enum_name = to_upper_camel(name);
+            format!(
+                "{indent}final Uint8List __encoded = _uniffiEncode{enum_name}({value_expr});\n{indent}{writer}.writeI32(__encoded.length);\n{indent}{writer}.writeBytes(__encoded);\n"
+            )
         }
         _ => format!(
             "{indent}throw UnsupportedError('UniFFI binary write not implemented for {}');\n",
@@ -2555,17 +2692,16 @@ fn render_uniffi_binary_read_expression(type_: &Type, reader: &str, enums: &[Udl
                 "(() {{ final int __len = {reader}.readI32(); final out = <String, {value_type_name}>{{}}; for (var i = 0; i < __len; i++) {{ final key = {reader}.readString(); final value = {value}; out[key] = value; }} return out; }})()"
             )
         }
-        Type::Record { name, .. } => format!("_uniffiDecode{}(bytes)", to_upper_camel(name))
-            .replacen(
-                "bytes",
-                &format!("{reader}.readBytes(({reader})._bytes.length - ({reader})._offset)"),
-                1,
-            ),
+        Type::Record { name, .. } => {
+            format!(
+                "(() {{ final int __len = {reader}.readI32(); final Uint8List __bytes = {reader}.readBytes(__len); return _uniffiDecode{}(__bytes); }})()",
+                to_upper_camel(name)
+            )
+        }
         Type::Enum { name, .. } if is_runtime_enum_type(type_, enums) => {
-            format!("_uniffiDecode{}(bytes)", to_upper_camel(name)).replacen(
-                "bytes",
-                &format!("{reader}.readBytes(({reader})._bytes.length - ({reader})._offset)"),
-                1,
+            format!(
+                "(() {{ final int __len = {reader}.readI32(); final Uint8List __bytes = {reader}.readBytes(__len); return _uniffiDecode{}(__bytes); }})()",
+                to_upper_camel(name)
             )
         }
         _ => format!(
@@ -2902,6 +3038,27 @@ fn render_callback_bridges(
         ));
         out.push_str("  final Map<int, int> _refCounts = <int, int>{};\n");
         out.push_str("  int _nextHandle = 1;\n\n");
+        let has_async_methods = callback_interface.methods.iter().any(|m| m.is_async);
+        if has_async_methods {
+            out.push_str("  final Map<int, bool> _droppedFutures = <int, bool>{};\n");
+            out.push_str("  int _nextDroppedFutureHandle = 1;\n\n");
+            out.push_str("  int beginDroppedFutureTracking() {\n");
+            out.push_str("    final int handle = _nextDroppedFutureHandle++;\n");
+            out.push_str("    _droppedFutures[handle] = false;\n");
+            out.push_str("    return handle;\n");
+            out.push_str("  }\n\n");
+            out.push_str("  void markDroppedFuture(int handle) {\n");
+            out.push_str("    if (_droppedFutures.containsKey(handle)) {\n");
+            out.push_str("      _droppedFutures[handle] = true;\n");
+            out.push_str("    }\n");
+            out.push_str("  }\n\n");
+            out.push_str("  bool isDroppedFuture(int handle) {\n");
+            out.push_str("    return _droppedFutures[handle] ?? true;\n");
+            out.push_str("  }\n\n");
+            out.push_str("  void finishDroppedFuture(int handle) {\n");
+            out.push_str("    _droppedFutures.remove(handle);\n");
+            out.push_str("  }\n\n");
+        }
         out.push_str(&format!("  int register({class_name} callback) {{\n"));
         out.push_str("    final int handle = _nextHandle++;\n");
         out.push_str("    _callbacks[handle] = callback;\n");
@@ -2923,7 +3080,7 @@ fn render_callback_bridges(
         out.push_str("  int cloneHandle(int handle) {\n");
         out.push_str("    final int? refs = _refCounts[handle];\n");
         out.push_str("    if (refs == null) {\n");
-        out.push_str("      return handle;\n");
+        out.push_str("      throw StateError('Invalid callback handle: $handle');\n");
         out.push_str("    }\n");
         out.push_str("    _refCounts[handle] = refs + 1;\n");
         out.push_str("    return handle;\n");
@@ -2941,6 +3098,13 @@ fn render_callback_bridges(
         );
         out.push_str("    return instance.cloneHandle(handle);\n");
         out.push_str("  }, exceptionalReturn: 0);\n\n");
+        if has_async_methods {
+            out.push_str(
+                "  static final ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle)> _futureDroppedNative = ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle)>.isolateLocal((int handle) {\n",
+            );
+            out.push_str("    instance.markDroppedFuture(handle);\n");
+            out.push_str("  });\n\n");
+        }
 
         for method in &callback_interface.methods {
             let method_name = safe_dart_identifier(&to_lower_camel(&method.name));
@@ -2963,6 +3127,10 @@ fn render_callback_bridges(
             if method.is_async {
                 let result_struct_name =
                     callback_async_result_struct_name(&callback_interface.name, &method.name);
+                let async_result_uses_utf8_ptr = method
+                    .return_type
+                    .as_ref()
+                    .is_some_and(|t| is_runtime_utf8_pointer_marshaled_type(t, records, enums));
                 ffi_args.push(format!(
                     "ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, {result_struct_name} result)>> uniffiFutureCallback"
                 ));
@@ -2992,10 +3160,13 @@ fn render_callback_bridges(
                 out.push_str("    final complete = uniffiFutureCallback.asFunction<void Function(int callbackData, ");
                 out.push_str(&result_struct_name);
                 out.push_str(" result)>();\n");
+                out.push_str(
+                    "    final int droppedHandle = instance.beginDroppedFutureTracking();\n",
+                );
                 out.push_str("    if (uniffiOutDroppedCallback != ffi.nullptr) {\n");
                 out.push_str("      uniffiOutDroppedCallback.ref\n");
-                out.push_str("        ..handle = 0\n");
-                out.push_str("        ..callback = ffi.nullptr;\n");
+                out.push_str("        ..handle = droppedHandle\n");
+                out.push_str("        ..callback = _futureDroppedNative.nativeFunction;\n");
                 out.push_str("    }\n");
                 out.push_str("    if (callback == null) {\n");
                 out.push_str(&format!(
@@ -3010,8 +3181,23 @@ fn render_callback_bridges(
                 }
                 out.push_str("      resultPtr.ref.callStatus\n");
                 out.push_str("        ..code = _rustCallStatusUnexpectedError\n");
-                out.push_str("        ..errorBuf = ffi.nullptr;\n");
-                out.push_str("      complete(callbackData, resultPtr.ref);\n");
+                out.push_str("        ..errorBuf = 'Invalid callback handle'.toNativeUtf8();\n");
+                out.push_str(
+                    "      final bool dropped = instance.isDroppedFuture(droppedHandle);\n",
+                );
+                out.push_str("      if (!dropped) {\n");
+                out.push_str("        complete(callbackData, resultPtr.ref);\n");
+                out.push_str("      } else {\n");
+                out.push_str("        if (resultPtr.ref.callStatus.errorBuf != ffi.nullptr) {\n");
+                out.push_str("          calloc.free(resultPtr.ref.callStatus.errorBuf);\n");
+                out.push_str("        }\n");
+                if async_result_uses_utf8_ptr {
+                    out.push_str("        if (resultPtr.ref.returnValue != ffi.nullptr) {\n");
+                    out.push_str("          calloc.free(resultPtr.ref.returnValue);\n");
+                    out.push_str("        }\n");
+                }
+                out.push_str("      }\n");
+                out.push_str("      instance.finishDroppedFuture(droppedHandle);\n");
                 out.push_str("      calloc.free(resultPtr);\n");
                 out.push_str("      return;\n");
                 out.push_str("    }\n");
@@ -3044,18 +3230,52 @@ fn render_callback_bridges(
                 out.push_str("        resultPtr.ref.callStatus\n");
                 out.push_str("          ..code = _rustCallStatusSuccess\n");
                 out.push_str("          ..errorBuf = ffi.nullptr;\n");
-                out.push_str("      } catch (_) {\n");
+                out.push_str("      } catch (err) {\n");
                 if method.throws_type.is_some() {
-                    out.push_str("        resultPtr.ref.callStatus\n");
-                    out.push_str("          ..code = _rustCallStatusError\n");
-                    out.push_str("          ..errorBuf = ffi.nullptr;\n");
+                    if let Some(exception_name) = method
+                        .throws_type
+                        .as_ref()
+                        .and_then(enum_name_from_type)
+                        .map(|name| format!("{}Exception", to_upper_camel(name)))
+                    {
+                        out.push_str(&format!("        if (err is {exception_name}) {{\n"));
+                        out.push_str("          resultPtr.ref.callStatus\n");
+                        out.push_str("            ..code = _rustCallStatusError\n");
+                        out.push_str(&format!(
+                            "            ..errorBuf = {exception_name}FfiCodec.encode(err).toNativeUtf8();\n"
+                        ));
+                        out.push_str("        } else {\n");
+                        out.push_str("          resultPtr.ref.callStatus\n");
+                        out.push_str("            ..code = _rustCallStatusUnexpectedError\n");
+                        out.push_str("            ..errorBuf = err.toString().toNativeUtf8();\n");
+                        out.push_str("        }\n");
+                    } else {
+                        out.push_str("        resultPtr.ref.callStatus\n");
+                        out.push_str("          ..code = _rustCallStatusUnexpectedError\n");
+                        out.push_str("          ..errorBuf = err.toString().toNativeUtf8();\n");
+                    }
                 } else {
                     out.push_str("        resultPtr.ref.callStatus\n");
                     out.push_str("          ..code = _rustCallStatusUnexpectedError\n");
-                    out.push_str("          ..errorBuf = ffi.nullptr;\n");
+                    out.push_str("          ..errorBuf = err.toString().toNativeUtf8();\n");
                 }
                 out.push_str("      } finally {\n");
-                out.push_str("        complete(callbackData, resultPtr.ref);\n");
+                out.push_str(
+                    "        final bool dropped = instance.isDroppedFuture(droppedHandle);\n",
+                );
+                out.push_str("        if (!dropped) {\n");
+                out.push_str("          complete(callbackData, resultPtr.ref);\n");
+                out.push_str("        } else {\n");
+                out.push_str("          if (resultPtr.ref.callStatus.errorBuf != ffi.nullptr) {\n");
+                out.push_str("            calloc.free(resultPtr.ref.callStatus.errorBuf);\n");
+                out.push_str("          }\n");
+                if async_result_uses_utf8_ptr {
+                    out.push_str("          if (resultPtr.ref.returnValue != ffi.nullptr) {\n");
+                    out.push_str("            calloc.free(resultPtr.ref.returnValue);\n");
+                    out.push_str("          }\n");
+                }
+                out.push_str("        }\n");
+                out.push_str("        instance.finishDroppedFuture(droppedHandle);\n");
                 out.push_str("        calloc.free(resultPtr);\n");
                 out.push_str("      }\n");
                 out.push_str("    }();\n");
@@ -3084,7 +3304,7 @@ fn render_callback_bridges(
                 out.push_str("    if (callback == null) {\n");
                 out.push_str("      outStatus.ref\n");
                 out.push_str("        ..code = _rustCallStatusUnexpectedError\n");
-                out.push_str("        ..errorBuf = ffi.nullptr;\n");
+                out.push_str("        ..errorBuf = 'Invalid callback handle'.toNativeUtf8();\n");
                 out.push_str("      return;\n");
                 out.push_str("    }\n");
                 out.push_str("    try {\n");
@@ -3105,15 +3325,34 @@ fn render_callback_bridges(
                 out.push_str("      outStatus.ref\n");
                 out.push_str("        ..code = _rustCallStatusSuccess\n");
                 out.push_str("        ..errorBuf = ffi.nullptr;\n");
-                out.push_str("    } catch (_) {\n");
+                out.push_str("    } catch (err) {\n");
                 if method.throws_type.is_some() {
-                    out.push_str("      outStatus.ref\n");
-                    out.push_str("        ..code = _rustCallStatusError\n");
-                    out.push_str("        ..errorBuf = ffi.nullptr;\n");
+                    if let Some(exception_name) = method
+                        .throws_type
+                        .as_ref()
+                        .and_then(enum_name_from_type)
+                        .map(|name| format!("{}Exception", to_upper_camel(name)))
+                    {
+                        out.push_str(&format!("      if (err is {exception_name}) {{\n"));
+                        out.push_str("        outStatus.ref\n");
+                        out.push_str("          ..code = _rustCallStatusError\n");
+                        out.push_str(&format!(
+                            "          ..errorBuf = {exception_name}FfiCodec.encode(err).toNativeUtf8();\n"
+                        ));
+                        out.push_str("      } else {\n");
+                        out.push_str("        outStatus.ref\n");
+                        out.push_str("          ..code = _rustCallStatusUnexpectedError\n");
+                        out.push_str("          ..errorBuf = err.toString().toNativeUtf8();\n");
+                        out.push_str("      }\n");
+                    } else {
+                        out.push_str("      outStatus.ref\n");
+                        out.push_str("        ..code = _rustCallStatusUnexpectedError\n");
+                        out.push_str("        ..errorBuf = err.toString().toNativeUtf8();\n");
+                    }
                 } else {
                     out.push_str("      outStatus.ref\n");
                     out.push_str("        ..code = _rustCallStatusUnexpectedError\n");
-                    out.push_str("        ..errorBuf = ffi.nullptr;\n");
+                    out.push_str("        ..errorBuf = err.toString().toNativeUtf8();\n");
                 }
                 out.push_str("    }\n");
             }
@@ -3150,7 +3389,6 @@ fn render_bound_methods(
     callback_interfaces: &[UdlCallbackInterface],
     ffi_namespace: &str,
     local_module_path: &str,
-    _ffi_class_name: &str,
     records: &[UdlRecord],
     enums: &[UdlEnum],
 ) -> String {
@@ -5897,7 +6135,7 @@ fn render_bound_methods(
 
                     match method.return_type.as_ref() {
                         None => out.push_str("      return;\n"),
-                        Some(ret_type) if matches!(ret_type, Type::Boolean) => {
+                        Some(Type::Boolean) => {
                             out.push_str("      return (returnBuf + 0).ref.i8 == 1;\n");
                         }
                         Some(ret_type) if is_runtime_object_type(ret_type) => {
@@ -9621,6 +9859,9 @@ interface Outcome {
             "uniffi_models",
             None,
             "crate_name",
+            None,
+            None,
+            &[],
             &HashMap::new(),
             &HashMap::new(),
             &[],
@@ -9775,6 +10016,9 @@ interface Outcome {
             "uniffi_demo",
             None,
             "crate_name",
+            None,
+            None,
+            &[],
             &HashMap::new(),
             &HashMap::new(),
             &[],
@@ -9821,6 +10065,9 @@ interface Outcome {
             "uniffi_demo",
             None,
             "crate_name",
+            None,
+            None,
+            &[],
             &HashMap::new(),
             &HashMap::new(),
             &[],
