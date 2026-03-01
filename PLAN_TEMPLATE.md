@@ -327,6 +327,13 @@ These rules are part of the template and should not be skipped:
 - Any deviation from this template must be documented in `docs/release.md` with rationale.
 - Any temporary skipped test must include a linked issue and expiry/removal condition.
 
+### Git Commit Workflow
+- Initialize Git at project start and keep history linear.
+- Commit continuously as coherent units of change; do not batch unrelated work.
+- Use descriptive commit messages that explain what changed and why.
+- Do not use commit messages framed as milestone or step progress.
+- Run relevant tests before each commit that changes behavior.
+
 ## Risk Register (Template)
 | Risk | Impact | Mitigation |
 |---|---|---|
