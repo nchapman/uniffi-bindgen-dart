@@ -21,7 +21,8 @@ void main() {
     expect(contents, contains("libraryName = 'uniffi_simple_fns';"));
     expect(contents, contains('int add(int left, int right) {'));
     expect(contents, contains('late final int Function(int left, int right) _add ='));
-    expect(contents, contains('final SimpleFnsBindings _defaultBindings = SimpleFnsBindings();'));
+    expect(contents, contains('void configureDefaultBindings('));
+    expect(contents, contains('return _bindings().add(left, right);'));
   });
 
   test('runtime ffi binding can call native add', () {
@@ -35,5 +36,9 @@ void main() {
 
     final bindings = SimpleFnsBindings(libraryPath: libPath);
     expect(bindings.add(20, 22), 42);
+
+    configureDefaultBindings(libraryPath: libPath);
+    expect(add(1, 2), 3);
+    resetDefaultBindings();
   });
 }

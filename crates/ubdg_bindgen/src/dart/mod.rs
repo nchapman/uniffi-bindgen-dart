@@ -269,8 +269,21 @@ fn render_function_stubs(functions: &[UdlFunction], ffi_class_name: &str) -> Str
     out.push('\n');
     if has_runtime_functions {
         out.push_str(&format!(
-            "final {ffi_class_name} _defaultBindings = {ffi_class_name}();\n\n"
+            "{ffi_class_name}? _defaultBindings;\n\n"
         ));
+        out.push_str(&format!(
+            "{ffi_class_name} _bindings() => _defaultBindings ??= {ffi_class_name}();\n\n"
+        ));
+        out.push_str(
+            "void configureDefaultBindings({ffi.DynamicLibrary? dynamicLibrary, String? libraryPath}) {\n",
+        );
+        out.push_str(&format!(
+            "  _defaultBindings = {ffi_class_name}(dynamicLibrary: dynamicLibrary, libraryPath: libraryPath);\n"
+        ));
+        out.push_str("}\n\n");
+        out.push_str("void resetDefaultBindings() {\n");
+        out.push_str("  _defaultBindings = null;\n");
+        out.push_str("}\n\n");
     }
     for f in functions {
         let fn_name = safe_dart_identifier(&to_lower_camel(&f.name));
@@ -301,9 +314,9 @@ fn render_function_stubs(functions: &[UdlFunction], ffi_class_name: &str) -> Str
         out.push_str(&format!("{return_type} {fn_name}({args}) {{\n"));
         if is_runtime_ffi_compatible_function(f) {
             if f.return_type.is_some() {
-                out.push_str(&format!("  return _defaultBindings.{fn_name}({arg_names});\n"));
+                out.push_str(&format!("  return _bindings().{fn_name}({arg_names});\n"));
             } else {
-                out.push_str(&format!("  _defaultBindings.{fn_name}({arg_names});\n"));
+                out.push_str(&format!("  _bindings().{fn_name}({arg_names});\n"));
             }
         } else {
             out.push_str("  throw UnimplementedError('TODO: bind to Rust FFI');\n");
@@ -776,8 +789,9 @@ namespace simple {
 
         generate_bindings(&args).expect("generate");
         let content = fs::read_to_string(out_dir.join("simple.dart")).expect("read generated");
-        assert!(content.contains("final SimpleFfi _defaultBindings = SimpleFfi();"));
-        assert!(content.contains("return _defaultBindings.add(left, right);"));
+        assert!(content.contains("SimpleFfi? _defaultBindings;"));
+        assert!(content.contains("void configureDefaultBindings("));
+        assert!(content.contains("return _bindings().add(left, right);"));
         assert!(content.contains("throw UnimplementedError('TODO: bind to Rust FFI');"));
     }
 }

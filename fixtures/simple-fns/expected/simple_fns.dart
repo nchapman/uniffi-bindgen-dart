@@ -30,9 +30,19 @@ class SimpleFnsBindings {
   }
 }
 
-final SimpleFnsBindings _defaultBindings = SimpleFnsBindings();
+SimpleFnsBindings? _defaultBindings;
+
+SimpleFnsBindings _bindings() => _defaultBindings ??= SimpleFnsBindings();
+
+void configureDefaultBindings({ffi.DynamicLibrary? dynamicLibrary, String? libraryPath}) {
+  _defaultBindings = SimpleFnsBindings(dynamicLibrary: dynamicLibrary, libraryPath: libraryPath);
+}
+
+void resetDefaultBindings() {
+  _defaultBindings = null;
+}
 
 int add(int left, int right) {
-  return _defaultBindings.add(left, right);
+  return _bindings().add(left, right);
 }
 
