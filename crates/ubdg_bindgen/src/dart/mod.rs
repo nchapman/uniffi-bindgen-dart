@@ -447,30 +447,72 @@ fn render_data_models(records: &[UdlRecord], enums: &[UdlEnum]) -> String {
     for enum_ in enums {
         let enum_name = to_upper_camel(&enum_.name);
         let has_data = enum_.variants.iter().any(|v| !v.fields.is_empty());
-        if has_data {
+        out.push_str(&format!("String _encode{enum_name}({enum_name} value) {{\n"));
+        if !has_data {
+            out.push_str("  return switch (value) {\n");
+            for variant in &enum_.variants {
+                let variant_name = safe_dart_identifier(&to_lower_camel(&variant.name));
+                out.push_str(&format!("    {enum_name}.{variant_name} => '{variant_name}',\n"));
+            }
+            out.push_str("  };\n");
+            out.push_str("}\n\n");
+
+            out.push_str(&format!("{enum_name} _decode{enum_name}(String raw) {{\n"));
+            out.push_str("  switch (raw) {\n");
+            for variant in &enum_.variants {
+                let variant_name = safe_dart_identifier(&to_lower_camel(&variant.name));
+                out.push_str(&format!("    case '{variant_name}':\n"));
+                out.push_str(&format!("      return {enum_name}.{variant_name};\n"));
+            }
+            out.push_str("    default:\n");
+            out.push_str(&format!(
+                "      throw StateError('Unknown {} variant: $raw');\n",
+                enum_name
+            ));
+            out.push_str("  }\n");
+            out.push_str("}\n\n");
             continue;
         }
-        out.push_str(&format!(
-            "String _encode{enum_name}({enum_name} value) {{\n"
-        ));
-        out.push_str("  return switch (value) {\n");
+
         for variant in &enum_.variants {
-            let variant_name = safe_dart_identifier(&to_lower_camel(&variant.name));
-            out.push_str(&format!("    {enum_name}.{variant_name} => '{variant_name}',\n"));
+            let variant_class = format!("{}{}", enum_name, to_upper_camel(&variant.name));
+            out.push_str(&format!("  if (value is {variant_class}) {{\n"));
+            out.push_str("    return jsonEncode({\n");
+            let variant_tag = safe_dart_identifier(&to_lower_camel(&variant.name));
+            out.push_str(&format!("      'tag': '{variant_tag}',\n"));
+            for field in &variant.fields {
+                let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
+                let expr = render_json_encode_expr(&format!("value.{field_name}"), &field.type_);
+                out.push_str(&format!("      '{field_name}': {expr},\n"));
+            }
+            out.push_str("    });\n");
+            out.push_str("  }\n");
         }
-        out.push_str("  };\n");
+        out.push_str(&format!(
+            "  throw StateError('Unknown {} variant instance: $value');\n",
+            enum_name
+        ));
         out.push_str("}\n\n");
 
         out.push_str(&format!("{enum_name} _decode{enum_name}(String raw) {{\n"));
-        out.push_str("  switch (raw) {\n");
+        out.push_str("  final Map<String, dynamic> map = jsonDecode(raw) as Map<String, dynamic>;\n");
+        out.push_str("  final String? tag = map['tag'] as String?;\n");
+        out.push_str("  switch (tag) {\n");
         for variant in &enum_.variants {
-            let variant_name = safe_dart_identifier(&to_lower_camel(&variant.name));
-            out.push_str(&format!("    case '{variant_name}':\n"));
-            out.push_str(&format!("      return {enum_name}.{variant_name};\n"));
+            let variant_tag = safe_dart_identifier(&to_lower_camel(&variant.name));
+            let variant_class = format!("{}{}", enum_name, to_upper_camel(&variant.name));
+            out.push_str(&format!("    case '{variant_tag}':\n"));
+            out.push_str(&format!("      return {variant_class}(\n"));
+            for field in &variant.fields {
+                let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
+                let decode = render_json_decode_expr(&format!("map['{field_name}']"), &field.type_);
+                out.push_str(&format!("        {field_name}: {decode},\n"));
+            }
+            out.push_str("      );\n");
         }
         out.push_str("    default:\n");
         out.push_str(&format!(
-            "      throw StateError('Unknown {} variant: $raw');\n",
+            "      throw StateError('Unknown {} variant tag: $tag');\n",
             enum_name
         ));
         out.push_str("  }\n");
@@ -756,7 +798,7 @@ fn render_bound_methods(functions: &[UdlFunction], records: &[UdlRecord], enums:
                 ));
                 post_call.push(format!("    calloc.free({native_name});\n"));
                 call_args.push(native_name);
-            } else if is_runtime_flat_enum_type(&arg.type_, enums) {
+            } else if is_runtime_enum_type(&arg.type_, enums) {
                 let native_name = format!("{arg_name}Native");
                 let enum_name = enum_name_from_type(&arg.type_).unwrap_or("Enum");
                 pre_call.push(format!(
@@ -956,7 +998,7 @@ fn render_bound_methods(functions: &[UdlFunction], records: &[UdlRecord], enums:
                 out.push_str("        _rustStringFree(resultPtr);\n");
                 out.push_str("      }\n");
             }
-            Some(type_) if is_runtime_flat_enum_type(type_, enums) => {
+            Some(type_) if is_runtime_enum_type(type_, enums) => {
                 let enum_name = enum_name_from_type(type_).unwrap_or("Enum");
                 out.push_str(&format!(
                     "      final ffi.Pointer<Utf8> resultPtr = {call_expr};\n"
@@ -1122,7 +1164,7 @@ fn map_runtime_native_ffi_type(
             Some("ffi.Pointer<Utf8>")
         }
         Type::Record { name, .. } if records.iter().any(|r| r.name == *name) => Some("ffi.Pointer<Utf8>"),
-        Type::Enum { name, .. } if enums.iter().any(|e| e.name == *name && e.variants.iter().all(|v| v.fields.is_empty())) => {
+        Type::Enum { name, .. } if enums.iter().any(|e| e.name == *name) => {
             Some("ffi.Pointer<Utf8>")
         }
         _ => None,
@@ -1158,7 +1200,7 @@ fn map_runtime_dart_ffi_type(
             Some("ffi.Pointer<Utf8>")
         }
         Type::Record { name, .. } if records.iter().any(|r| r.name == *name) => Some("ffi.Pointer<Utf8>"),
-        Type::Enum { name, .. } if enums.iter().any(|e| e.name == *name && e.variants.iter().all(|v| v.fields.is_empty())) => {
+        Type::Enum { name, .. } if enums.iter().any(|e| e.name == *name) => {
             Some("ffi.Pointer<Utf8>")
         }
         _ => None,
@@ -1185,18 +1227,15 @@ fn is_runtime_record_type(type_: &Type) -> bool {
     matches!(type_, Type::Record { .. })
 }
 
-fn is_runtime_flat_enum_type(type_: &Type, enums: &[UdlEnum]) -> bool {
+fn is_runtime_enum_type(type_: &Type, enums: &[UdlEnum]) -> bool {
     let Some(name) = enum_name_from_type(type_) else {
         return false;
     };
-    enums
-        .iter()
-        .find(|e| e.name == name)
-        .is_some_and(|e| e.variants.iter().all(|v| v.fields.is_empty()))
+    enums.iter().any(|e| e.name == name)
 }
 
 fn is_runtime_record_or_enum_string_type(type_: &Type, enums: &[UdlEnum]) -> bool {
-    is_runtime_record_type(type_) || is_runtime_flat_enum_type(type_, enums)
+    is_runtime_record_type(type_) || is_runtime_enum_type(type_, enums)
 }
 
 fn enum_name_from_type(type_: &Type) -> Option<&str> {
@@ -1831,5 +1870,7 @@ interface Outcome {
         assert!(content.contains("sealed class Outcome {"));
         assert!(content.contains("final class OutcomeSuccess extends Outcome {"));
         assert!(content.contains("final class OutcomeFailure extends Outcome {"));
+        assert!(content.contains("String _encodeOutcome(Outcome value) {"));
+        assert!(content.contains("Outcome _decodeOutcome(String raw) {"));
     }
 }

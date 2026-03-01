@@ -67,6 +67,26 @@ enum Color {
   blue,
 }
 
+sealed class Outcome {
+  const Outcome();
+}
+
+final class OutcomeSuccess extends Outcome {
+  const OutcomeSuccess({
+    required this.message,
+  });
+  final String message;
+}
+
+final class OutcomeFailure extends Outcome {
+  const OutcomeFailure({
+    required this.code,
+    required this.reason,
+  });
+  final int code;
+  final String reason;
+}
+
 String _encodeColor(Color value) {
   return switch (value) {
     Color.red => 'red',
@@ -85,6 +105,41 @@ Color _decodeColor(String raw) {
       return Color.blue;
     default:
       throw StateError('Unknown Color variant: $raw');
+  }
+}
+
+String _encodeOutcome(Outcome value) {
+  if (value is OutcomeSuccess) {
+    return jsonEncode({
+      'tag': 'success',
+      'message': value.message,
+    });
+  }
+  if (value is OutcomeFailure) {
+    return jsonEncode({
+      'tag': 'failure',
+      'code': value.code,
+      'reason': value.reason,
+    });
+  }
+  throw StateError('Unknown Outcome variant instance: $value');
+}
+
+Outcome _decodeOutcome(String raw) {
+  final Map<String, dynamic> map = jsonDecode(raw) as Map<String, dynamic>;
+  final String? tag = map['tag'] as String?;
+  switch (tag) {
+    case 'success':
+      return OutcomeSuccess(
+        message: map['message'] as String,
+      );
+    case 'failure':
+      return OutcomeFailure(
+        code: (map['code'] as num).toInt(),
+        reason: map['reason'] as String,
+      );
+    default:
+      throw StateError('Unknown Outcome variant tag: $tag');
   }
 }
 
@@ -350,6 +405,27 @@ class SimpleFnsBindings {
     }
   }
 
+  late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> input) _evolveOutcome = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> input), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> input)>('evolve_outcome');
+
+  Outcome evolveOutcome(Outcome input) {
+    final String inputNativeJson = _encodeOutcome(input);
+    final ffi.Pointer<Utf8> inputNative = inputNativeJson.toNativeUtf8();
+    try {
+      final ffi.Pointer<Utf8> resultPtr = _evolveOutcome(inputNative);
+      if (resultPtr == ffi.nullptr) {
+        throw StateError('Rust returned null for evolve_outcome');
+      }
+      try {
+        final String payload = resultPtr.toDartString();
+        return _decodeOutcome(payload);
+      } finally {
+        _rustStringFree(resultPtr);
+      }
+    } finally {
+    calloc.free(inputNative);
+    }
+  }
+
   late final int Function() _freeCount = _lib.lookupFunction<ffi.Uint32 Function(), int Function()>('free_count');
 
   int freeCount() {
@@ -514,6 +590,10 @@ Color cycleColor(Color input) {
 
 Person echoPerson(Person input) {
   return _bindings().echoPerson(input);
+}
+
+Outcome evolveOutcome(Outcome input) {
+  return _bindings().evolveOutcome(input);
 }
 
 int freeCount() {

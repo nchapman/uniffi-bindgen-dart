@@ -22,6 +22,7 @@ void main() {
     expect(contents, contains("libraryName = 'uniffi_simple_fns';"));
     expect(contents, contains('int add(int left, int right) {'));
     expect(contents, contains('Person echoPerson(Person input) {'));
+    expect(contents, contains('Outcome evolveOutcome(Outcome input) {'));
     expect(contents, contains('DateTime addSeconds(DateTime when_, int seconds) {'));
     expect(contents, contains('int addU64(int left, int right) {'));
     expect(contents, contains('int freeCount() {'));
@@ -88,8 +89,13 @@ void main() {
     expect(contents, contains('return Uint8List.fromList(resultData.asTypedList(resultLen));'));
     expect(contents, contains('class Person {'));
     expect(contents, contains('enum Color {'));
+    expect(contents, contains('sealed class Outcome {'));
+    expect(contents, contains('final class OutcomeSuccess extends Outcome {'));
+    expect(contents, contains('final class OutcomeFailure extends Outcome {'));
     expect(contents, contains('String _encodeColor(Color value) {'));
     expect(contents, contains('Color _decodeColor(String raw) {'));
+    expect(contents, contains('String _encodeOutcome(Outcome value) {'));
+    expect(contents, contains('Outcome _decodeOutcome(String raw) {'));
   });
 
   test('runtime ffi binding can call native exports', () {
@@ -168,6 +174,19 @@ void main() {
     expect(bindings.cycleColor(Color.red), Color.green);
     expect(bindings.cycleColor(Color.green), Color.blue);
     expect(bindings.cycleColor(Color.blue), Color.red);
+    final freeBeforeOutcome = bindings.freeCount();
+    final evolved1 = bindings.evolveOutcome(const OutcomeSuccess(message: 'ok'));
+    expect(evolved1, isA<OutcomeFailure>());
+    final evolved1Failure = evolved1 as OutcomeFailure;
+    expect(evolved1Failure.code, 2);
+    expect(evolved1Failure.reason, 'ok');
+    final evolved2 = bindings.evolveOutcome(
+      const OutcomeFailure(code: 7, reason: 'bad'),
+    );
+    expect(evolved2, isA<OutcomeSuccess>());
+    final evolved2Success = evolved2 as OutcomeSuccess;
+    expect(evolved2Success.message, '7:bad');
+    expect(bindings.freeCount(), freeBeforeOutcome + 2);
     expect(bindings.isEven(9), isFalse);
     expect(bindings.scale(2.5, 4.0), closeTo(10.0, 0.000001));
     expect(bindings.scale32(1.25, 8.0), closeTo(10.0, 0.0001));
@@ -225,6 +244,13 @@ void main() {
     expect(freeCount(), 3);
     expect(isEven(10), isTrue);
     expect(cycleColor(Color.red), Color.green);
+    final freeBeforeTopOutcome = freeCount();
+    final topEvolved = evolveOutcome(const OutcomeSuccess(message: 'go'));
+    expect(topEvolved, isA<OutcomeFailure>());
+    final topFailure = topEvolved as OutcomeFailure;
+    expect(topFailure.code, 2);
+    expect(topFailure.reason, 'go');
+    expect(freeCount(), freeBeforeTopOutcome + 1);
     expect(isEven(11), isFalse);
     expect(scale(1.5, 3.0), closeTo(4.5, 0.000001));
     expect(scale32(0.5, 6.0), closeTo(3.0, 0.0001));

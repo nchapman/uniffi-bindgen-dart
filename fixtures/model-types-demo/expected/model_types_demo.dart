@@ -91,6 +91,41 @@ Color _decodeColor(String raw) {
   }
 }
 
+String _encodeOutcome(Outcome value) {
+  if (value is OutcomeSuccess) {
+    return jsonEncode({
+      'tag': 'success',
+      'message': value.message,
+    });
+  }
+  if (value is OutcomeFailure) {
+    return jsonEncode({
+      'tag': 'failure',
+      'code': value.code,
+      'reason': value.reason,
+    });
+  }
+  throw StateError('Unknown Outcome variant instance: $value');
+}
+
+Outcome _decodeOutcome(String raw) {
+  final Map<String, dynamic> map = jsonDecode(raw) as Map<String, dynamic>;
+  final String? tag = map['tag'] as String?;
+  switch (tag) {
+    case 'success':
+      return OutcomeSuccess(
+        message: map['message'] as String,
+      );
+    case 'failure':
+      return OutcomeFailure(
+        code: (map['code'] as num).toInt(),
+        reason: map['reason'] as String,
+      );
+    default:
+      throw StateError('Unknown Outcome variant tag: $tag');
+  }
+}
+
 class ModelTypesDemoFfi {
   ModelTypesDemoFfi({ffi.DynamicLibrary? dynamicLibrary, String? libraryPath})
       : _dynamicLibrary = dynamicLibrary,

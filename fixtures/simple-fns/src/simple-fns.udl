@@ -1,6 +1,7 @@
 namespace simple_fns {
   u32 add(u32 left, u32 right);
   Person echo_person(Person input);
+  Outcome evolve_outcome(Outcome input);
   timestamp add_seconds(timestamp when, i64 seconds);
   u64 add_u64(u64 left, u64 right);
   string broken_greet();
@@ -35,4 +36,10 @@ enum Color {
   "red",
   "green",
   "blue"
+};
+
+[Enum]
+interface Outcome {
+  Success(string message);
+  Failure(i32 code, string reason);
 };

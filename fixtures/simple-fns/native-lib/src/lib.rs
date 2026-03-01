@@ -2,6 +2,8 @@ use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::sync::atomic::{AtomicU32, Ordering};
 
+use serde_json::Value;
+
 static TICK_COUNT: AtomicU32 = AtomicU32::new(0);
 static FREE_COUNT: AtomicU32 = AtomicU32::new(0);
 static BYTES_FREE_COUNT: AtomicU32 = AtomicU32::new(0);
@@ -187,6 +189,52 @@ pub extern "C" fn cycle_color(input: *const c_char) -> *mut c_char {
         _ => return std::ptr::null_mut(),
     };
     CString::new(next).expect("valid CString").into_raw()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn evolve_outcome(input: *const c_char) -> *mut c_char {
+    if input.is_null() {
+        return std::ptr::null_mut();
+    }
+    let payload = unsafe { CStr::from_ptr(input) }.to_string_lossy().into_owned();
+    let Ok(value) = serde_json::from_str::<Value>(&payload) else {
+        return std::ptr::null_mut();
+    };
+    let Some(tag) = value.get("tag").and_then(Value::as_str) else {
+        return std::ptr::null_mut();
+    };
+
+    let out = match tag {
+        "success" => {
+            let message = value
+                .get("message")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string();
+            serde_json::json!({
+                "tag": "failure",
+                "code": message.len() as i64,
+                "reason": message
+            })
+        }
+        "failure" => {
+            let code = value.get("code").and_then(Value::as_i64).unwrap_or_default();
+            let reason = value
+                .get("reason")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string();
+            serde_json::json!({
+                "tag": "success",
+                "message": format!("{code}:{reason}")
+            })
+        }
+        _ => return std::ptr::null_mut(),
+    };
+
+    CString::new(out.to_string())
+        .expect("valid CString")
+        .into_raw()
 }
 
 #[unsafe(no_mangle)]
