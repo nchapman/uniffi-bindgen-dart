@@ -1100,6 +1100,25 @@ fn render_dart_scaffold(
         out.push_str("  external int len;\n");
         out.push_str("}\n\n");
     }
+    if has_runtime_unsupported {
+        out.push_str("final class _UniFfiRustBuffer extends ffi.Struct {\n");
+        out.push_str("  @ffi.Uint64()\n");
+        out.push_str("  external int capacity;\n\n");
+        out.push_str("  @ffi.Uint64()\n");
+        out.push_str("  external int len;\n\n");
+        out.push_str("  external ffi.Pointer<ffi.Uint8> data;\n");
+        out.push_str("}\n\n");
+        out.push_str("final class _UniFfiForeignBytes extends ffi.Struct {\n");
+        out.push_str("  @ffi.Int32()\n");
+        out.push_str("  external int len;\n\n");
+        out.push_str("  external ffi.Pointer<ffi.Uint8> data;\n");
+        out.push_str("}\n\n");
+        out.push_str("final class _UniFfiRustCallStatus extends ffi.Struct {\n");
+        out.push_str("  @ffi.Int8()\n");
+        out.push_str("  external int code;\n\n");
+        out.push_str("  external _UniFfiRustBuffer errorBuf;\n");
+        out.push_str("}\n\n");
+    }
     if needs_rust_call_status {
         out.push_str("final class _RustCallStatus extends ffi.Struct {\n");
         out.push_str("  @ffi.Int8()\n");
