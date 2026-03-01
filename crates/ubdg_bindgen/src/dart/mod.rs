@@ -109,6 +109,7 @@ fn extract_namespace_from_udl(source: &Path) -> Option<String> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct UdlFunction {
     name: String,
+    docstring: Option<String>,
     is_async: bool,
     return_type: Option<Type>,
     throws_type: Option<Type>,
@@ -119,11 +120,13 @@ struct UdlFunction {
 struct UdlArg {
     name: String,
     type_: Type,
+    docstring: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct UdlObject {
     name: String,
+    docstring: Option<String>,
     constructors: Vec<UdlObjectConstructor>,
     methods: Vec<UdlObjectMethod>,
     trait_methods: UdlObjectTraitMethods,
@@ -132,6 +135,7 @@ struct UdlObject {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct UdlObjectConstructor {
     name: String,
+    docstring: Option<String>,
     is_async: bool,
     args: Vec<UdlArg>,
     throws_type: Option<Type>,
@@ -140,6 +144,7 @@ struct UdlObjectConstructor {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct UdlObjectMethod {
     name: String,
+    docstring: Option<String>,
     is_async: bool,
     return_type: Option<Type>,
     throws_type: Option<Type>,
@@ -158,12 +163,14 @@ struct UdlObjectTraitMethods {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct UdlCallbackInterface {
     name: String,
+    docstring: Option<String>,
     methods: Vec<UdlCallbackMethod>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct UdlCallbackMethod {
     name: String,
+    docstring: Option<String>,
     is_async: bool,
     return_type: Option<Type>,
     throws_type: Option<Type>,
@@ -173,12 +180,14 @@ struct UdlCallbackMethod {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct UdlRecord {
     name: String,
+    docstring: Option<String>,
     fields: Vec<UdlArg>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct UdlEnum {
     name: String,
+    docstring: Option<String>,
     is_error: bool,
     variants: Vec<UdlEnumVariant>,
 }
@@ -186,6 +195,7 @@ struct UdlEnum {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct UdlEnumVariant {
     name: String,
+    docstring: Option<String>,
     fields: Vec<UdlArg>,
 }
 
@@ -260,6 +270,7 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
         .iter()
         .map(|f| UdlFunction {
             name: f.name().to_string(),
+            docstring: f.docstring().map(ToString::to_string),
             is_async: f.is_async(),
             return_type: f.return_type().cloned(),
             throws_type: f.throws_type().cloned(),
@@ -269,40 +280,48 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
                 .map(|a| UdlArg {
                     name: a.name().to_string(),
                     type_: a.as_type(),
+                    docstring: None,
                 })
                 .collect(),
         })
         .collect::<Vec<_>>();
     let records = ci
         .record_definitions()
+        .iter()
         .map(|record| UdlRecord {
             name: record.name().to_string(),
+            docstring: record.docstring().map(ToString::to_string),
             fields: record
                 .fields()
                 .iter()
                 .map(|field| UdlArg {
                     name: field.name().to_string(),
                     type_: field.as_type(),
+                    docstring: field.docstring().map(ToString::to_string),
                 })
                 .collect(),
         })
         .collect::<Vec<_>>();
     let enums = ci
         .enum_definitions()
+        .iter()
         .map(|enum_| UdlEnum {
             name: enum_.name().to_string(),
+            docstring: enum_.docstring().map(ToString::to_string),
             is_error: ci.is_name_used_as_error(enum_.name()),
             variants: enum_
                 .variants()
                 .iter()
                 .map(|variant| UdlEnumVariant {
                     name: variant.name().to_string(),
+                    docstring: variant.docstring().map(ToString::to_string),
                     fields: variant
                         .fields()
                         .iter()
                         .map(|field| UdlArg {
                             name: field.name().to_string(),
                             type_: field.as_type(),
+                            docstring: field.docstring().map(ToString::to_string),
                         })
                         .collect(),
                 })
@@ -318,6 +337,7 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
                 .into_iter()
                 .map(|m| UdlObjectMethod {
                     name: m.name().to_string(),
+                    docstring: m.docstring().map(ToString::to_string),
                     is_async: m.is_async(),
                     return_type: m.return_type().cloned(),
                     throws_type: m.throws_type().cloned(),
@@ -327,6 +347,7 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
                         .map(|a| UdlArg {
                             name: a.name().to_string(),
                             type_: a.as_type(),
+                            docstring: None,
                         })
                         .collect(),
                 })
@@ -350,6 +371,7 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
                 trait_methods.display = Some("uniffi_trait_display".to_string());
                 methods.push(UdlObjectMethod {
                     name: "uniffi_trait_display".to_string(),
+                    docstring: None,
                     is_async: false,
                     return_type: Some(Type::String),
                     throws_type: None,
@@ -360,6 +382,7 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
                 trait_methods.debug = Some("uniffi_trait_debug".to_string());
                 methods.push(UdlObjectMethod {
                     name: "uniffi_trait_debug".to_string(),
+                    docstring: None,
                     is_async: false,
                     return_type: Some(Type::String),
                     throws_type: None,
@@ -370,6 +393,7 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
                 trait_methods.hash = Some("uniffi_trait_hash".to_string());
                 methods.push(UdlObjectMethod {
                     name: "uniffi_trait_hash".to_string(),
+                    docstring: None,
                     is_async: false,
                     return_type: Some(Type::UInt64),
                     throws_type: None,
@@ -380,12 +404,14 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
                 trait_methods.eq = Some("uniffi_trait_eq".to_string());
                 methods.push(UdlObjectMethod {
                     name: "uniffi_trait_eq".to_string(),
+                    docstring: None,
                     is_async: false,
                     return_type: Some(Type::Boolean),
                     throws_type: None,
                     args: vec![UdlArg {
                         name: "other".to_string(),
                         type_: Type::UInt64,
+                        docstring: None,
                     }],
                 });
             }
@@ -393,12 +419,14 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
                 trait_methods.ne = Some("uniffi_trait_ne".to_string());
                 methods.push(UdlObjectMethod {
                     name: "uniffi_trait_ne".to_string(),
+                    docstring: None,
                     is_async: false,
                     return_type: Some(Type::Boolean),
                     throws_type: None,
                     args: vec![UdlArg {
                         name: "other".to_string(),
                         type_: Type::UInt64,
+                        docstring: None,
                     }],
                 });
             }
@@ -407,11 +435,13 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
 
             UdlObject {
                 name: obj.name().to_string(),
+                docstring: obj.docstring().map(ToString::to_string),
                 constructors: obj
                     .constructors()
                     .into_iter()
                     .map(|ctor| UdlObjectConstructor {
                         name: ctor.name().to_string(),
+                        docstring: ctor.docstring().map(ToString::to_string),
                         is_async: ctor.is_async(),
                         args: ctor
                             .arguments()
@@ -419,6 +449,7 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
                             .map(|a| UdlArg {
                                 name: a.name().to_string(),
                                 type_: a.as_type(),
+                                docstring: None,
                             })
                             .collect(),
                         throws_type: ctor.throws_type().cloned(),
@@ -434,11 +465,13 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
         .iter()
         .map(|cb| UdlCallbackInterface {
             name: cb.name().to_string(),
+            docstring: cb.docstring().map(ToString::to_string),
             methods: cb
                 .methods()
                 .into_iter()
                 .map(|m| UdlCallbackMethod {
                     name: m.name().to_string(),
+                    docstring: m.docstring().map(ToString::to_string),
                     is_async: m.is_async(),
                     return_type: m.return_type().cloned(),
                     throws_type: m.throws_type().cloned(),
@@ -448,6 +481,7 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
                         .map(|a| UdlArg {
                             name: a.name().to_string(),
                             type_: a.as_type(),
+                            docstring: None,
                         })
                         .collect(),
                 })
@@ -772,19 +806,42 @@ fn render_dart_scaffold(
     out
 }
 
+fn render_doc_comment(docstring: Option<&str>, indent: &str) -> String {
+    let Some(raw) = docstring.map(str::trim) else {
+        return String::new();
+    };
+    if raw.is_empty() {
+        return String::new();
+    }
+
+    let mut out = String::new();
+    for line in raw.lines() {
+        let clean = line.trim();
+        if clean.is_empty() {
+            out.push_str(&format!("{indent}///\n"));
+        } else {
+            out.push_str(&format!("{indent}/// {clean}\n"));
+        }
+    }
+    out
+}
+
 fn render_data_models(records: &[UdlRecord], enums: &[UdlEnum]) -> String {
     let mut out = String::new();
 
     for record in records {
         let class_name = to_upper_camel(&record.name);
+        out.push_str(&render_doc_comment(record.docstring.as_deref(), ""));
         out.push_str(&format!("class {class_name} {{\n"));
         out.push_str(&format!("  const {class_name}({{\n"));
         for field in &record.fields {
+            out.push_str(&render_doc_comment(field.docstring.as_deref(), "    "));
             let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
             out.push_str(&format!("    required this.{field_name},\n"));
         }
         out.push_str("  });\n\n");
         for field in &record.fields {
+            out.push_str(&render_doc_comment(field.docstring.as_deref(), "  "));
             let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
             out.push_str(&format!(
                 "  final {} {field_name};\n",
@@ -843,8 +900,10 @@ fn render_data_models(records: &[UdlRecord], enums: &[UdlEnum]) -> String {
         let enum_name = to_upper_camel(&enum_.name);
         let has_data = enum_.variants.iter().any(|v| !v.fields.is_empty());
         if !has_data && !enum_.is_error {
+            out.push_str(&render_doc_comment(enum_.docstring.as_deref(), ""));
             out.push_str(&format!("enum {enum_name} {{\n"));
             for variant in &enum_.variants {
+                out.push_str(&render_doc_comment(variant.docstring.as_deref(), "  "));
                 out.push_str(&format!(
                     "  {},\n",
                     safe_dart_identifier(&to_lower_camel(&variant.name))
@@ -854,12 +913,14 @@ fn render_data_models(records: &[UdlRecord], enums: &[UdlEnum]) -> String {
             continue;
         }
 
+        out.push_str(&render_doc_comment(enum_.docstring.as_deref(), ""));
         out.push_str(&format!(
             "sealed class {enum_name} {{\n  const {enum_name}();\n}}\n\n"
         ));
         for variant in &enum_.variants {
             let variant_name = to_upper_camel(&variant.name);
             let class_name = format!("{enum_name}{variant_name}");
+            out.push_str(&render_doc_comment(variant.docstring.as_deref(), ""));
             out.push_str(&format!(
                 "final class {class_name} extends {enum_name} {{\n"
             ));
@@ -868,12 +929,14 @@ fn render_data_models(records: &[UdlRecord], enums: &[UdlEnum]) -> String {
             } else {
                 out.push_str(&format!("  const {class_name}({{\n"));
                 for field in &variant.fields {
+                    out.push_str(&render_doc_comment(field.docstring.as_deref(), "    "));
                     let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
                     out.push_str(&format!("    required this.{field_name},\n"));
                 }
                 out.push_str("  });\n");
             }
             for field in &variant.fields {
+                out.push_str(&render_doc_comment(field.docstring.as_deref(), "  "));
                 let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
                 out.push_str(&format!(
                     "  final {} {field_name};\n",
@@ -890,12 +953,14 @@ fn render_data_models(records: &[UdlRecord], enums: &[UdlEnum]) -> String {
         }
         let enum_name = to_upper_camel(&enum_.name);
         let exception_name = format!("{enum_name}Exception");
+        out.push_str(&render_doc_comment(enum_.docstring.as_deref(), ""));
         out.push_str(&format!(
             "sealed class {exception_name} implements Exception {{\n  const {exception_name}();\n}}\n\n"
         ));
         for variant in &enum_.variants {
             let variant_name = to_upper_camel(&variant.name);
             let variant_exception = format!("{exception_name}{variant_name}");
+            out.push_str(&render_doc_comment(variant.docstring.as_deref(), ""));
             out.push_str(&format!(
                 "final class {variant_exception} extends {exception_name} {{\n"
             ));
@@ -904,11 +969,13 @@ fn render_data_models(records: &[UdlRecord], enums: &[UdlEnum]) -> String {
             } else {
                 out.push_str(&format!("  const {variant_exception}({{\n"));
                 for field in &variant.fields {
+                    out.push_str(&render_doc_comment(field.docstring.as_deref(), "    "));
                     let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
                     out.push_str(&format!("    required this.{field_name},\n"));
                 }
                 out.push_str("  });\n");
                 for field in &variant.fields {
+                    out.push_str(&render_doc_comment(field.docstring.as_deref(), "  "));
                     let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
                     out.push_str(&format!(
                         "  final {} {field_name};\n",
@@ -1288,6 +1355,10 @@ fn render_callback_interfaces(callback_interfaces: &[UdlCallbackInterface]) -> S
     let mut out = String::new();
     for callback_interface in callback_interfaces {
         let class_name = to_upper_camel(&callback_interface.name);
+        out.push_str(&render_doc_comment(
+            callback_interface.docstring.as_deref(),
+            "",
+        ));
         out.push_str(&format!("abstract interface class {class_name} {{\n"));
         for method in &callback_interface.methods {
             let value_return_type = method
@@ -1313,6 +1384,7 @@ fn render_callback_interfaces(callback_interfaces: &[UdlCallbackInterface]) -> S
                 .collect::<Vec<_>>()
                 .join(", ");
             let method_name = safe_dart_identifier(&to_lower_camel(&method.name));
+            out.push_str(&render_doc_comment(method.docstring.as_deref(), "  "));
             out.push_str(&format!(
                 "  {signature_return_type} {method_name}({args});\n"
             ));
@@ -3705,6 +3777,7 @@ fn render_object_classes(
         out.push_str(&format!(
             "final class {token_name} {{\n  const {token_name}(this.free, this.handle);\n  final void Function(int) free;\n  final int handle;\n}}\n\n"
         ));
+        out.push_str(&render_doc_comment(object.docstring.as_deref(), ""));
         out.push_str(&format!("final class {object_name} {{\n"));
         out.push_str(&format!("  {object_name}._(this._ffi, this._handle) {{\n"));
         out.push_str(&format!(
@@ -3783,6 +3856,7 @@ fn render_object_classes(
             } else {
                 object_name.clone()
             };
+            out.push_str(&render_doc_comment(ctor.docstring.as_deref(), "  "));
             out.push_str(&format!(
                 "  static {signature_return} {static_name}({args}) {{\n"
             ));
@@ -3854,6 +3928,7 @@ fn render_object_classes(
                 .map(|a| safe_dart_identifier(&to_lower_camel(&a.name)))
                 .collect::<Vec<_>>()
                 .join(", ");
+            out.push_str(&render_doc_comment(method.docstring.as_deref(), "  "));
             out.push_str(&format!("  {signature_return} {method_name}({args}) {{\n"));
             out.push_str("    _ensureOpen();\n");
             let invoke_args = if arg_names.is_empty() {
