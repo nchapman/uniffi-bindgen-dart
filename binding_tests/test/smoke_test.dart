@@ -99,7 +99,12 @@ void main() {
     expect(contents, contains('static Counter create(int initial) {'));
     expect(contents, contains('void addValue(int amount) {'));
     expect(contents, contains('int currentValue() {'));
+    expect(contents, contains('String describe() {'));
+    expect(contents, contains('Person snapshotPerson() {'));
+    expect(contents, contains('Outcome snapshotOutcome() {'));
+    expect(contents, contains('Uint8List snapshotBytes() {'));
     expect(contents, contains('int divideBy(int divisor) {'));
+    expect(contents, contains('Outcome riskyOutcome(int divisor) {'));
     expect(contents, contains('void close() {'));
     expect(contents, contains('final class OutcomeSuccess extends Outcome {'));
     expect(contents, contains('final class OutcomeFailure extends Outcome {'));
@@ -197,6 +202,26 @@ void main() {
     expect(counter.currentValue(), 15);
     expect(counter.divideBy(3), 5);
     expect(counter.currentValue(), 5);
+    expect(counter.describe(), 'counter:5');
+    final snapPerson = counter.snapshotPerson();
+    expect(snapPerson.name, 'counter');
+    expect(snapPerson.age, 5);
+    final snapOutcome = counter.snapshotOutcome();
+    expect(snapOutcome, isA<OutcomeFailure>());
+    final snapFailure = snapOutcome as OutcomeFailure;
+    expect(snapFailure.code, 5);
+    expect(snapFailure.reason, 'odd');
+    final bytesBeforeSnapshot = bindings.bytesFreeCount();
+    expect(counter.snapshotBytes(), Uint8List.fromList('bytes:5'.codeUnits));
+    expect(bindings.bytesFreeCount(), bytesBeforeSnapshot + 1);
+    final risky = counter.riskyOutcome(5);
+    expect(risky, isA<OutcomeSuccess>());
+    final riskySuccess = risky as OutcomeSuccess;
+    expect(riskySuccess.message, 'q:1');
+    expect(
+      () => counter.riskyOutcome(0),
+      throwsA(isA<MathErrorExceptionDivisionByZero>()),
+    );
     expect(() => counter.divideBy(0), throwsA(isA<MathErrorExceptionDivisionByZero>()));
     expect(
       () => counter.divideBy(-2),
@@ -206,12 +231,14 @@ void main() {
     );
     counter.close();
     expect(() => counter.currentValue(), throwsA(isA<StateError>()));
+    final freeAfterCounter = bindings.freeCount();
+    expect(freeAfterCounter, greaterThanOrEqualTo(9));
     expect(bindings.maybeGreet('dart'), 'maybe, dart');
-    expect(bindings.freeCount(), 9);
+    expect(bindings.freeCount(), freeAfterCounter + 1);
     expect(bindings.maybeGreet(null), isNull);
-    expect(bindings.freeCount(), 9);
+    expect(bindings.freeCount(), freeAfterCounter + 1);
     expect(() => bindings.brokenGreet(), throwsA(isA<StateError>()));
-    expect(bindings.freeCount(), 9);
+    expect(bindings.freeCount(), freeAfterCounter + 1);
     expect(bindings.isEven(8), isTrue);
     expect(bindings.cycleColor(Color.red), Color.green);
     expect(bindings.cycleColor(Color.green), Color.blue);

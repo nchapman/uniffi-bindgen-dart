@@ -1470,7 +1470,7 @@ fn render_bound_methods(
             let supported_return = method
                 .return_type
                 .as_ref()
-                .map(is_runtime_plain_ffi_type)
+                .map(|t| is_runtime_ffi_compatible_type(t, records, enums))
                 .unwrap_or(true);
             if !supported_return
                 || !method
@@ -1583,7 +1583,7 @@ fn render_bound_methods(
                 out.push_str("    }\n");
                 if method.return_type.is_some() {
                     out.push_str("    final Object? okRaw = envelope['ok'];\n");
-                    let decode = render_plain_json_ok_decode_expr(
+                    let decode = render_json_decode_expr(
                         "okRaw",
                         method.return_type.as_ref().expect("checked"),
                     );
@@ -1592,11 +1592,99 @@ fn render_bound_methods(
                     out.push_str("    return;\n");
                 }
             } else if let Some(ret) = &method.return_type {
-                let decode = render_plain_ffi_decode_expr(
-                    ret,
-                    &format!("{method_field}({})", call_args.join(", ")),
-                );
-                out.push_str(&format!("    return {decode};\n"));
+                let call_expr = format!("{method_field}({})", call_args.join(", "));
+                if is_runtime_string_type(ret) {
+                    out.push_str(&format!(
+                        "    final ffi.Pointer<Utf8> resultPtr = {call_expr};\n"
+                    ));
+                    out.push_str("    if (resultPtr == ffi.nullptr) {\n");
+                    out.push_str(&format!(
+                        "      throw StateError('Rust returned null for {}');\n",
+                        method_symbol
+                    ));
+                    out.push_str("    }\n");
+                    out.push_str("    try {\n");
+                    out.push_str("      return resultPtr.toDartString();\n");
+                    out.push_str("    } finally {\n");
+                    out.push_str("      _rustStringFree(resultPtr);\n");
+                    out.push_str("    }\n");
+                } else if is_runtime_optional_string_type(ret) {
+                    out.push_str(&format!(
+                        "    final ffi.Pointer<Utf8> resultPtr = {call_expr};\n"
+                    ));
+                    out.push_str("    if (resultPtr == ffi.nullptr) {\n");
+                    out.push_str("      return null;\n");
+                    out.push_str("    }\n");
+                    out.push_str("    try {\n");
+                    out.push_str("      return resultPtr.toDartString();\n");
+                    out.push_str("    } finally {\n");
+                    out.push_str("      _rustStringFree(resultPtr);\n");
+                    out.push_str("    }\n");
+                } else if is_runtime_record_type(ret) {
+                    let record_name = record_name_from_type(ret).unwrap_or("Record");
+                    out.push_str(&format!(
+                        "    final ffi.Pointer<Utf8> resultPtr = {call_expr};\n"
+                    ));
+                    out.push_str("    if (resultPtr == ffi.nullptr) {\n");
+                    out.push_str(&format!(
+                        "      throw StateError('Rust returned null for {}');\n",
+                        method_symbol
+                    ));
+                    out.push_str("    }\n");
+                    out.push_str("    try {\n");
+                    out.push_str("      final String payload = resultPtr.toDartString();\n");
+                    out.push_str(&format!(
+                        "      return {}.fromJson(jsonDecode(payload) as Map<String, dynamic>);\n",
+                        to_upper_camel(record_name)
+                    ));
+                    out.push_str("    } finally {\n");
+                    out.push_str("      _rustStringFree(resultPtr);\n");
+                    out.push_str("    }\n");
+                } else if is_runtime_enum_type(ret, enums) {
+                    let enum_name = enum_name_from_type(ret).unwrap_or("Enum");
+                    out.push_str(&format!(
+                        "    final ffi.Pointer<Utf8> resultPtr = {call_expr};\n"
+                    ));
+                    out.push_str("    if (resultPtr == ffi.nullptr) {\n");
+                    out.push_str(&format!(
+                        "      throw StateError('Rust returned null for {}');\n",
+                        method_symbol
+                    ));
+                    out.push_str("    }\n");
+                    out.push_str("    try {\n");
+                    out.push_str("      final String payload = resultPtr.toDartString();\n");
+                    out.push_str(&format!(
+                        "      return _decode{}(payload);\n",
+                        to_upper_camel(enum_name)
+                    ));
+                    out.push_str("    } finally {\n");
+                    out.push_str("      _rustStringFree(resultPtr);\n");
+                    out.push_str("    }\n");
+                } else if is_runtime_bytes_type(ret) {
+                    out.push_str(&format!("    final _RustBuffer resultBuf = {call_expr};\n"));
+                    out.push_str("    final ffi.Pointer<ffi.Uint8> resultData = resultBuf.data;\n");
+                    out.push_str("    final int resultLen = resultBuf.len;\n");
+                    out.push_str("    if (resultData == ffi.nullptr) {\n");
+                    out.push_str("      if (resultLen == 0) {\n");
+                    out.push_str("        _rustBytesFree(resultBuf);\n");
+                    out.push_str("        return Uint8List(0);\n");
+                    out.push_str("      }\n");
+                    out.push_str(&format!(
+                        "      throw StateError('Rust returned invalid buffer for {}');\n",
+                        method_symbol
+                    ));
+                    out.push_str("    }\n");
+                    out.push_str("    try {\n");
+                    out.push_str(
+                        "      return Uint8List.fromList(resultData.asTypedList(resultLen));\n",
+                    );
+                    out.push_str("    } finally {\n");
+                    out.push_str("      _rustBytesFree(resultBuf);\n");
+                    out.push_str("    }\n");
+                } else {
+                    let decode = render_plain_ffi_decode_expr(ret, &call_expr);
+                    out.push_str(&format!("    return {decode};\n"));
+                }
             } else {
                 out.push_str(&format!("    {method_field}({});\n", call_args.join(", ")));
             }
@@ -1700,7 +1788,7 @@ fn render_object_classes(
             let supported_return = method
                 .return_type
                 .as_ref()
-                .map(is_runtime_plain_ffi_type)
+                .map(|t| is_runtime_ffi_compatible_type(t, records, enums))
                 .unwrap_or(true);
             if !supported_return
                 || !method
@@ -2037,26 +2125,6 @@ fn is_runtime_plain_ffi_type(type_: &Type) -> bool {
             | Type::Timestamp
             | Type::Duration
     )
-}
-
-fn render_plain_json_ok_decode_expr(value_expr: &str, type_: &Type) -> String {
-    match type_ {
-        Type::UInt8
-        | Type::Int8
-        | Type::UInt16
-        | Type::Int16
-        | Type::UInt32
-        | Type::Int32
-        | Type::UInt64
-        | Type::Int64 => format!("({value_expr} as num).toInt()"),
-        Type::Float32 | Type::Float64 => format!("({value_expr} as num).toDouble()"),
-        Type::Boolean => format!("{value_expr} as bool"),
-        Type::Timestamp => format!(
-            "DateTime.fromMicrosecondsSinceEpoch(({value_expr} as num).toInt(), isUtc: true)"
-        ),
-        Type::Duration => format!("Duration(microseconds: ({value_expr} as num).toInt())"),
-        _ => "throw UnimplementedError('unsupported object ok decode type')".to_string(),
-    }
 }
 
 fn render_plain_ffi_decode_expr(type_: &Type, call_expr: &str) -> String {
@@ -2682,12 +2750,29 @@ interface MathError {
   DivisionByZero();
 };
 
+dictionary Person {
+  string name;
+  u32 age;
+};
+
+[Enum]
+interface Outcome {
+  Success(string message);
+  Failure(i32 code, string reason);
+};
+
 interface Counter {
   constructor(u32 initial);
   void add_value(u32 amount);
   u32 current_value();
+  string describe();
+  Person snapshot_person();
+  Outcome snapshot_outcome();
+  bytes snapshot_bytes();
   [Throws=MathError]
   i32 divide_by(i32 divisor);
+  [Throws=MathError]
+  Outcome risky_outcome(i32 divisor);
 };
 "#,
         )
@@ -2709,7 +2794,12 @@ interface Counter {
         assert!(content.contains("void close() {"));
         assert!(content.contains("void addValue(int amount) {"));
         assert!(content.contains("int currentValue() {"));
+        assert!(content.contains("String describe() {"));
+        assert!(content.contains("Person snapshotPerson() {"));
+        assert!(content.contains("Outcome snapshotOutcome() {"));
+        assert!(content.contains("Uint8List snapshotBytes() {"));
         assert!(content.contains("int divideBy(int divisor) {"));
+        assert!(content.contains("Outcome riskyOutcome(int divisor) {"));
         assert!(content.contains("late final void Function(int handle) _counterFree ="));
         assert!(content.contains("Counter counterCreateNew(int initial) {"));
         assert!(content.contains("int counterInvokeCurrentValue(int handle) {"));

@@ -56,6 +56,12 @@ interface Counter {
   constructor(u32 initial);
   void add_value(u32 amount);
   u32 current_value();
+  string describe();
+  Person snapshot_person();
+  Outcome snapshot_outcome();
+  bytes snapshot_bytes();
   [Throws=MathError]
   i32 divide_by(i32 divisor);
+  [Throws=MathError]
+  Outcome risky_outcome(i32 divisor);
 };

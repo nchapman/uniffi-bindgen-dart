@@ -352,6 +352,72 @@ pub extern "C" fn counter_current_value(handle: u64) -> u32 {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn counter_describe(handle: u64) -> *mut c_char {
+    let value = COUNTERS
+        .lock()
+        .expect("counter map lock")
+        .get(&handle)
+        .copied()
+        .unwrap_or_default();
+    CString::new(format!("counter:{value}"))
+        .expect("valid CString")
+        .into_raw()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_snapshot_person(handle: u64) -> *mut c_char {
+    let value = COUNTERS
+        .lock()
+        .expect("counter map lock")
+        .get(&handle)
+        .copied()
+        .unwrap_or_default();
+    let payload = serde_json::json!({
+        "name": "counter",
+        "age": value.max(0) as u32
+    });
+    CString::new(payload.to_string())
+        .expect("valid CString")
+        .into_raw()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_snapshot_outcome(handle: u64) -> *mut c_char {
+    let value = COUNTERS
+        .lock()
+        .expect("counter map lock")
+        .get(&handle)
+        .copied()
+        .unwrap_or_default();
+    let payload = if value % 2 == 0 {
+        serde_json::json!({
+            "tag": "success",
+            "message": format!("even:{value}")
+        })
+    } else {
+        serde_json::json!({
+            "tag": "failure",
+            "code": value,
+            "reason": "odd"
+        })
+    };
+    CString::new(payload.to_string())
+        .expect("valid CString")
+        .into_raw()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_snapshot_bytes(handle: u64) -> RustBuffer {
+    let value = COUNTERS
+        .lock()
+        .expect("counter map lock")
+        .get(&handle)
+        .copied()
+        .unwrap_or_default();
+    vec_into_rust_buffer(format!("bytes:{value}").into_bytes())
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn counter_divide_by(handle: u64, divisor: i32) -> *mut c_char {
     let mut counters = COUNTERS.lock().expect("counter map lock");
     let value = counters.get(&handle).copied().unwrap_or_default();
@@ -367,6 +433,34 @@ pub extern "C" fn counter_divide_by(handle: u64, divisor: i32) -> *mut c_char {
         let quotient = value / divisor;
         counters.insert(handle, quotient);
         serde_json::json!({ "ok": quotient })
+    };
+
+    CString::new(envelope.to_string())
+        .expect("valid CString")
+        .into_raw()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_risky_outcome(handle: u64, divisor: i32) -> *mut c_char {
+    let mut counters = COUNTERS.lock().expect("counter map lock");
+    let value = counters.get(&handle).copied().unwrap_or_default();
+    let envelope = if divisor == 0 {
+        serde_json::json!({
+            "err": { "tag": "divisionByZero" }
+        })
+    } else if divisor < 0 {
+        serde_json::json!({
+            "err": { "tag": "negativeInput", "value": divisor }
+        })
+    } else {
+        let quotient = value / divisor;
+        counters.insert(handle, quotient);
+        let outcome_json = serde_json::json!({
+            "tag": "success",
+            "message": format!("q:{quotient}")
+        })
+        .to_string();
+        serde_json::json!({ "ok": outcome_json })
     };
 
     CString::new(envelope.to_string())

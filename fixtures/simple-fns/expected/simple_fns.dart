@@ -654,6 +654,20 @@ class SimpleFnsBindings {
     return _counterCurrentValue(handle);
   }
 
+  late final ffi.Pointer<Utf8> Function(int handle) _counterDescribe = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle), ffi.Pointer<Utf8> Function(int handle)>('counter_describe');
+
+  String counterInvokeDescribe(int handle) {
+    final ffi.Pointer<Utf8> resultPtr = _counterDescribe(handle);
+    if (resultPtr == ffi.nullptr) {
+      throw StateError('Rust returned null for counter_describe');
+    }
+    try {
+      return resultPtr.toDartString();
+    } finally {
+      _rustStringFree(resultPtr);
+    }
+  }
+
   late final ffi.Pointer<Utf8> Function(int handle, int divisor) _counterDivideBy = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle, ffi.Int32 divisor), ffi.Pointer<Utf8> Function(int handle, int divisor)>('counter_divide_by');
 
   int counterInvokeDivideBy(int handle, int divisor) {
@@ -674,6 +688,78 @@ class SimpleFnsBindings {
     }
     final Object? okRaw = envelope['ok'];
     return (okRaw as num).toInt();
+  }
+
+  late final ffi.Pointer<Utf8> Function(int handle, int divisor) _counterRiskyOutcome = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle, ffi.Int32 divisor), ffi.Pointer<Utf8> Function(int handle, int divisor)>('counter_risky_outcome');
+
+  Outcome counterInvokeRiskyOutcome(int handle, int divisor) {
+    final ffi.Pointer<Utf8> resultPtr = _counterRiskyOutcome(handle, divisor);
+    if (resultPtr == ffi.nullptr) {
+      throw StateError('Rust returned null for counter_risky_outcome');
+    }
+    final String payload;
+    try {
+      payload = resultPtr.toDartString();
+    } finally {
+      _rustStringFree(resultPtr);
+    }
+    final Map<String, dynamic> envelope = jsonDecode(payload) as Map<String, dynamic>;
+    final Object? errRaw = envelope['err'];
+    if (errRaw != null) {
+      throw _decodeMathErrorException(errRaw);
+    }
+    final Object? okRaw = envelope['ok'];
+    return _decodeOutcome(okRaw as String);
+  }
+
+  late final _RustBuffer Function(int handle) _counterSnapshotBytes = _lib.lookupFunction<_RustBuffer Function(ffi.Uint64 handle), _RustBuffer Function(int handle)>('counter_snapshot_bytes');
+
+  Uint8List counterInvokeSnapshotBytes(int handle) {
+    final _RustBuffer resultBuf = _counterSnapshotBytes(handle);
+    final ffi.Pointer<ffi.Uint8> resultData = resultBuf.data;
+    final int resultLen = resultBuf.len;
+    if (resultData == ffi.nullptr) {
+      if (resultLen == 0) {
+        _rustBytesFree(resultBuf);
+        return Uint8List(0);
+      }
+      throw StateError('Rust returned invalid buffer for counter_snapshot_bytes');
+    }
+    try {
+      return Uint8List.fromList(resultData.asTypedList(resultLen));
+    } finally {
+      _rustBytesFree(resultBuf);
+    }
+  }
+
+  late final ffi.Pointer<Utf8> Function(int handle) _counterSnapshotOutcome = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle), ffi.Pointer<Utf8> Function(int handle)>('counter_snapshot_outcome');
+
+  Outcome counterInvokeSnapshotOutcome(int handle) {
+    final ffi.Pointer<Utf8> resultPtr = _counterSnapshotOutcome(handle);
+    if (resultPtr == ffi.nullptr) {
+      throw StateError('Rust returned null for counter_snapshot_outcome');
+    }
+    try {
+      final String payload = resultPtr.toDartString();
+      return _decodeOutcome(payload);
+    } finally {
+      _rustStringFree(resultPtr);
+    }
+  }
+
+  late final ffi.Pointer<Utf8> Function(int handle) _counterSnapshotPerson = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle), ffi.Pointer<Utf8> Function(int handle)>('counter_snapshot_person');
+
+  Person counterInvokeSnapshotPerson(int handle) {
+    final ffi.Pointer<Utf8> resultPtr = _counterSnapshotPerson(handle);
+    if (resultPtr == ffi.nullptr) {
+      throw StateError('Rust returned null for counter_snapshot_person');
+    }
+    try {
+      final String payload = resultPtr.toDartString();
+      return Person.fromJson(jsonDecode(payload) as Map<String, dynamic>);
+    } finally {
+      _rustStringFree(resultPtr);
+    }
   }
 }
 
@@ -727,9 +813,34 @@ final class Counter {
     return _ffi.counterInvokeCurrentValue(_handle);
   }
 
+  String describe() {
+    _ensureOpen();
+    return _ffi.counterInvokeDescribe(_handle);
+  }
+
   int divideBy(int divisor) {
     _ensureOpen();
     return _ffi.counterInvokeDivideBy(_handle, divisor);
+  }
+
+  Outcome riskyOutcome(int divisor) {
+    _ensureOpen();
+    return _ffi.counterInvokeRiskyOutcome(_handle, divisor);
+  }
+
+  Uint8List snapshotBytes() {
+    _ensureOpen();
+    return _ffi.counterInvokeSnapshotBytes(_handle);
+  }
+
+  Outcome snapshotOutcome() {
+    _ensureOpen();
+    return _ffi.counterInvokeSnapshotOutcome(_handle);
+  }
+
+  Person snapshotPerson() {
+    _ensureOpen();
+    return _ffi.counterInvokeSnapshotPerson(_handle);
   }
 
 }
