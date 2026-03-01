@@ -16,7 +16,7 @@ Legend:
 | Records | Implemented | model generation + JSON codecs + `copyWith`; record field defaults are rendered in Dart constructors and respected in `fromJson` when keys are absent |
 | Enums | Implemented | flat + data-carrying codecs |
 | Errors (`[Error]` + `[Throws]`) | Partial | typed Dart exception mapping for supported runtime-compatible paths, including external enum throw-contract paths via `*ExceptionFfiCodec.decode` |
-| Optionals/sequences/maps | Partial | optionals/sequences are covered in top-level + object paths (including async bytes families); string-keyed maps are covered in top-level and object sync/async paths; broader nested map parity still pending |
+| Optionals/sequences/maps | Partial | optionals/sequences are covered in top-level + object paths (including async bytes families); string-keyed maps are covered in top-level and object sync/async paths; non-string map keys (`record<u32, u64>`) are not yet supported |
 | Builtins | Implemented | int/float/bool/string/bytes/timestamp/duration |
 | Async futures | Partial | `[Async]` maps to idiomatic `Future<...>` APIs with rust-future poll/cancel/complete/free runtime flow for string, `void`, integer, object-handle (`u64`), bytes, optional-bytes, bytes-sequence, and string-keyed-map return families; builtin-backed custom typedefs in those families are supported; dedicated async golden coverage exists (`fixtures/futures-stress`) and runtime smoke includes failure + timeout/non-completion checks; external/custom parity is still incomplete |
 | Callback interfaces | Partial | sync/async/throws callback argument paths for top-level + object methods are implemented, including callback-interface method-level async/throws generation for primitive + string/optional string/record/enum return families with runtime fixture coverage; async callback methods with builtin-backed custom aliases are now covered by regression goldens |
@@ -26,6 +26,11 @@ Legend:
 | Library-mode metadata input | Implemented | `generate --library <cdylib>` now parses UniFFI metadata from library artifacts (with optional crate selection via `--crate`) instead of requiring UDL-only inputs |
 | Record/enum methods (proc-macro metadata) | Partial | library-metadata-driven generation now emits idiomatic Dart record methods and enum methods (flat-enum extensions + sealed-enum instance methods) plus runtime FFI lookup/invoke wrappers; dedicated runtime fixture coverage for these surfaces is still pending |
 
+## Known Limitations
+- **Non-string map keys**: `record<u32, u64>` and similar non-string-keyed maps are not yet supported. Only `record<string, V>` maps work at runtime.
+- **`[ByRef]` / `[Self=ByArc]`**: These Rust calling-convention attributes are not reflected in generated Dart code. All values are copied across the FFI boundary.
+- **Error interface methods**: Error types generated from `[Error]` enums do not support methods.
+
 ## Notes
-- Current fixture coverage is centered on `simple-fns` (rich runtime interactions) plus focused golden fixtures.
+- Current fixture coverage includes 14 golden tests across all major feature domains, anchored by `coverall-demo` (comprehensive feature combinations) and `simple-fns` (rich runtime interactions).
 - Strict hygiene gate includes `cargo clippy --all-targets -- -D warnings` and full `./scripts/test_bindings.sh`.
