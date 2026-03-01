@@ -117,6 +117,9 @@ fn extract_namespace_from_udl(source: &Path) -> Option<String> {
 struct UdlFunction {
     name: String,
     ffi_symbol: Option<String>,
+    ffi_arg_types: Vec<FfiType>,
+    ffi_return_type: Option<FfiType>,
+    ffi_has_rust_call_status: bool,
     runtime_unsupported: Option<String>,
     docstring: Option<String>,
     is_async: bool,
@@ -146,6 +149,9 @@ struct UdlObject {
 struct UdlObjectConstructor {
     name: String,
     ffi_symbol: Option<String>,
+    ffi_arg_types: Vec<FfiType>,
+    ffi_return_type: Option<FfiType>,
+    ffi_has_rust_call_status: bool,
     runtime_unsupported: Option<String>,
     docstring: Option<String>,
     is_async: bool,
@@ -157,6 +163,9 @@ struct UdlObjectConstructor {
 struct UdlObjectMethod {
     name: String,
     ffi_symbol: Option<String>,
+    ffi_arg_types: Vec<FfiType>,
+    ffi_return_type: Option<FfiType>,
+    ffi_has_rust_call_status: bool,
     runtime_unsupported: Option<String>,
     docstring: Option<String>,
     is_async: bool,
@@ -332,6 +341,13 @@ fn component_interface_to_metadata(
         .map(|f| UdlFunction {
             name: f.name().to_string(),
             ffi_symbol: include_ffi_symbols.then(|| f.ffi_func().name().to_string()),
+            ffi_arg_types: include_ffi_symbols
+                .then(|| f.ffi_func().arguments().iter().map(|a| a.type_()).collect())
+                .unwrap_or_default(),
+            ffi_return_type: include_ffi_symbols.then(|| f.ffi_func().return_type().cloned()).flatten(),
+            ffi_has_rust_call_status: include_ffi_symbols
+                .then(|| f.ffi_func().has_rust_call_status_arg())
+                .unwrap_or(false),
             runtime_unsupported: include_ffi_symbols
                 .then(|| runtime_unsupported_reason_for_ffi_func(f.ffi_func()))
                 .flatten(),
@@ -380,6 +396,15 @@ fn component_interface_to_metadata(
                 .map(|m| UdlObjectMethod {
                     name: m.name().to_string(),
                     ffi_symbol: include_ffi_symbols.then(|| m.ffi_func().name().to_string()),
+                    ffi_arg_types: include_ffi_symbols
+                        .then(|| m.ffi_func().arguments().iter().map(|a| a.type_()).collect())
+                        .unwrap_or_default(),
+                    ffi_return_type: include_ffi_symbols
+                        .then(|| m.ffi_func().return_type().cloned())
+                        .flatten(),
+                    ffi_has_rust_call_status: include_ffi_symbols
+                        .then(|| m.ffi_func().has_rust_call_status_arg())
+                        .unwrap_or(false),
                     runtime_unsupported: include_ffi_symbols
                         .then(|| runtime_unsupported_reason_for_ffi_func(m.ffi_func()))
                         .flatten(),
@@ -432,6 +457,15 @@ fn component_interface_to_metadata(
                 .map(|m| UdlObjectMethod {
                     name: m.name().to_string(),
                     ffi_symbol: include_ffi_symbols.then(|| m.ffi_func().name().to_string()),
+                    ffi_arg_types: include_ffi_symbols
+                        .then(|| m.ffi_func().arguments().iter().map(|a| a.type_()).collect())
+                        .unwrap_or_default(),
+                    ffi_return_type: include_ffi_symbols
+                        .then(|| m.ffi_func().return_type().cloned())
+                        .flatten(),
+                    ffi_has_rust_call_status: include_ffi_symbols
+                        .then(|| m.ffi_func().has_rust_call_status_arg())
+                        .unwrap_or(false),
                     runtime_unsupported: include_ffi_symbols
                         .then(|| runtime_unsupported_reason_for_ffi_func(m.ffi_func()))
                         .flatten(),
@@ -463,6 +497,15 @@ fn component_interface_to_metadata(
                 .map(|m| UdlObjectMethod {
                     name: m.name().to_string(),
                     ffi_symbol: include_ffi_symbols.then(|| m.ffi_func().name().to_string()),
+                    ffi_arg_types: include_ffi_symbols
+                        .then(|| m.ffi_func().arguments().iter().map(|a| a.type_()).collect())
+                        .unwrap_or_default(),
+                    ffi_return_type: include_ffi_symbols
+                        .then(|| m.ffi_func().return_type().cloned())
+                        .flatten(),
+                    ffi_has_rust_call_status: include_ffi_symbols
+                        .then(|| m.ffi_func().has_rust_call_status_arg())
+                        .unwrap_or(false),
                     runtime_unsupported: include_ffi_symbols
                         .then(|| runtime_unsupported_reason_for_ffi_func(m.ffi_func()))
                         .flatten(),
@@ -503,6 +546,9 @@ fn component_interface_to_metadata(
                 methods.push(UdlObjectMethod {
                     name: "uniffi_trait_display".to_string(),
                     ffi_symbol: None,
+                    ffi_arg_types: Vec::new(),
+                    ffi_return_type: None,
+                    ffi_has_rust_call_status: false,
                     runtime_unsupported: None,
                     docstring: None,
                     is_async: false,
@@ -516,6 +562,9 @@ fn component_interface_to_metadata(
                 methods.push(UdlObjectMethod {
                     name: "uniffi_trait_debug".to_string(),
                     ffi_symbol: None,
+                    ffi_arg_types: Vec::new(),
+                    ffi_return_type: None,
+                    ffi_has_rust_call_status: false,
                     runtime_unsupported: None,
                     docstring: None,
                     is_async: false,
@@ -529,6 +578,9 @@ fn component_interface_to_metadata(
                 methods.push(UdlObjectMethod {
                     name: "uniffi_trait_hash".to_string(),
                     ffi_symbol: None,
+                    ffi_arg_types: Vec::new(),
+                    ffi_return_type: None,
+                    ffi_has_rust_call_status: false,
                     runtime_unsupported: None,
                     docstring: None,
                     is_async: false,
@@ -542,6 +594,9 @@ fn component_interface_to_metadata(
                 methods.push(UdlObjectMethod {
                     name: "uniffi_trait_eq".to_string(),
                     ffi_symbol: None,
+                    ffi_arg_types: Vec::new(),
+                    ffi_return_type: None,
+                    ffi_has_rust_call_status: false,
                     runtime_unsupported: None,
                     docstring: None,
                     is_async: false,
@@ -560,6 +615,9 @@ fn component_interface_to_metadata(
                 methods.push(UdlObjectMethod {
                     name: "uniffi_trait_ne".to_string(),
                     ffi_symbol: None,
+                    ffi_arg_types: Vec::new(),
+                    ffi_return_type: None,
+                    ffi_has_rust_call_status: false,
                     runtime_unsupported: None,
                     docstring: None,
                     is_async: false,
@@ -578,6 +636,9 @@ fn component_interface_to_metadata(
                 methods.push(UdlObjectMethod {
                     name: "uniffi_trait_ord_cmp".to_string(),
                     ffi_symbol: None,
+                    ffi_arg_types: Vec::new(),
+                    ffi_return_type: None,
+                    ffi_has_rust_call_status: false,
                     runtime_unsupported: None,
                     docstring: None,
                     is_async: false,
@@ -603,6 +664,15 @@ fn component_interface_to_metadata(
                     .map(|ctor| UdlObjectConstructor {
                         name: ctor.name().to_string(),
                         ffi_symbol: include_ffi_symbols.then(|| ctor.ffi_func().name().to_string()),
+                        ffi_arg_types: include_ffi_symbols
+                            .then(|| ctor.ffi_func().arguments().iter().map(|a| a.type_()).collect())
+                            .unwrap_or_default(),
+                        ffi_return_type: include_ffi_symbols
+                            .then(|| ctor.ffi_func().return_type().cloned())
+                            .flatten(),
+                        ffi_has_rust_call_status: include_ffi_symbols
+                            .then(|| ctor.ffi_func().has_rust_call_status_arg())
+                            .unwrap_or(false),
                         runtime_unsupported: include_ffi_symbols
                             .then(|| runtime_unsupported_reason_for_ffi_func(ctor.ffi_func()))
                             .flatten(),
@@ -704,6 +774,44 @@ fn runtime_unsupported_reason_for_ffi_func(
         );
     }
     None
+}
+
+#[allow(dead_code)]
+fn is_ffibuffer_supported_ffi_type(type_: &FfiType) -> bool {
+    match type_ {
+        FfiType::UInt8
+        | FfiType::Int8
+        | FfiType::UInt16
+        | FfiType::Int16
+        | FfiType::UInt32
+        | FfiType::Int32
+        | FfiType::UInt64
+        | FfiType::Int64
+        | FfiType::Float32
+        | FfiType::Float64
+        | FfiType::Handle
+        | FfiType::RustBuffer(_)
+        | FfiType::RustCallStatus => true,
+        FfiType::Reference(inner) | FfiType::MutReference(inner) => {
+            matches!(inner.as_ref(), FfiType::VoidPointer)
+        }
+        _ => false,
+    }
+}
+
+#[allow(dead_code)]
+fn is_ffibuffer_eligible_function(function: &UdlFunction) -> bool {
+    function.ffi_symbol.is_some()
+        && !function.is_async
+        && function.throws_type.is_none()
+        && function
+            .ffi_arg_types
+            .iter()
+            .all(is_ffibuffer_supported_ffi_type)
+        && function
+            .ffi_return_type
+            .as_ref()
+            .is_none_or(is_ffibuffer_supported_ffi_type)
 }
 
 fn parse_udl_interface_traits(udl: &str) -> std::collections::HashMap<String, Vec<String>> {
@@ -2514,6 +2622,9 @@ fn render_bound_methods(
                     dart_identifier(&method.name)
                 ),
                 ffi_symbol: method.ffi_symbol.clone(),
+                ffi_arg_types: method.ffi_arg_types.clone(),
+                ffi_return_type: method.ffi_return_type.clone(),
+                ffi_has_rust_call_status: method.ffi_has_rust_call_status,
                 runtime_unsupported: method.runtime_unsupported.clone(),
                 docstring: method.docstring.clone(),
                 is_async: method.is_async,
@@ -2542,6 +2653,9 @@ fn render_bound_methods(
                     dart_identifier(&method.name)
                 ),
                 ffi_symbol: method.ffi_symbol.clone(),
+                ffi_arg_types: method.ffi_arg_types.clone(),
+                ffi_return_type: method.ffi_return_type.clone(),
+                ffi_has_rust_call_status: method.ffi_has_rust_call_status,
                 runtime_unsupported: method.runtime_unsupported.clone(),
                 docstring: method.docstring.clone(),
                 is_async: method.is_async,
@@ -7256,6 +7370,9 @@ interface Outcome {
             methods: vec![UdlObjectMethod {
                 name: "checksum".to_string(),
                 ffi_symbol: None,
+                ffi_arg_types: Vec::new(),
+                ffi_return_type: None,
+                ffi_has_rust_call_status: false,
                 runtime_unsupported: None,
                 docstring: None,
                 is_async: false,
@@ -7283,6 +7400,9 @@ interface Outcome {
             methods: vec![UdlObjectMethod {
                 name: "rank".to_string(),
                 ffi_symbol: None,
+                ffi_arg_types: Vec::new(),
+                ffi_return_type: None,
+                ffi_has_rust_call_status: false,
                 runtime_unsupported: None,
                 docstring: None,
                 is_async: false,
@@ -7317,6 +7437,75 @@ interface Outcome {
         assert!(content.contains("_stateRank = _lib.lookupFunction<"));
         assert!(content.contains(">('point_checksum');"));
         assert!(content.contains(">('state_rank');"));
+    }
+
+    #[test]
+    fn ffibuffer_eligibility_allows_sync_non_throwing_rustbuffer_signatures() {
+        let function = UdlFunction {
+            name: "methodpoint_checksum".to_string(),
+            ffi_symbol: Some(
+                "uniffi_uniffi_record_enum_methods_fn_method_methodpoint_checksum".to_string(),
+            ),
+            ffi_arg_types: vec![FfiType::RustBuffer(None)],
+            ffi_return_type: Some(FfiType::UInt32),
+            ffi_has_rust_call_status: true,
+            runtime_unsupported: Some("placeholder".to_string()),
+            docstring: None,
+            is_async: false,
+            return_type: Some(Type::UInt32),
+            throws_type: None,
+            args: vec![UdlArg {
+                name: "self".to_string(),
+                type_: Type::Record {
+                    module_path: "crate_name".to_string(),
+                    name: "MethodPoint".to_string(),
+                },
+                docstring: None,
+                default: None,
+            }],
+        };
+        assert!(is_ffibuffer_eligible_function(&function));
+    }
+
+    #[test]
+    fn ffibuffer_eligibility_rejects_async_and_throwing_functions() {
+        let async_function = UdlFunction {
+            name: "methodpoint_async_label".to_string(),
+            ffi_symbol: Some(
+                "uniffi_uniffi_record_enum_methods_fn_method_methodpoint_async_label".to_string(),
+            ),
+            ffi_arg_types: vec![FfiType::RustBuffer(None), FfiType::RustBuffer(None)],
+            ffi_return_type: Some(FfiType::Handle),
+            ffi_has_rust_call_status: false,
+            runtime_unsupported: Some("placeholder".to_string()),
+            docstring: None,
+            is_async: true,
+            return_type: Some(Type::String),
+            throws_type: None,
+            args: vec![],
+        };
+        assert!(!is_ffibuffer_eligible_function(&async_function));
+
+        let throwing_function = UdlFunction {
+            name: "methodpoint_checked_divide".to_string(),
+            ffi_symbol: Some(
+                "uniffi_uniffi_record_enum_methods_fn_method_methodpoint_checked_divide"
+                    .to_string(),
+            ),
+            ffi_arg_types: vec![FfiType::RustBuffer(None), FfiType::UInt32],
+            ffi_return_type: Some(FfiType::UInt32),
+            ffi_has_rust_call_status: true,
+            runtime_unsupported: Some("placeholder".to_string()),
+            docstring: None,
+            is_async: false,
+            return_type: Some(Type::UInt32),
+            throws_type: Some(Type::Enum {
+                module_path: "crate_name".to_string(),
+                name: "MethodError".to_string(),
+            }),
+            args: vec![],
+        };
+        assert!(!is_ffibuffer_eligible_function(&throwing_function));
     }
 
     #[test]
