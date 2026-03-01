@@ -168,6 +168,43 @@ Every row must have generator tests + runtime tests.
 | Renaming/exclusion | Yes | parity with Swift/Kotlin behavior |
 | Docstrings | Yes | language-appropriate emission |
 
+## UDL Coverage Ledger (Mandatory)
+Use this ledger as the execution checklist for full parity. This is the operational source of truth for implementation status, not optional documentation.
+
+### Canonical Source
+- For each ledger row, confirm semantics against `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` before implementation and before marking complete.
+- If upstream behavior is unclear, add a note with the exact upstream file/module reviewed.
+
+### Row Rules
+1. One row per UDL semantic unit (not per file).
+2. Every row must include generator and runtime tests.
+3. A row is not complete until all required gates and docs updates pass.
+4. If a bug is found, add a regression row before implementing the fix.
+
+### Row Execution Playbook (Formulaic)
+1. Select next `Not started` row from this ledger.
+2. Add/extend fixture and write failing runtime test for that row.
+3. Add failing generator-level test (unit or golden).
+4. Implement minimal generator/runtime changes to satisfy semantics.
+5. Run required gates and update docs.
+6. Mark row `Done` with evidence links (tests/PR/commit references).
+
+### UDL Coverage Table (Template)
+| UDL Unit | Rust Semantics Source (`uniffi-rs`) | Target-Language API Shape | Generator Changes | Runtime Changes | Required Tests (unit/golden/runtime) | Status | Evidence/Notes |
+|---|---|---|---|---|---|---|---|
+| Top-level functions (sync) | `<module/file>` | `<idiomatic host signature>` | `<needed>` | `<needed>` | `<test ids>` | Not started | |
+| Top-level functions (`[Throws]`) | `<module/file>` | `<typed host exceptions>` | `<needed>` | `<needed>` | `<test ids>` | Not started | |
+| Records (defaults/mutability) | `<module/file>` | `<host model conventions>` | `<needed>` | `<needed>` | `<test ids>` | Not started | |
+| Enums (flat/data-carrying) | `<module/file>` | `<host enum conventions>` | `<needed>` | `<needed>` | `<test ids>` | Not started | |
+| Objects/interfaces lifecycle | `<module/file>` | `<construct/close/finalize pattern>` | `<needed>` | `<needed>` | `<test ids>` | Not started | |
+| Trait methods | `<module/file>` | `<host trait/protocol mapping>` | `<needed>` | `<needed>` | `<test ids>` | Not started | |
+| Async futures | `<module/file>` | `<future/promise mapping>` | `<needed>` | `<needed>` | `<test ids>` | Not started | |
+| Callback interfaces (sync/async) | `<module/file>` | `<callback idioms>` | `<needed>` | `<needed>` | `<test ids>` | Not started | |
+| Custom types | `<module/file>` | `<host conversion wrappers>` | `<needed>` | `<needed>` | `<test ids>` | Not started | |
+| External/remote types | `<module/file>` | `<cross-crate/package idioms>` | `<needed>` | `<needed>` | `<test ids>` | Not started | |
+| Rename/exclude/docstrings | `<module/file>` | `<naming/docs idioms>` | `<needed>` | `<needed>` | `<test ids>` | Not started | |
+| Regression: <bug-id> | `<related upstream behavior>` | `<expected behavior>` | `<needed>` | `<needed>` | `<test ids>` | Not started | |
+
 ## Test Strategy (TDD-First)
 ### Test Layers
 1. Unit tests (Rust): naming, type maps, config parse, edge semantics.

@@ -186,6 +186,43 @@ Every row must have generator tests + runtime tests.
 | Renaming/exclusion | Yes | parity with Swift/Kotlin behavior |
 | Docstrings | Yes | language-appropriate emission |
 
+## UDL Coverage Ledger (Mandatory)
+Use this ledger as the execution checklist for full parity. This is the operational source of truth for implementation status.
+
+### Canonical Source
+- For each row, confirm semantics against `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` before implementation and before marking complete.
+- If behavior is unclear, add a note with the exact upstream file/module reviewed.
+
+### Row Rules
+1. One row per UDL semantic unit (not per file).
+2. Every row must include generator and runtime tests.
+3. A row is not complete until required gates and docs updates pass.
+4. If a bug is found, add a regression row before implementing the fix.
+
+### Row Execution Playbook (Formulaic)
+1. Select next `Not started` or `In progress` row from this ledger.
+2. Add/extend fixture and write failing runtime test for that row.
+3. Add failing generator-level test (unit or golden).
+4. Implement minimal generator/runtime changes to satisfy semantics.
+5. Run required gates and update docs.
+6. Mark row `Done` with evidence references.
+
+### UDL Coverage Table (Dart Status)
+| UDL Unit | Rust Semantics Source (`uniffi-rs`) | Dart API Shape | Generator Changes | Runtime Changes | Required Tests (unit/golden/runtime) | Status | Evidence/Notes |
+|---|---|---|---|---|---|---|---|
+| Top-level functions (sync) | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | top-level Dart functions | complete for supported types | complete for supported types | `dart::tests::renders_top_level_function_stubs_from_udl`; golden `simple-fns`; `binding_tests/test/smoke_test.dart` | Done | primitives/bytes/temporal/record+enum paths covered |
+| Top-level functions (`[Throws]`) | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | typed Dart exceptions | complete for current envelope mapping | complete for current envelope mapping | `dart::tests::renders_throwing_functions_with_typed_exceptions`; `smoke_test.dart` throw path | Done | `[Throws]` + `[Error]` typed mapping implemented for supported runtime paths |
+| Records (defaults/mutability) | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | Dart model classes + `copyWith` + codecs | complete for current fixture scope | complete for current fixture scope | `dart::tests::renders_record_and_enum_models`; golden `model-types-demo`; runtime smoke assertions | Done | mutability controls remain to expand with dedicated fixtures |
+| Enums (flat/data-carrying) | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | Dart sealed-style model conventions | complete for current fixture scope | complete for current fixture scope | `dart::tests::renders_record_and_enum_models`; golden `compound-demo`; runtime smoke assertions | Done | flat + data-carrying enums covered |
+| Objects/interfaces lifecycle | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | wrappers with `close()` + finalizer fallback | sync constructors/methods complete | sync lifecycle paths complete | `dart::tests::renders_object_classes_with_lifecycle_and_throws`; runtime smoke object calls | In progress | async/trait-related object parity pending |
+| Trait methods | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | trait mapping into idiomatic Dart APIs | pending | pending | add dedicated trait fixture + runtime tests | Not started | phase 4 parity gap |
+| Async futures | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | `Future<T>`-based idiomatic APIs | pending | pending | add futures fixture + runtime tests | Not started | phase 5 target |
+| Callback interfaces (sync/async) | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | callback APIs with Dart callable conventions | pending | pending | add callbacks fixture + runtime tests | Not started | phase 5 target |
+| Custom types | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | Dart conversion helpers | pending | pending | add custom-types fixture + tests | Not started | phase 6 target |
+| External/remote types | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | cross-package import/type mapping | pending | pending | add ext-types fixture + tests | Not started | phase 6 target |
+| Rename/exclude/docstrings | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | idiomatic naming/docs in Dart output | pending full parity | pending full parity | add rename/docstring fixtures + tests | Not started | phase 6 target |
+| Regression rows (`regressions/*`) | `/Users/nchapman/Drive/Code/lessisbetter/refs/uniffi-rs` | N/A | policy in place | policy in place | add per-bug reproducer before fix | In progress | no dedicated regression fixture committed yet |
+
 ## Test Strategy (TDD-First)
 ### Test Layers
 1. Unit tests (Rust): naming, type maps, config parse, edge semantics.
