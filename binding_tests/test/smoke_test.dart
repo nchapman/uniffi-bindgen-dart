@@ -23,6 +23,7 @@ void main() {
     expect(contents, contains('int negate(int value) {'));
     expect(contents, contains('String brokenGreet() {'));
     expect(contents, contains('String greet(String name) {'));
+    expect(contents, contains('String? maybeGreet(String? name) {'));
     expect(contents, contains('bool isEven(int value) {'));
     expect(contents, contains('double scale(double value, double factor) {'));
     expect(contents, contains('void tick() {'));
@@ -30,6 +31,12 @@ void main() {
     expect(contents, contains('late final int Function(int left, int right) _add ='));
     expect(contents, contains('late final bool Function(int value) _isEven ='));
     expect(contents, contains('ffi.Pointer<Utf8> nameNative = name.toNativeUtf8();'));
+    expect(
+      contents,
+      contains(
+        'final ffi.Pointer<Utf8> nameNative = name == null ? ffi.nullptr : name.toNativeUtf8();',
+      ),
+    );
     expect(contents, contains('_rustStringFree(resultPtr);'));
     expect(
       contents,
@@ -55,6 +62,8 @@ void main() {
     expect(bindings.add(20, 22), 42);
     expect(bindings.negate(7), -7);
     expect(bindings.greet('dart'), 'hello, dart');
+    expect(bindings.maybeGreet('dart'), 'maybe, dart');
+    expect(bindings.maybeGreet(null), isNull);
     expect(() => bindings.brokenGreet(), throwsA(isA<StateError>()));
     expect(bindings.isEven(8), isTrue);
     expect(bindings.isEven(9), isFalse);
@@ -67,6 +76,8 @@ void main() {
     expect(add(1, 2), 3);
     expect(negate(5), -5);
     expect(greet('ffi'), 'hello, ffi');
+    expect(maybeGreet('ffi'), 'maybe, ffi');
+    expect(maybeGreet(null), isNull);
     expect(() => brokenGreet(), throwsA(isA<StateError>()));
     expect(isEven(10), isTrue);
     expect(isEven(11), isFalse);

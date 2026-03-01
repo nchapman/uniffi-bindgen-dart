@@ -77,6 +77,25 @@ class SimpleFnsBindings {
       return _isEven(value);
   }
 
+  late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> name) _maybeGreet = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> name), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> name)>('maybe_greet');
+
+  String? maybeGreet(String? name) {
+    final ffi.Pointer<Utf8> nameNative = name == null ? ffi.nullptr : name.toNativeUtf8();
+    try {
+      final ffi.Pointer<Utf8> resultPtr = _maybeGreet(nameNative);
+      if (resultPtr == ffi.nullptr) {
+        return null;
+      }
+      try {
+        return resultPtr.toDartString();
+      } finally {
+        _rustStringFree(resultPtr);
+      }
+    } finally {
+    if (nameNative != ffi.nullptr) calloc.free(nameNative);
+    }
+  }
+
   late final int Function(int value) _negate = _lib.lookupFunction<ffi.Int32 Function(ffi.Int32 value), int Function(int value)>('negate');
 
   int negate(int value) {
@@ -126,6 +145,10 @@ String greet(String name) {
 
 bool isEven(int value) {
   return _bindings().isEven(value);
+}
+
+String? maybeGreet(String? name) {
+  return _bindings().maybeGreet(name);
 }
 
 int negate(int value) {

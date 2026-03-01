@@ -29,6 +29,18 @@ pub extern "C" fn broken_greet() -> *mut c_char {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn maybe_greet(name: *const c_char) -> *mut c_char {
+    if name.is_null() {
+        return std::ptr::null_mut();
+    }
+
+    let name = unsafe { CStr::from_ptr(name) }.to_string_lossy();
+    CString::new(format!("maybe, {name}"))
+        .expect("valid CString")
+        .into_raw()
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn rust_string_free(value: *mut c_char) {
     if value.is_null() {
         return;

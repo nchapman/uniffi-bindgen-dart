@@ -116,17 +116,17 @@ impl UdlFunction {
     fn uses_runtime_string(&self) -> bool {
         self.return_type
             .as_ref()
-            .is_some_and(is_runtime_string_type)
+            .is_some_and(is_runtime_string_like_type)
             || self
                 .args
                 .iter()
-                .any(|a| is_runtime_string_type(&a.type_))
+                .any(|a| is_runtime_string_like_type(&a.type_))
     }
 
     fn returns_runtime_string(&self) -> bool {
         self.return_type
             .as_ref()
-            .is_some_and(is_runtime_string_type)
+            .is_some_and(is_runtime_string_like_type)
     }
 }
 
@@ -274,6 +274,15 @@ fn render_bound_methods(functions: &[UdlFunction]) -> String {
                 ));
                 post_call.push(format!("    calloc.free({native_name});\n"));
                 call_args.push(native_name);
+            } else if is_runtime_optional_string_type(&arg.type_) {
+                let native_name = format!("{arg_name}Native");
+                pre_call.push(format!(
+                    "    final ffi.Pointer<Utf8> {native_name} = {arg_name} == null ? ffi.nullptr : {arg_name}.toNativeUtf8();\n"
+                ));
+                post_call.push(format!(
+                    "    if ({native_name} != ffi.nullptr) calloc.free({native_name});\n"
+                ));
+                call_args.push(native_name);
             } else {
                 call_args.push(arg_name);
             }
@@ -316,6 +325,19 @@ fn render_bound_methods(functions: &[UdlFunction]) -> String {
                     "        throw StateError('Rust returned null for {}');\n",
                     function.name
                 ));
+                out.push_str("      }\n");
+                out.push_str("      try {\n");
+                out.push_str("        return resultPtr.toDartString();\n");
+                out.push_str("      } finally {\n");
+                out.push_str("        _rustStringFree(resultPtr);\n");
+                out.push_str("      }\n");
+            }
+            Some(type_) if is_runtime_optional_string_type(type_) => {
+                out.push_str(&format!(
+                    "      final ffi.Pointer<Utf8> resultPtr = {call_expr};\n"
+                ));
+                out.push_str("      if (resultPtr == ffi.nullptr) {\n");
+                out.push_str("        return null;\n");
                 out.push_str("      }\n");
                 out.push_str("      try {\n");
                 out.push_str("        return resultPtr.toDartString();\n");
@@ -440,6 +462,9 @@ fn map_runtime_native_ffi_type(type_: &Type) -> Option<&'static str> {
         Type::Float64 => Some("ffi.Double"),
         Type::Boolean => Some("ffi.Bool"),
         Type::String => Some("ffi.Pointer<Utf8>"),
+        Type::Optional { inner_type } if is_runtime_string_type(inner_type) => {
+            Some("ffi.Pointer<Utf8>")
+        }
         _ => None,
     }
 }
@@ -457,12 +482,23 @@ fn map_runtime_dart_ffi_type(type_: &Type) -> Option<&'static str> {
         Type::Float32 | Type::Float64 => Some("double"),
         Type::Boolean => Some("bool"),
         Type::String => Some("ffi.Pointer<Utf8>"),
+        Type::Optional { inner_type } if is_runtime_string_type(inner_type) => {
+            Some("ffi.Pointer<Utf8>")
+        }
         _ => None,
     }
 }
 
 fn is_runtime_string_type(type_: &Type) -> bool {
     matches!(type_, Type::String)
+}
+
+fn is_runtime_optional_string_type(type_: &Type) -> bool {
+    matches!(type_, Type::Optional { inner_type } if is_runtime_string_type(inner_type))
+}
+
+fn is_runtime_string_like_type(type_: &Type) -> bool {
+    is_runtime_string_type(type_) || is_runtime_optional_string_type(type_)
 }
 
 fn map_uniffi_type_to_dart(type_: &Type) -> String {
@@ -912,6 +948,7 @@ namespace simple {
             r#"
 namespace strings {
   string greet(string name);
+  string? maybe_greet(string? name);
 };
 "#,
         )
@@ -932,5 +969,13 @@ namespace strings {
         assert!(content.contains("ffi.Pointer<Utf8> nameNative = name.toNativeUtf8();"));
         assert!(content.contains("calloc.free(nameNative);"));
         assert!(content.contains("_rustStringFree(resultPtr);"));
+        assert!(
+            content.contains(
+                "final ffi.Pointer<Utf8> nameNative = name == null ? ffi.nullptr : name.toNativeUtf8();"
+            )
+        );
+        assert!(content.contains("if (nameNative != ffi.nullptr) calloc.free(nameNative);"));
+        assert!(content.contains("if (resultPtr == ffi.nullptr) {"));
+        assert!(content.contains("return null;"));
     }
 }

@@ -2,6 +2,7 @@
 library compound_demo;
 
 import 'dart:ffi' as ffi;
+import 'package:ffi/ffi.dart';
 import 'dart:typed_data';
 
 class CompoundDemoFfi {
@@ -23,6 +24,39 @@ class CompoundDemoFfi {
   }
 
   late final ffi.DynamicLibrary _lib = open();
+
+  late final void Function(ffi.Pointer<Utf8>) _rustStringFree = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<Utf8>), void Function(ffi.Pointer<Utf8>)>('rust_string_free');
+
+  late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> value) _maybeName = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> value), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> value)>('maybe_name');
+
+  String? maybeName(String? value) {
+    final ffi.Pointer<Utf8> valueNative = value == null ? ffi.nullptr : value.toNativeUtf8();
+    try {
+      final ffi.Pointer<Utf8> resultPtr = _maybeName(valueNative);
+      if (resultPtr == ffi.nullptr) {
+        return null;
+      }
+      try {
+        return resultPtr.toDartString();
+      } finally {
+        _rustStringFree(resultPtr);
+      }
+    } finally {
+    if (valueNative != ffi.nullptr) calloc.free(valueNative);
+    }
+  }
+}
+
+CompoundDemoFfi? _defaultBindings;
+
+CompoundDemoFfi _bindings() => _defaultBindings ??= CompoundDemoFfi();
+
+void configureDefaultBindings({ffi.DynamicLibrary? dynamicLibrary, String? libraryPath}) {
+  _defaultBindings = CompoundDemoFfi(dynamicLibrary: dynamicLibrary, libraryPath: libraryPath);
+}
+
+void resetDefaultBindings() {
+  _defaultBindings = null;
 }
 
 List<Uint8List> chunk(List<Uint8List> input) {
@@ -38,6 +72,6 @@ List<int> listify(List<int> values) {
 }
 
 String? maybeName(String? value) {
-  throw UnimplementedError('TODO: bind to Rust FFI');
+  return _bindings().maybeName(value);
 }
 

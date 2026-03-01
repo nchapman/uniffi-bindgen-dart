@@ -2,6 +2,7 @@ namespace simple_fns {
   u32 add(u32 left, u32 right);
   string broken_greet();
   string greet(string name);
+  string? maybe_greet(string? name);
   i32 negate(i32 value);
   boolean is_even(i32 value);
   f64 scale(f64 value, f64 factor);
