@@ -2,6 +2,7 @@
 set -euo pipefail
 
 cargo test --workspace
+./scripts/build_bindings.sh
 
 if command -v dart >/dev/null 2>&1; then
   (

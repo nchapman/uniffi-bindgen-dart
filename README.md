@@ -10,5 +10,6 @@ cargo test --workspace
 
 ```bash
 ./scripts/build.sh
+./scripts/build_bindings.sh
 ./scripts/test_bindings.sh
 ```

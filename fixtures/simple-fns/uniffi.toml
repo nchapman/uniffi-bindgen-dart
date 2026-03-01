@@ -1,0 +1,4 @@
+[bindings.dart]
+module_name = "simple_fns"
+ffi_class_name = "SimpleFnsBindings"
+library_name = "uniffi_simple_fns"

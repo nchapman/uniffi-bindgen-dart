@@ -18,7 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
       - uses: dart-lang/setup-dart@v1
+      - name: Generate bindings
+        run: ./scripts/build_bindings.sh
       - name: Dart tests
         run: |
           cd binding_tests
