@@ -32,6 +32,20 @@ class SimpleFnsBindings {
       return _add(left, right);
   }
 
+  late final ffi.Pointer<Utf8> Function() _brokenGreet = _lib.lookupFunction<ffi.Pointer<Utf8> Function(), ffi.Pointer<Utf8> Function()>('broken_greet');
+
+  String brokenGreet() {
+      final ffi.Pointer<Utf8> resultPtr = _brokenGreet();
+      if (resultPtr == ffi.nullptr) {
+        throw StateError('Rust returned null for broken_greet');
+      }
+      try {
+        return resultPtr.toDartString();
+      } finally {
+        _rustStringFree(resultPtr);
+      }
+  }
+
   late final int Function() _currentTick = _lib.lookupFunction<ffi.Uint32 Function(), int Function()>('current_tick');
 
   int currentTick() {
@@ -96,6 +110,10 @@ void resetDefaultBindings() {
 
 int add(int left, int right) {
   return _bindings().add(left, right);
+}
+
+String brokenGreet() {
+  return _bindings().brokenGreet();
 }
 
 int currentTick() {

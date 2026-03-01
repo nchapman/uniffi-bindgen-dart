@@ -24,6 +24,11 @@ pub extern "C" fn greet(name: *const c_char) -> *mut c_char {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn broken_greet() -> *mut c_char {
+    std::ptr::null_mut()
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn rust_string_free(value: *mut c_char) {
     if value.is_null() {
         return;

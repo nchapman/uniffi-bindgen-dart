@@ -21,6 +21,7 @@ void main() {
     expect(contents, contains("libraryName = 'uniffi_simple_fns';"));
     expect(contents, contains('int add(int left, int right) {'));
     expect(contents, contains('int negate(int value) {'));
+    expect(contents, contains('String brokenGreet() {'));
     expect(contents, contains('String greet(String name) {'));
     expect(contents, contains('bool isEven(int value) {'));
     expect(contents, contains('double scale(double value, double factor) {'));
@@ -54,6 +55,7 @@ void main() {
     expect(bindings.add(20, 22), 42);
     expect(bindings.negate(7), -7);
     expect(bindings.greet('dart'), 'hello, dart');
+    expect(() => bindings.brokenGreet(), throwsA(isA<StateError>()));
     expect(bindings.isEven(8), isTrue);
     expect(bindings.isEven(9), isFalse);
     expect(bindings.scale(2.5, 4.0), closeTo(10.0, 0.000001));
@@ -65,6 +67,7 @@ void main() {
     expect(add(1, 2), 3);
     expect(negate(5), -5);
     expect(greet('ffi'), 'hello, ffi');
+    expect(() => brokenGreet(), throwsA(isA<StateError>()));
     expect(isEven(10), isTrue);
     expect(isEven(11), isFalse);
     expect(scale(1.5, 3.0), closeTo(4.5, 0.000001));
