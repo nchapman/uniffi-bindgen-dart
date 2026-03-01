@@ -20,7 +20,7 @@ pub mod record;
 pub fn generate_bindings(args: &GenerateArgs) -> Result<()> {
     let namespace = namespace_from_source(&args.source)?;
     let cfg = config::load(args)?;
-    let functions = parse_udl_functions(&args.source, args.crate_name.as_deref())?;
+    let metadata = parse_udl_metadata(&args.source, args.crate_name.as_deref())?;
 
     let module_name = cfg
         .module_name
@@ -39,7 +39,14 @@ pub fn generate_bindings(args: &GenerateArgs) -> Result<()> {
     fs::create_dir_all(&args.out_dir)?;
 
     let output_file = args.out_dir.join(format!("{namespace}.dart"));
-    let content = render_dart_scaffold(&module_name, &ffi_class_name, &library_name, &functions);
+    let content = render_dart_scaffold(
+        &module_name,
+        &ffi_class_name,
+        &library_name,
+        &metadata.functions,
+        &metadata.records,
+        &metadata.enums,
+    );
     fs::write(&output_file, content).with_context(|| {
         format!(
             "failed to write generated dart bindings: {}",
@@ -105,6 +112,24 @@ struct UdlArg {
     type_: Type,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct UdlRecord {
+    name: String,
+    fields: Vec<UdlArg>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct UdlEnum {
+    name: String,
+    variants: Vec<UdlEnumVariant>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct UdlEnumVariant {
+    name: String,
+    fields: Vec<UdlArg>,
+}
+
 impl UdlFunction {
     fn uses_bytes(&self) -> bool {
         self.return_type
@@ -143,9 +168,16 @@ impl UdlFunction {
     }
 }
 
-fn parse_udl_functions(source: &Path, crate_name: Option<&str>) -> Result<Vec<UdlFunction>> {
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+struct UdlMetadata {
+    functions: Vec<UdlFunction>,
+    records: Vec<UdlRecord>,
+    enums: Vec<UdlEnum>,
+}
+
+fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMetadata> {
     if source.extension().and_then(|e| e.to_str()) != Some("udl") {
-        return Ok(Vec::new());
+        return Ok(UdlMetadata::default());
     }
 
     let udl = fs::read_to_string(source)
@@ -169,9 +201,48 @@ fn parse_udl_functions(source: &Path, crate_name: Option<&str>) -> Result<Vec<Ud
                 })
                 .collect(),
         })
-        .collect();
+        .collect::<Vec<_>>();
+    let records = ci
+        .record_definitions()
+        .map(|record| UdlRecord {
+            name: record.name().to_string(),
+            fields: record
+                .fields()
+                .iter()
+                .map(|field| UdlArg {
+                    name: field.name().to_string(),
+                    type_: field.as_type(),
+                })
+                .collect(),
+        })
+        .collect::<Vec<_>>();
+    let enums = ci
+        .enum_definitions()
+        .map(|enum_| UdlEnum {
+            name: enum_.name().to_string(),
+            variants: enum_
+                .variants()
+                .iter()
+                .map(|variant| UdlEnumVariant {
+                    name: variant.name().to_string(),
+                    fields: variant
+                        .fields()
+                        .iter()
+                        .map(|field| UdlArg {
+                            name: field.name().to_string(),
+                            type_: field.as_type(),
+                        })
+                        .collect(),
+                })
+                .collect(),
+        })
+        .collect::<Vec<_>>();
 
-    Ok(functions)
+    Ok(UdlMetadata {
+        functions,
+        records,
+        enums,
+    })
 }
 
 fn render_dart_scaffold(
@@ -179,6 +250,8 @@ fn render_dart_scaffold(
     ffi_class_name: &str,
     library_name: &str,
     functions: &[UdlFunction],
+    records: &[UdlRecord],
+    enums: &[UdlEnum],
 ) -> String {
     let needs_typed_data = functions.iter().any(UdlFunction::uses_bytes);
     let needs_ffi_helpers = functions
@@ -232,6 +305,7 @@ fn render_dart_scaffold(
         out.push_str("  external int len;\n");
         out.push_str("}\n\n");
     }
+    out.push_str(&render_data_models(records, enums));
     out.push_str(&format!(
         "class {ffi_class_name} {{\n  {ffi_class_name}({{ffi.DynamicLibrary? dynamicLibrary, String? libraryPath}})\n      : _dynamicLibrary = dynamicLibrary,\n        _libraryPath = libraryPath;\n\n"
     ));
@@ -251,6 +325,94 @@ fn render_dart_scaffold(
     out.push_str(&render_bound_methods(functions));
     out.push_str("}\n");
     out.push_str(&render_function_stubs(functions, ffi_class_name));
+    out
+}
+
+fn render_data_models(records: &[UdlRecord], enums: &[UdlEnum]) -> String {
+    let mut out = String::new();
+
+    for record in records {
+        let class_name = to_upper_camel(&record.name);
+        out.push_str(&format!("class {class_name} {{\n"));
+        out.push_str(&format!("  const {class_name}({{\n"));
+        for field in &record.fields {
+            let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
+            out.push_str(&format!("    required this.{field_name},\n"));
+        }
+        out.push_str("  });\n\n");
+        for field in &record.fields {
+            let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
+            out.push_str(&format!(
+                "  final {} {field_name};\n",
+                map_uniffi_type_to_dart(&field.type_)
+            ));
+        }
+        if !record.fields.is_empty() {
+            out.push('\n');
+            out.push_str(&format!("  {class_name} copyWith({{\n"));
+            for field in &record.fields {
+                let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
+                let field_type = map_uniffi_type_to_dart(&field.type_);
+                let copy_with_type = if field_type.ends_with('?') {
+                    field_type
+                } else {
+                    format!("{field_type}?")
+                };
+                out.push_str(&format!(
+                    "    {copy_with_type} {field_name},\n"
+                ));
+            }
+            out.push_str("  }) {\n");
+            out.push_str(&format!("    return {class_name}(\n"));
+            for field in &record.fields {
+                let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
+                out.push_str(&format!("      {field_name}: {field_name} ?? this.{field_name},\n"));
+            }
+            out.push_str("    );\n");
+            out.push_str("  }\n");
+        }
+        out.push_str("}\n\n");
+    }
+
+    for enum_ in enums {
+        let enum_name = to_upper_camel(&enum_.name);
+        let has_data = enum_.variants.iter().any(|v| !v.fields.is_empty());
+        if !has_data {
+            out.push_str(&format!("enum {enum_name} {{\n"));
+            for variant in &enum_.variants {
+                out.push_str(&format!(
+                    "  {},\n",
+                    safe_dart_identifier(&to_lower_camel(&variant.name))
+                ));
+            }
+            out.push_str("}\n\n");
+            continue;
+        }
+
+        out.push_str(&format!(
+            "sealed class {enum_name} {{\n  const {enum_name}();\n}}\n\n"
+        ));
+        for variant in &enum_.variants {
+            let variant_name = to_upper_camel(&variant.name);
+            let class_name = format!("{enum_name}{variant_name}");
+            out.push_str(&format!("final class {class_name} extends {enum_name} {{\n"));
+            out.push_str(&format!("  const {class_name}({{\n"));
+            for field in &variant.fields {
+                let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
+                out.push_str(&format!("    required this.{field_name},\n"));
+            }
+            out.push_str("  });\n");
+            for field in &variant.fields {
+                let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
+                out.push_str(&format!(
+                    "  final {} {field_name};\n",
+                    map_uniffi_type_to_dart(&field.type_)
+                ));
+            }
+            out.push_str("}\n\n");
+        }
+    }
+
     out
 }
 
@@ -1361,5 +1523,52 @@ namespace temporal {
         assert!(content.contains("Duration multiplyDuration(Duration value, int factor) {"));
         assert!(content.contains("return Duration(microseconds: micros);"));
         assert!(content.contains("value.inMicroseconds"));
+    }
+
+    #[test]
+    fn renders_record_and_enum_models() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = temp.path().join("models.udl");
+        let out_dir = temp.path().join("out");
+        fs::write(
+            &source,
+            r#"
+namespace models {};
+
+dictionary Person {
+  string name;
+  u32 age;
+  string? nickname;
+};
+
+enum Color { "red", "blue" };
+
+[Enum]
+interface Outcome {
+  Success(string message);
+  Failure(i32 code, string reason);
+};
+"#,
+        )
+        .expect("write source");
+
+        let args = GenerateArgs {
+            source,
+            out_dir: out_dir.clone(),
+            library: false,
+            config: None,
+            crate_name: None,
+            no_format: false,
+        };
+
+        generate_bindings(&args).expect("generate");
+        let content = fs::read_to_string(out_dir.join("models.dart")).expect("read generated");
+        assert!(content.contains("class Person {"));
+        assert!(content.contains("const Person({"));
+        assert!(content.contains("Person copyWith({"));
+        assert!(content.contains("enum Color {"));
+        assert!(content.contains("sealed class Outcome {"));
+        assert!(content.contains("final class OutcomeSuccess extends Outcome {"));
+        assert!(content.contains("final class OutcomeFailure extends Outcome {"));
     }
 }

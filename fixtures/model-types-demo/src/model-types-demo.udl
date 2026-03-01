@@ -1,0 +1,19 @@
+namespace model_types_demo {};
+
+dictionary Person {
+  string name;
+  u32 age;
+  string? nickname;
+};
+
+enum Color {
+  "red",
+  "green",
+  "blue"
+};
+
+[Enum]
+interface Outcome {
+  Success(string message);
+  Failure(i32 code, string reason);
+};

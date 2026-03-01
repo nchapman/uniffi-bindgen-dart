@@ -59,3 +59,16 @@ fn golden_compound_demo() {
     generate(&source, &out_dir, None);
     assert_matches_expected(&out_dir.join("compound_demo.dart"), &expected);
 }
+
+#[test]
+fn golden_model_types_demo() {
+    let root = repo_root();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let out_dir = temp.path().join("out");
+
+    let source = root.join("fixtures/model-types-demo/src/model-types-demo.udl");
+    let expected = root.join("fixtures/model-types-demo/expected/model_types_demo.dart");
+
+    generate(&source, &out_dir, None);
+    assert_matches_expected(&out_dir.join("model_types_demo.dart"), &expected);
+}
