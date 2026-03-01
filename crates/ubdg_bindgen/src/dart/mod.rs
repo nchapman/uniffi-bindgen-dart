@@ -246,7 +246,7 @@ fn render_function_stubs(functions: &[UdlFunction]) -> String {
     let mut out = String::new();
     out.push('\n');
     for f in functions {
-        let fn_name = to_lower_camel(&f.name);
+        let fn_name = safe_dart_identifier(&to_lower_camel(&f.name));
         let return_type = map_udl_type_to_dart(&f.return_type);
         let args = f
             .args
@@ -255,7 +255,7 @@ fn render_function_stubs(functions: &[UdlFunction]) -> String {
                 format!(
                     "{} {}",
                     map_udl_type_to_dart(&a.type_name),
-                    to_lower_camel(&a.name)
+                    safe_dart_identifier(&to_lower_camel(&a.name))
                 )
             })
             .collect::<Vec<_>>()
@@ -403,6 +403,86 @@ fn to_lower_camel(input: &str) -> String {
     } else {
         out
     }
+}
+
+fn safe_dart_identifier(input: &str) -> String {
+    if is_dart_keyword(input) {
+        format!("{input}_")
+    } else {
+        input.to_string()
+    }
+}
+
+fn is_dart_keyword(input: &str) -> bool {
+    matches!(
+        input,
+        "abstract"
+            | "as"
+            | "assert"
+            | "async"
+            | "await"
+            | "base"
+            | "break"
+            | "case"
+            | "catch"
+            | "class"
+            | "const"
+            | "continue"
+            | "covariant"
+            | "default"
+            | "deferred"
+            | "do"
+            | "dynamic"
+            | "else"
+            | "enum"
+            | "export"
+            | "extends"
+            | "extension"
+            | "external"
+            | "factory"
+            | "false"
+            | "final"
+            | "finally"
+            | "for"
+            | "Function"
+            | "get"
+            | "hide"
+            | "if"
+            | "implements"
+            | "import"
+            | "in"
+            | "interface"
+            | "is"
+            | "late"
+            | "library"
+            | "mixin"
+            | "new"
+            | "null"
+            | "on"
+            | "operator"
+            | "part"
+            | "required"
+            | "rethrow"
+            | "return"
+            | "sealed"
+            | "set"
+            | "show"
+            | "static"
+            | "super"
+            | "switch"
+            | "sync"
+            | "this"
+            | "throw"
+            | "true"
+            | "try"
+            | "typedef"
+            | "var"
+            | "void"
+            | "when"
+            | "while"
+            | "with"
+            | "yield"
+    )
 }
 
 #[cfg(test)]
@@ -623,5 +703,34 @@ namespace demo {
         assert_eq!(parsed[0].name, "risky_call");
         assert_eq!(parsed[0].return_type, "string");
         assert_eq!(parsed[0].args.len(), 1);
+    }
+
+    #[test]
+    fn rewrites_reserved_identifiers() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = temp.path().join("keywords.udl");
+        let out_dir = temp.path().join("out");
+        fs::write(
+            &source,
+            r#"
+namespace keywords {
+  u32 class(u32 switch);
+};
+"#,
+        )
+        .expect("write source");
+
+        let args = GenerateArgs {
+            source,
+            out_dir: out_dir.clone(),
+            library: false,
+            config: None,
+            crate_name: None,
+            no_format: false,
+        };
+
+        generate_bindings(&args).expect("generate");
+        let content = fs::read_to_string(out_dir.join("keywords.dart")).expect("read generated");
+        assert!(content.contains("int class_(int switch_) {"));
     }
 }
