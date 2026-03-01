@@ -116,7 +116,7 @@ mod tests {
         let temp_dir = tempfile::tempdir().expect("create tempdir");
         let out_dir = temp_dir.path().join("out");
         let source = temp_dir.path().join("simple-fns.udl");
-        std::fs::write(&source, "namespace simple_fns {}").expect("write source");
+        std::fs::write(&source, "namespace simple_fns { u32 noop(); };").expect("write source");
 
         run([
             "uniffi-bindgen-dart",
