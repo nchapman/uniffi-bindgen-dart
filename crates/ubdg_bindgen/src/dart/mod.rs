@@ -189,6 +189,7 @@ struct UdlRecord {
     name: String,
     docstring: Option<String>,
     fields: Vec<UdlArg>,
+    methods: Vec<UdlObjectMethod>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -197,6 +198,7 @@ struct UdlEnum {
     docstring: Option<String>,
     is_error: bool,
     variants: Vec<UdlEnumVariant>,
+    methods: Vec<UdlObjectMethod>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -359,6 +361,27 @@ fn component_interface_to_metadata(
                     default: field.default_value().cloned(),
                 })
                 .collect(),
+            methods: record
+                .methods()
+                .iter()
+                .map(|m| UdlObjectMethod {
+                    name: m.name().to_string(),
+                    docstring: m.docstring().map(ToString::to_string),
+                    is_async: m.is_async(),
+                    return_type: m.return_type().cloned(),
+                    throws_type: m.throws_type().cloned(),
+                    args: m
+                        .arguments()
+                        .into_iter()
+                        .map(|a| UdlArg {
+                            name: a.name().to_string(),
+                            type_: a.as_type(),
+                            docstring: None,
+                            default: a.default_value().cloned(),
+                        })
+                        .collect(),
+                })
+                .collect(),
         })
         .collect::<Vec<_>>();
     let enums = ci
@@ -382,6 +405,27 @@ fn component_interface_to_metadata(
                             type_: field.as_type(),
                             docstring: field.docstring().map(ToString::to_string),
                             default: field.default_value().cloned(),
+                        })
+                        .collect(),
+                })
+                .collect(),
+            methods: enum_
+                .methods()
+                .iter()
+                .map(|m| UdlObjectMethod {
+                    name: m.name().to_string(),
+                    docstring: m.docstring().map(ToString::to_string),
+                    is_async: m.is_async(),
+                    return_type: m.return_type().cloned(),
+                    throws_type: m.throws_type().cloned(),
+                    args: m
+                        .arguments()
+                        .into_iter()
+                        .map(|a| UdlArg {
+                            name: a.name().to_string(),
+                            type_: a.as_type(),
+                            docstring: None,
+                            default: a.default_value().cloned(),
                         })
                         .collect(),
                 })
@@ -764,6 +808,18 @@ fn render_dart_scaffold(
                 m.return_type.as_ref().is_some_and(uniffi_type_uses_bytes)
                     || m.args.iter().any(|a| uniffi_type_uses_bytes(&a.type_))
             })
+        })
+        || records.iter().any(|r| {
+            r.methods.iter().any(|m| {
+                m.return_type.as_ref().is_some_and(uniffi_type_uses_bytes)
+                    || m.args.iter().any(|a| uniffi_type_uses_bytes(&a.type_))
+            })
+        })
+        || enums.iter().any(|e| {
+            e.methods.iter().any(|m| {
+                m.return_type.as_ref().is_some_and(uniffi_type_uses_bytes)
+                    || m.args.iter().any(|a| uniffi_type_uses_bytes(&a.type_))
+            })
         });
     let needs_json_convert = !records.is_empty()
         || !enums.is_empty()
@@ -800,12 +856,28 @@ fn render_dart_scaffold(
                         .iter()
                         .any(|a| is_runtime_record_or_enum_string_type(&a.type_, enums)))
         })
-        || !objects.is_empty();
-    let needs_runtime_bytes = functions
-        .iter()
-        .any(|f| is_runtime_ffi_compatible_function(f, records, enums) && f.uses_runtime_bytes())
-        || objects.iter().any(|o| {
+        || !objects.is_empty()
+        || records.iter().any(|r| !r.methods.is_empty())
+        || enums.iter().any(|e| !e.methods.is_empty());
+    let needs_runtime_bytes =
+        functions.iter().any(|f| {
+            is_runtime_ffi_compatible_function(f, records, enums) && f.uses_runtime_bytes()
+        }) || objects.iter().any(|o| {
             o.methods.iter().any(|m| {
+                m.return_type
+                    .as_ref()
+                    .is_some_and(is_runtime_bytes_like_type)
+                    || m.args.iter().any(|a| is_runtime_bytes_like_type(&a.type_))
+            })
+        }) || records.iter().any(|r| {
+            r.methods.iter().any(|m| {
+                m.return_type
+                    .as_ref()
+                    .is_some_and(is_runtime_bytes_like_type)
+                    || m.args.iter().any(|a| is_runtime_bytes_like_type(&a.type_))
+            })
+        }) || enums.iter().any(|e| {
+            e.methods.iter().any(|m| {
                 m.return_type
                     .as_ref()
                     .is_some_and(is_runtime_bytes_like_type)
@@ -830,6 +902,24 @@ fn render_dart_scaffold(
                     .iter()
                     .any(|a| is_runtime_optional_bytes_type(&a.type_))
         })
+    }) || records.iter().any(|r| {
+        r.methods.iter().any(|m| {
+            m.return_type
+                .as_ref()
+                .is_some_and(is_runtime_optional_bytes_type)
+                || m.args
+                    .iter()
+                    .any(|a| is_runtime_optional_bytes_type(&a.type_))
+        })
+    }) || enums.iter().any(|e| {
+        e.methods.iter().any(|m| {
+            m.return_type
+                .as_ref()
+                .is_some_and(is_runtime_optional_bytes_type)
+                || m.args
+                    .iter()
+                    .any(|a| is_runtime_optional_bytes_type(&a.type_))
+        })
     });
     let needs_runtime_sequence_bytes = functions.iter().any(|f| {
         is_runtime_ffi_compatible_function(f, records, enums)
@@ -842,6 +932,24 @@ fn render_dart_scaffold(
                     .any(|a| is_runtime_sequence_bytes_type(&a.type_)))
     }) || objects.iter().any(|o| {
         o.methods.iter().any(|m| {
+            m.return_type
+                .as_ref()
+                .is_some_and(is_runtime_sequence_bytes_type)
+                || m.args
+                    .iter()
+                    .any(|a| is_runtime_sequence_bytes_type(&a.type_))
+        })
+    }) || records.iter().any(|r| {
+        r.methods.iter().any(|m| {
+            m.return_type
+                .as_ref()
+                .is_some_and(is_runtime_sequence_bytes_type)
+                || m.args
+                    .iter()
+                    .any(|a| is_runtime_sequence_bytes_type(&a.type_))
+        })
+    }) || enums.iter().any(|e| {
+        e.methods.iter().any(|m| {
             m.return_type
                 .as_ref()
                 .is_some_and(is_runtime_sequence_bytes_type)
@@ -909,7 +1017,7 @@ fn render_dart_scaffold(
         out.push_str("const int _rustFuturePollReady = 0;\n");
         out.push_str("const int _rustFuturePollWake = 1;\n\n");
     }
-    out.push_str(&render_data_models(records, enums));
+    out.push_str(&render_data_models(records, enums, callback_interfaces));
     out.push_str(&render_callback_interfaces(callback_interfaces));
     out.push_str(&render_callback_bridges(
         functions,
@@ -1122,7 +1230,11 @@ fn render_callable_arg_names(args: &[UdlArg]) -> String {
         .join(", ")
 }
 
-fn render_data_models(records: &[UdlRecord], enums: &[UdlEnum]) -> String {
+fn render_data_models(
+    records: &[UdlRecord],
+    enums: &[UdlEnum],
+    callback_interfaces: &[UdlCallbackInterface],
+) -> String {
     let mut out = String::new();
 
     for record in records {
@@ -1207,6 +1319,54 @@ fn render_data_models(records: &[UdlRecord], enums: &[UdlEnum]) -> String {
             out.push_str("    );\n");
             out.push_str("  }\n");
         }
+        for method in &record.methods {
+            let method_name = safe_dart_identifier(&to_lower_camel(&method.name));
+            let invoke_name = safe_dart_identifier(&to_lower_camel(&format!(
+                "{}_{}",
+                dart_identifier(&record.name),
+                dart_identifier(&method.name)
+            )));
+            let return_type = method
+                .return_type
+                .as_ref()
+                .map(map_uniffi_type_to_dart)
+                .unwrap_or_else(|| "void".to_string());
+            let signature_return = if method.is_async {
+                format!("Future<{return_type}>")
+            } else {
+                return_type.clone()
+            };
+            let args = render_callable_args_signature(&method.args, enums);
+            let arg_names = render_callable_arg_names(&method.args);
+            let invoke_args = if arg_names.is_empty() {
+                "this".to_string()
+            } else {
+                format!("this, {arg_names}")
+            };
+            out.push('\n');
+            out.push_str(&render_doc_comment(method.docstring.as_deref(), "  "));
+            out.push_str(&format!("  {signature_return} {method_name}({args}) {{\n"));
+            if method.is_async
+                && !is_runtime_async_rust_future_compatible_method(
+                    method,
+                    callback_interfaces,
+                    records,
+                    enums,
+                )
+            {
+                out.push_str(&format!(
+                    "    return Future(() => _bindings().{invoke_name}({invoke_args}));\n"
+                ));
+            } else if method.return_type.is_some() {
+                out.push_str(&format!(
+                    "    return _bindings().{invoke_name}({invoke_args});\n"
+                ));
+            } else {
+                out.push_str(&format!("    _bindings().{invoke_name}({invoke_args});\n"));
+            }
+            out.push_str("  }\n");
+        }
+
         out.push_str("}\n\n");
     }
 
@@ -1224,13 +1384,113 @@ fn render_data_models(records: &[UdlRecord], enums: &[UdlEnum]) -> String {
                 ));
             }
             out.push_str("}\n\n");
+            if !enum_.methods.is_empty() {
+                let extension_name = format!("{enum_name}Methods");
+                out.push_str(&format!("extension {extension_name} on {enum_name} {{\n"));
+                for method in &enum_.methods {
+                    let method_name = safe_dart_identifier(&to_lower_camel(&method.name));
+                    let invoke_name = safe_dart_identifier(&to_lower_camel(&format!(
+                        "{}_{}",
+                        dart_identifier(&enum_.name),
+                        dart_identifier(&method.name)
+                    )));
+                    let return_type = method
+                        .return_type
+                        .as_ref()
+                        .map(map_uniffi_type_to_dart)
+                        .unwrap_or_else(|| "void".to_string());
+                    let signature_return = if method.is_async {
+                        format!("Future<{return_type}>")
+                    } else {
+                        return_type.clone()
+                    };
+                    let args = render_callable_args_signature(&method.args, enums);
+                    let arg_names = render_callable_arg_names(&method.args);
+                    let invoke_args = if arg_names.is_empty() {
+                        "this".to_string()
+                    } else {
+                        format!("this, {arg_names}")
+                    };
+                    out.push('\n');
+                    out.push_str(&render_doc_comment(method.docstring.as_deref(), "  "));
+                    out.push_str(&format!("  {signature_return} {method_name}({args}) {{\n"));
+                    if method.is_async
+                        && !is_runtime_async_rust_future_compatible_method(
+                            method,
+                            callback_interfaces,
+                            records,
+                            enums,
+                        )
+                    {
+                        out.push_str(&format!(
+                            "    return Future(() => _bindings().{invoke_name}({invoke_args}));\n"
+                        ));
+                    } else if method.return_type.is_some() {
+                        out.push_str(&format!(
+                            "    return _bindings().{invoke_name}({invoke_args});\n"
+                        ));
+                    } else {
+                        out.push_str(&format!("    _bindings().{invoke_name}({invoke_args});\n"));
+                    }
+                    out.push_str("  }\n");
+                }
+                out.push_str("}\n\n");
+            }
             continue;
         }
 
         out.push_str(&render_doc_comment(enum_.docstring.as_deref(), ""));
         out.push_str(&format!(
-            "sealed class {enum_name} {{\n  const {enum_name}();\n}}\n\n"
+            "sealed class {enum_name} {{\n  const {enum_name}();\n"
         ));
+        for method in &enum_.methods {
+            let method_name = safe_dart_identifier(&to_lower_camel(&method.name));
+            let invoke_name = safe_dart_identifier(&to_lower_camel(&format!(
+                "{}_{}",
+                dart_identifier(&enum_.name),
+                dart_identifier(&method.name)
+            )));
+            let return_type = method
+                .return_type
+                .as_ref()
+                .map(map_uniffi_type_to_dart)
+                .unwrap_or_else(|| "void".to_string());
+            let signature_return = if method.is_async {
+                format!("Future<{return_type}>")
+            } else {
+                return_type.clone()
+            };
+            let args = render_callable_args_signature(&method.args, enums);
+            let arg_names = render_callable_arg_names(&method.args);
+            let invoke_args = if arg_names.is_empty() {
+                "this".to_string()
+            } else {
+                format!("this, {arg_names}")
+            };
+            out.push('\n');
+            out.push_str(&render_doc_comment(method.docstring.as_deref(), "  "));
+            out.push_str(&format!("  {signature_return} {method_name}({args}) {{\n"));
+            if method.is_async
+                && !is_runtime_async_rust_future_compatible_method(
+                    method,
+                    callback_interfaces,
+                    records,
+                    enums,
+                )
+            {
+                out.push_str(&format!(
+                    "    return Future(() => _bindings().{invoke_name}({invoke_args}));\n"
+                ));
+            } else if method.return_type.is_some() {
+                out.push_str(&format!(
+                    "    return _bindings().{invoke_name}({invoke_args});\n"
+                ));
+            } else {
+                out.push_str(&format!("    _bindings().{invoke_name}({invoke_args});\n"));
+            }
+            out.push_str("  }\n");
+        }
+        out.push_str("}\n\n");
         for variant in &enum_.variants {
             let variant_name = to_upper_camel(&variant.name);
             let class_name = format!("{enum_name}{variant_name}");
@@ -2117,8 +2377,61 @@ fn render_bound_methods(
     enums: &[UdlEnum],
 ) -> String {
     let mut out = String::new();
+    let mut runtime_functions = functions.to_vec();
+    for record in records {
+        for method in &record.methods {
+            let mut args = vec![UdlArg {
+                name: "self".to_string(),
+                type_: Type::Record {
+                    module_path: local_module_path.to_string(),
+                    name: record.name.clone(),
+                },
+                docstring: None,
+                default: None,
+            }];
+            args.extend(method.args.clone());
+            runtime_functions.push(UdlFunction {
+                name: format!(
+                    "{}_{}",
+                    dart_identifier(&record.name),
+                    dart_identifier(&method.name)
+                ),
+                docstring: method.docstring.clone(),
+                is_async: method.is_async,
+                return_type: method.return_type.clone(),
+                throws_type: method.throws_type.clone(),
+                args,
+            });
+        }
+    }
+    for enum_ in enums {
+        for method in &enum_.methods {
+            let mut args = vec![UdlArg {
+                name: "self".to_string(),
+                type_: Type::Enum {
+                    module_path: local_module_path.to_string(),
+                    name: enum_.name.clone(),
+                },
+                docstring: None,
+                default: None,
+            }];
+            args.extend(method.args.clone());
+            runtime_functions.push(UdlFunction {
+                name: format!(
+                    "{}_{}",
+                    dart_identifier(&enum_.name),
+                    dart_identifier(&method.name)
+                ),
+                docstring: method.docstring.clone(),
+                is_async: method.is_async,
+                return_type: method.return_type.clone(),
+                throws_type: method.throws_type.clone(),
+                args,
+            });
+        }
+    }
     let callback_runtime_interfaces = callback_interfaces_used_for_runtime(
-        functions,
+        &runtime_functions,
         objects,
         callback_interfaces,
         records,
@@ -2162,11 +2475,53 @@ fn render_bound_methods(
                             .iter()
                             .all(|a| is_runtime_ffi_compatible_type(&a.type_, records, enums)))
             })
+        })
+        || records.iter().any(|r| {
+            r.methods.iter().any(|m| {
+                m.return_type
+                    .as_ref()
+                    .is_some_and(|t| is_runtime_utf8_pointer_marshaled_type(t, records, enums))
+                    || (m.throws_type.is_some()
+                        && m.return_type
+                            .as_ref()
+                            .map(|t| is_runtime_ffi_compatible_type(t, records, enums))
+                            .unwrap_or(true)
+                        && m.args
+                            .iter()
+                            .all(|a| is_runtime_ffi_compatible_type(&a.type_, records, enums)))
+            })
+        })
+        || enums.iter().any(|e| {
+            e.methods.iter().any(|m| {
+                m.return_type
+                    .as_ref()
+                    .is_some_and(|t| is_runtime_utf8_pointer_marshaled_type(t, records, enums))
+                    || (m.throws_type.is_some()
+                        && m.return_type
+                            .as_ref()
+                            .map(|t| is_runtime_ffi_compatible_type(t, records, enums))
+                            .unwrap_or(true)
+                        && m.args
+                            .iter()
+                            .all(|a| is_runtime_ffi_compatible_type(&a.type_, records, enums)))
+            })
         });
     let needs_bytes_free = functions.iter().any(|f| {
         is_runtime_ffi_compatible_function(f, records, enums) && f.returns_runtime_bytes()
     }) || objects.iter().any(|o| {
         o.methods.iter().any(|m| {
+            m.return_type
+                .as_ref()
+                .is_some_and(is_runtime_bytes_like_type)
+        })
+    }) || records.iter().any(|r| {
+        r.methods.iter().any(|m| {
+            m.return_type
+                .as_ref()
+                .is_some_and(is_runtime_bytes_like_type)
+        })
+    }) || enums.iter().any(|e| {
+        e.methods.iter().any(|m| {
             m.return_type
                 .as_ref()
                 .is_some_and(is_runtime_bytes_like_type)
@@ -2179,6 +2534,18 @@ fn render_bound_methods(
                 .is_some_and(is_runtime_sequence_bytes_type)
     }) || objects.iter().any(|o| {
         o.methods.iter().any(|m| {
+            m.return_type
+                .as_ref()
+                .is_some_and(is_runtime_sequence_bytes_type)
+        })
+    }) || records.iter().any(|r| {
+        r.methods.iter().any(|m| {
+            m.return_type
+                .as_ref()
+                .is_some_and(is_runtime_sequence_bytes_type)
+        })
+    }) || enums.iter().any(|e| {
+        e.methods.iter().any(|m| {
             m.return_type
                 .as_ref()
                 .is_some_and(is_runtime_sequence_bytes_type)
@@ -2217,7 +2584,7 @@ fn render_bound_methods(
         ));
     }
 
-    for function in functions {
+    for function in &runtime_functions {
         let is_runtime_supported = is_runtime_ffi_compatible_function(function, records, enums);
         let is_sync_callback_supported =
             is_runtime_callback_compatible_function(function, callback_interfaces, records, enums);
@@ -4390,7 +4757,11 @@ fn render_function_stubs(
     records: &[UdlRecord],
     enums: &[UdlEnum],
 ) -> String {
-    if functions.is_empty() && objects.is_empty() {
+    if functions.is_empty()
+        && objects.is_empty()
+        && records.iter().all(|r| r.methods.is_empty())
+        && enums.iter().all(|e| e.methods.is_empty())
+    {
         return String::new();
     }
 
@@ -4399,7 +4770,9 @@ fn render_function_stubs(
         is_runtime_ffi_compatible_function(f, records, enums)
             || is_runtime_callback_compatible_function(f, callback_interfaces, records, enums)
             || has_runtime_callback_args_in_args(&f.args, callback_interfaces, records, enums)
-    }) || !objects.is_empty();
+    }) || !objects.is_empty()
+        || records.iter().any(|r| !r.methods.is_empty())
+        || enums.iter().any(|e| !e.methods.is_empty());
     out.push('\n');
     if has_runtime_functions {
         out.push_str(&format!("{ffi_class_name}? _defaultBindings;\n\n"));
@@ -4491,6 +4864,16 @@ fn has_runtime_callback_support(
         .any(|f| has_runtime_callback_args_in_args(&f.args, callback_interfaces, records, enums))
         || objects.iter().any(|o| {
             o.methods.iter().any(|m| {
+                has_runtime_callback_args_in_args(&m.args, callback_interfaces, records, enums)
+            })
+        })
+        || records.iter().any(|r| {
+            r.methods.iter().any(|m| {
+                has_runtime_callback_args_in_args(&m.args, callback_interfaces, records, enums)
+            })
+        })
+        || enums.iter().any(|e| {
+            e.methods.iter().any(|m| {
                 has_runtime_callback_args_in_args(&m.args, callback_interfaces, records, enums)
             })
         })
@@ -4858,6 +5241,14 @@ fn has_runtime_async_rust_future_support(
         is_runtime_async_rust_future_compatible_function(f, callback_interfaces, records, enums)
     }) || objects.iter().any(|o| {
         o.methods.iter().any(|m| {
+            is_runtime_async_rust_future_compatible_method(m, callback_interfaces, records, enums)
+        })
+    }) || records.iter().any(|r| {
+        r.methods.iter().any(|m| {
+            is_runtime_async_rust_future_compatible_method(m, callback_interfaces, records, enums)
+        })
+    }) || enums.iter().any(|e| {
+        e.methods.iter().any(|m| {
             is_runtime_async_rust_future_compatible_method(m, callback_interfaces, records, enums)
         })
     })
@@ -5537,6 +5928,7 @@ fn is_dart_keyword(input: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
     use std::fs;
 
     use super::*;
@@ -6593,6 +6985,79 @@ interface Outcome {
         assert!(content.contains("final class OutcomeFailure extends Outcome {"));
         assert!(content.contains("String _encodeOutcome(Outcome value) {"));
         assert!(content.contains("Outcome _decodeOutcome(String raw) {"));
+    }
+
+    #[test]
+    fn renders_record_and_enum_methods_from_metadata() {
+        let records = vec![UdlRecord {
+            name: "Point".to_string(),
+            docstring: None,
+            fields: vec![UdlArg {
+                name: "x".to_string(),
+                type_: Type::Int32,
+                docstring: None,
+                default: None,
+            }],
+            methods: vec![UdlObjectMethod {
+                name: "checksum".to_string(),
+                docstring: None,
+                is_async: false,
+                return_type: Some(Type::UInt32),
+                throws_type: None,
+                args: vec![],
+            }],
+        }];
+        let enums = vec![UdlEnum {
+            name: "State".to_string(),
+            docstring: None,
+            is_error: false,
+            variants: vec![
+                UdlEnumVariant {
+                    name: "on".to_string(),
+                    docstring: None,
+                    fields: vec![],
+                },
+                UdlEnumVariant {
+                    name: "off".to_string(),
+                    docstring: None,
+                    fields: vec![],
+                },
+            ],
+            methods: vec![UdlObjectMethod {
+                name: "rank".to_string(),
+                docstring: None,
+                is_async: false,
+                return_type: Some(Type::UInt32),
+                throws_type: None,
+                args: vec![],
+            }],
+        }];
+
+        let content = render_dart_scaffold(
+            "models",
+            "ModelsFfi",
+            "uniffi_models",
+            None,
+            "crate_name",
+            &HashMap::new(),
+            &HashMap::new(),
+            &[],
+            &[],
+            &[],
+            &[],
+            &records,
+            &enums,
+        );
+
+        assert!(content.contains("int checksum() {"));
+        assert!(content.contains("return _bindings().pointChecksum(this);"));
+        assert!(content.contains("extension StateMethods on State {"));
+        assert!(content.contains("int rank() {"));
+        assert!(content.contains("return _bindings().stateRank(this);"));
+        assert!(content.contains("_pointChecksum = _lib.lookupFunction<"));
+        assert!(content.contains("_stateRank = _lib.lookupFunction<"));
+        assert!(content.contains(">('point_checksum');"));
+        assert!(content.contains(">('state_rank');"));
     }
 
     #[test]
