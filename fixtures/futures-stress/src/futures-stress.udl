@@ -1,6 +1,12 @@
 [Custom]
 typedef string Label;
 
+[Error]
+enum AsyncError {
+  "NotFound",
+  "InvalidInput",
+};
+
 namespace futures_stress {
   [Async]
   string greet_async(string name);
@@ -18,6 +24,14 @@ namespace futures_stress {
   record<string, u32> summarize_async(record<string, u32> values);
   [Async]
   Label label_echo_async(Label input);
+  [Async, Throws=AsyncError]
+  string validate_async(string input);
+  [Async, Throws=AsyncError]
+  u32 checked_add_async(u32 left, u32 right);
+  [Async, Throws=AsyncError]
+  void assert_not_empty_async(string value);
+  [Async, Throws=AsyncError]
+  bytes echo_bytes_checked_async(bytes input);
 };
 
 interface Worker {
@@ -30,4 +44,6 @@ interface Worker {
   record<string, u32> async_counts(record<string, u32> items);
   [Async]
   Label async_label_echo(Label input);
+  [Async, Throws=AsyncError]
+  string async_checked_describe(boolean fail);
 };

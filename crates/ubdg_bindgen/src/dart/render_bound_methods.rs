@@ -1746,6 +1746,68 @@ pub(super) fn render_bound_methods(
                 out.push_str("          return;\n");
             }
             out.push_str("        }\n");
+            debug_assert!(
+                function.throws_type.as_ref().and_then(enum_name_from_type).is_some()
+                    || function.throws_type.is_none(),
+                "throws_type passed is_runtime_throws_enum_type but enum_name_from_type returned None"
+            );
+            if let Some(throws_name) = function
+                .throws_type
+                .as_ref()
+                .and_then(enum_name_from_type)
+                .map(to_upper_camel)
+            {
+                // Free any bytes-like result buffer on the error path to prevent leaks.
+                if let Some(ret_type) = function.return_type.as_ref() {
+                    if is_runtime_bytes_type(ret_type) || is_runtime_map_type(ret_type) {
+                        out.push_str("        {\n");
+                        out.push_str("          final _RustBuffer buf = resultValue;\n");
+                        out.push_str("          if (buf.len > 0 && buf.data != ffi.nullptr) {\n");
+                        out.push_str("            _rustBytesFree(buf);\n");
+                        out.push_str("          }\n");
+                        out.push_str("        }\n");
+                    } else if is_runtime_optional_bytes_type(ret_type) {
+                        out.push_str("        {\n");
+                        out.push_str("          final _RustBufferOpt opt = resultValue;\n");
+                        out.push_str("          if (opt.isSome != 0) {\n");
+                        out.push_str("            final _RustBuffer buf = opt.value;\n");
+                        out.push_str("            if (buf.len > 0 && buf.data != ffi.nullptr) {\n");
+                        out.push_str("              _rustBytesFree(buf);\n");
+                        out.push_str("            }\n");
+                        out.push_str("          }\n");
+                        out.push_str("        }\n");
+                    } else if is_runtime_sequence_bytes_type(ret_type) {
+                        out.push_str("        {\n");
+                        out.push_str("          final _RustBufferVec vec = resultValue;\n");
+                        out.push_str("          if (vec.len > 0 && vec.data != ffi.nullptr) {\n");
+                        out.push_str("            _rustBytesVecFree(vec);\n");
+                        out.push_str("          }\n");
+                        out.push_str("        }\n");
+                    }
+                }
+                out.push_str("        if (statusCode == _rustCallStatusError) {\n");
+                out.push_str(
+                    "          final ffi.Pointer<Utf8> errorPtr = outStatusPtr.ref.errorBuf;\n",
+                );
+                out.push_str("          if (errorPtr != ffi.nullptr) {\n");
+                out.push_str("            try {\n");
+                out.push_str(
+                    "              final String errorPayload = errorPtr.toDartString();\n",
+                );
+                out.push_str(&format!(
+                    "              throw {}ExceptionFfiCodec.decode(jsonDecode(errorPayload));\n",
+                    throws_name
+                ));
+                out.push_str("            } finally {\n");
+                out.push_str("              _rustStringFree(errorPtr);\n");
+                out.push_str("            }\n");
+                out.push_str("          }\n");
+                out.push_str(&format!(
+                    "          throw StateError('Rust async error without payload for {}');\n",
+                    function.name
+                ));
+                out.push_str("        }\n");
+            }
             out.push_str("        if (statusCode == _rustCallStatusCancelled) {\n");
             out.push_str(&format!(
                 "          throw StateError('Rust future was cancelled for {}');\n",
@@ -3507,6 +3569,74 @@ pub(super) fn render_bound_methods(
                     out.push_str(&format!("          return {decode};\n"));
                 }
                 out.push_str("        }\n");
+                debug_assert!(
+                    method.throws_type.as_ref().and_then(enum_name_from_type).is_some()
+                        || method.throws_type.is_none(),
+                    "throws_type passed is_runtime_throws_enum_type but enum_name_from_type returned None"
+                );
+                if let Some(throws_name) = method
+                    .throws_type
+                    .as_ref()
+                    .and_then(enum_name_from_type)
+                    .map(to_upper_camel)
+                {
+                    // Free any bytes-like result buffer on the error path to prevent leaks.
+                    if let Some(ret_type) = method.return_type.as_ref() {
+                        if is_runtime_bytes_type(ret_type) || is_runtime_map_type(ret_type) {
+                            out.push_str("        {\n");
+                            out.push_str("          final _RustBuffer buf = resultValue;\n");
+                            out.push_str(
+                                "          if (buf.len > 0 && buf.data != ffi.nullptr) {\n",
+                            );
+                            out.push_str("            _rustBytesFree(buf);\n");
+                            out.push_str("          }\n");
+                            out.push_str("        }\n");
+                        } else if is_runtime_optional_bytes_type(ret_type) {
+                            out.push_str("        {\n");
+                            out.push_str("          final _RustBufferOpt opt = resultValue;\n");
+                            out.push_str("          if (opt.isSome != 0) {\n");
+                            out.push_str("            final _RustBuffer buf = opt.value;\n");
+                            out.push_str(
+                                "            if (buf.len > 0 && buf.data != ffi.nullptr) {\n",
+                            );
+                            out.push_str("              _rustBytesFree(buf);\n");
+                            out.push_str("            }\n");
+                            out.push_str("          }\n");
+                            out.push_str("        }\n");
+                        } else if is_runtime_sequence_bytes_type(ret_type) {
+                            out.push_str("        {\n");
+                            out.push_str("          final _RustBufferVec vec = resultValue;\n");
+                            out.push_str(
+                                "          if (vec.len > 0 && vec.data != ffi.nullptr) {\n",
+                            );
+                            out.push_str("            _rustBytesVecFree(vec);\n");
+                            out.push_str("          }\n");
+                            out.push_str("        }\n");
+                        }
+                    }
+                    out.push_str("        if (statusCode == _rustCallStatusError) {\n");
+                    out.push_str(
+                        "          final ffi.Pointer<Utf8> errorPtr = outStatusPtr.ref.errorBuf;\n",
+                    );
+                    out.push_str("          if (errorPtr != ffi.nullptr) {\n");
+                    out.push_str("            try {\n");
+                    out.push_str(
+                        "              final String errorPayload = errorPtr.toDartString();\n",
+                    );
+                    out.push_str(&format!(
+                        "              throw {}ExceptionFfiCodec.decode(jsonDecode(errorPayload));\n",
+                        throws_name
+                    ));
+                    out.push_str("            } finally {\n");
+                    out.push_str("              _rustStringFree(errorPtr);\n");
+                    out.push_str("            }\n");
+                    out.push_str("          }\n");
+                    out.push_str(&format!(
+                        "          throw StateError('Rust async error without payload for {}');\n",
+                        method_symbol
+                    ));
+                    out.push_str("        }\n");
+                }
                 out.push_str("        if (statusCode == _rustCallStatusCancelled) {\n");
                 out.push_str(&format!(
                     "          throw StateError('Rust future was cancelled for {}');\n",

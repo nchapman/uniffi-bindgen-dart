@@ -30,17 +30,9 @@ pub(super) fn is_runtime_object_type(type_: &Type) -> bool {
     matches!(runtime_unwrapped_type(type_), Type::Object { .. })
 }
 
-pub(super) fn is_runtime_error_enum_type(type_: &Type, enums: &[UdlEnum]) -> bool {
-    let Some(name) = enum_name_from_type(type_) else {
-        return false;
-    };
-    enums.iter().any(|e| e.name == name && e.is_error)
-}
-
-pub(super) fn is_runtime_throws_enum_type(type_: &Type, enums: &[UdlEnum]) -> bool {
-    if is_runtime_error_enum_type(type_, enums) {
-        return true;
-    }
+/// Returns true for any enum type that can be used as a throws type.
+/// UniFFI allows both `[Error]`-flagged and plain enums as throws types.
+pub(super) fn is_runtime_throws_enum_type(type_: &Type, _enums: &[UdlEnum]) -> bool {
     matches!(runtime_unwrapped_type(type_), Type::Enum { .. })
 }
 

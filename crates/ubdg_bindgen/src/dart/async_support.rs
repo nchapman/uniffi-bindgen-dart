@@ -189,7 +189,11 @@ pub(super) fn is_runtime_async_rust_future_compatible_function(
     enums: &[UdlEnum],
 ) -> bool {
     function.is_async
-        && function.throws_type.is_none()
+        && function
+            .throws_type
+            .as_ref()
+            .map(|t| is_runtime_throws_enum_type(t, enums))
+            .unwrap_or(true)
         && function
             .return_type
             .as_ref()
@@ -212,7 +216,11 @@ pub(super) fn is_runtime_async_rust_future_compatible_method(
     enums: &[UdlEnum],
 ) -> bool {
     method.is_async
-        && method.throws_type.is_none()
+        && method
+            .throws_type
+            .as_ref()
+            .map(|t| is_runtime_throws_enum_type(t, enums))
+            .unwrap_or(true)
         && async_rust_future_spec(method.return_type.as_ref(), records, enums).is_some()
         && runtime_args_compatible_with_optional_callbacks(
             &method.args,
