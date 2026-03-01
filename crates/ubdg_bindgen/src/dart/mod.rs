@@ -1227,7 +1227,7 @@ fn render_bound_methods(
         let native_sig = format!("{native_return} Function({})", native_args.join(", "));
         let dart_sig = format!("{dart_ffi_return} Function({})", dart_ffi_args.join(", "));
 
-        out.push_str("\n");
+        out.push('\n');
         out.push_str(&format!(
             "  late final {dart_sig} {field_name} = _lib.lookupFunction<{native_sig}, {dart_sig}>('{}');\n",
             function.name
@@ -1503,7 +1503,7 @@ fn render_bound_methods(
         let object_lower = safe_dart_identifier(&to_lower_camel(&object.name));
         let object_symbol = dart_identifier(&object.name);
         let free_field = format!("_{}Free", object_lower);
-        out.push_str("\n");
+        out.push('\n');
         out.push_str(&format!(
             "  late final void Function(int handle) {free_field} = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('{object_symbol}_free');\n"
         ));
@@ -1568,7 +1568,7 @@ fn render_bound_methods(
             if !signature_compatible {
                 continue;
             }
-            out.push_str("\n");
+            out.push('\n');
             out.push_str(&format!(
                 "  late final {dart_return} Function({}) {ctor_field} = _lib.lookupFunction<{native_return} Function({}), {dart_return} Function({})>('{ctor_symbol}');\n",
                 dart_ffi_args.join(", "),
@@ -1724,7 +1724,7 @@ fn render_bound_methods(
                     .to_string()
             };
 
-            out.push_str("\n");
+            out.push('\n');
             out.push_str(&format!(
                 "  late final {dart_return} Function({}) {method_field} = _lib.lookupFunction<{native_return} Function({}), {dart_return} Function({})>('{method_symbol}');\n",
                 dart_ffi_args.join(", "),
@@ -1777,12 +1777,9 @@ fn render_bound_methods(
                     throws_name
                 ));
                 out.push_str("    }\n");
-                if method.return_type.is_some() {
+                if let Some(ret_type) = method.return_type.as_ref() {
                     out.push_str("    final Object? okRaw = envelope['ok'];\n");
-                    let decode = render_json_decode_expr(
-                        "okRaw",
-                        method.return_type.as_ref().expect("checked"),
-                    );
+                    let decode = render_json_decode_expr("okRaw", ret_type);
                     out.push_str(&format!("    return {decode};\n"));
                 } else {
                     out.push_str("    return;\n");

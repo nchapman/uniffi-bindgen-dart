@@ -6,6 +6,18 @@
 cargo test --workspace
 ```
 
+## Strict lint gate
+
+```bash
+cargo clippy --all-targets -- -D warnings
+```
+
+## Formatting
+
+```bash
+cargo fmt --check
+```
+
 ## Binding tests
 
 ```bash

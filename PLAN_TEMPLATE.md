@@ -30,6 +30,14 @@ Use this as the source template for any UniFFI language backend. Create an insta
 ### Secondary Outcome
 A repeatable backend-development process that can be applied with minimal changes to future UniFFI language generators.
 
+## Progress Tracking (Instance-Only Section)
+When creating a language-specific plan instance, add a dated progress snapshot with:
+- Completed phases
+- In-progress phases
+- Blocked/deferred phases
+- Implemented scope summary (what is actually working today)
+- Current immediate next steps (remove finished items; keep this list forward-looking)
+
 ## Scope
 ### In Scope
 - Full code generation pipeline for `LANG_NAME`.
@@ -180,8 +188,16 @@ Every row must have generator tests + runtime tests.
 ### Definition Of Done For Any Feature
 - Unit/golden/runtime tests exist and pass.
 - No formatter/analyzer warnings in generated code.
+- `cargo clippy --all-targets -- -D warnings` passes.
 - Docs updated.
 - CI gates remain green.
+
+## Prototype Hygiene Gates
+- `cargo fmt --check`
+- `cargo clippy --all-targets -- -D warnings`
+- `cargo test --workspace`
+- `./scripts/test_bindings.sh`
+- Host-language analyze/test clean on generated bindings
 
 ## Fixture Matrix (Minimum)
 | Fixture Group | Purpose |
@@ -199,6 +215,11 @@ Every row must have generator tests + runtime tests.
 | `rename` | rename rule application |
 | `mutable-records` | mutability config behavior |
 | `regressions/*` | permanent bug prevention |
+
+## Fixture Strategy (Recommended)
+- Keep one rich end-to-end fixture that mixes features and exercises lifecycle/memory behavior.
+- Keep focused fixtures for deterministic golden coverage of specific type categories.
+- Add regression fixtures for every bug fix before implementing the fix.
 
 ## Execution Phases and Gates
 ### Phase 0: Bootstrap
@@ -359,3 +380,4 @@ These rules are part of the template and should not be skipped:
 3. Set up host-language `binding_tests` package/project and first runtime smoke test.
 4. Implement minimal top-level function generation.
 5. Add and enforce CI `build` + `test-bindings` job split.
+6. Replace this section in the language instance plan with current next steps once Phase 1 is complete.

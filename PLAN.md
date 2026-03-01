@@ -29,6 +29,33 @@ This plan is the implementation template for building production-grade UniFFI la
 ### Secondary Outcome
 A repeatable backend-development process that can be applied with minimal changes to future UniFFI language generators.
 
+## Progress Snapshot (March 1, 2026)
+### Completed
+- Phase 0: Bootstrap
+- Phase 1: First End-to-End Path
+- Phase 2: Core Type System
+- Phase 3: Object Model and Lifetimes (sync object lifecycle paths)
+
+### In Progress
+- Phase 4: Enums/errors are in place; trait parity still pending.
+- Phase 5: Async and callback interfaces pending.
+- Phase 6: Advanced config/external types pending.
+- Phase 7+: Documentation hardening and release workflow completion pending.
+
+### Blocked/Deferred
+- None currently.
+
+### Implemented So Far (Prototype Baseline)
+- CLI `generate` flow with `uniffi.toml` config resolution.
+- Deterministic generation with golden tests for `simple-fns`, `compound-demo`, and `model-types-demo`.
+- Top-level functions for primitive, temporal, bytes, record, enum, and fallible envelope paths.
+- Record models with JSON codec helpers and `copyWith`.
+- Flat + data-carrying enums with runtime encode/decode helpers.
+- Typed Dart exception hierarchy and throw mapping from `[Throws=...]` / `[Error]`.
+- Object wrappers with explicit `close()` plus finalizer fallback.
+- Object constructors/methods with runtime marshalling across supported FFI-compatible types.
+- Runtime fixture/native library coverage for strings, bytes, records, enums, objects, and typed errors.
+
 ## Scope
 ### In Scope
 - Full code generation pipeline for `Dart`.
@@ -179,8 +206,16 @@ Every row must have generator tests + runtime tests.
 ### Definition Of Done For Any Feature
 - Unit/golden/runtime tests exist and pass.
 - No formatter/analyzer warnings in generated code.
+- `cargo clippy --all-targets -- -D warnings` passes.
 - Docs updated.
 - CI gates remain green.
+
+## Prototype Hygiene Gates
+- `cargo fmt --check`
+- `cargo clippy --all-targets -- -D warnings`
+- `cargo test --workspace`
+- `./scripts/test_bindings.sh`
+- For generated Dart: analyzer clean (`dart analyze`) and runtime tests green (`dart test` via script)
 
 ## Fixture Matrix (Minimum)
 | Fixture Group | Purpose |
@@ -198,6 +233,11 @@ Every row must have generator tests + runtime tests.
 | `rename` | rename rule application |
 | `mutable-records` | mutability config behavior |
 | `regressions/*` | permanent bug prevention |
+
+## Fixture Strategy (Current Project Shape)
+- Keep one rich end-to-end fixture (`simple-fns`) that exercises mixed feature interactions and memory/resource behavior.
+- Keep focused fixture demos (`compound-demo`, `model-types-demo`) for deterministic golden coverage on type-shape changes.
+- Add targeted `regressions/*` fixtures when fixing generator/runtime bugs to prevent reintroductions.
 
 ## Execution Phases and Gates
 ### Phase 0: Bootstrap
@@ -353,8 +393,8 @@ These rules are part of the template and should not be skipped:
 | Release compatibility confusion | Consumer integration failures | Maintain explicit backend-to-UniFFI compatibility table |
 
 ## Immediate Next Steps (Dart Instance)
-1. Create workspace skeleton (`ubdg_bindgen`, `ubdg_runtime`, `ubdg_testing`).
-2. Implement CLI parse and no-op `generate` with tests.
-3. Set up `binding_tests` Dart package and first runtime smoke test.
-4. Implement minimal top-level function generation.
-5. Add and enforce CI `build` + `test-bindings` job split.
+1. Implement async futures and callback interface generation/runtime coverage.
+2. Add trait-related parity coverage and fixtures.
+3. Extend advanced config support (rename/exclude/custom/external/docstrings) with dedicated fixture tests.
+4. Keep `docs/supported-features.md` synchronized with every parity change.
+5. Add CI jobs for clippy strict mode and artifact-split runtime binding tests (Linux + macOS).
