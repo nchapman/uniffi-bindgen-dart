@@ -1,10 +1,13 @@
 namespace simple_fns {
   u32 add(u32 left, u32 right);
+  u64 add_u64(u64 left, u64 right);
   string broken_greet();
   string greet(string name);
+  i64 subtract_i64(i64 left, i64 right);
   string? maybe_greet(string? name);
   i32 negate(i32 value);
   boolean is_even(i32 value);
+  f32 scale32(f32 value, f32 factor);
   f64 scale(f64 value, f64 factor);
   void tick();
   u32 current_tick();

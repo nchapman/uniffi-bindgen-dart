@@ -32,6 +32,12 @@ class SimpleFnsBindings {
       return _add(left, right);
   }
 
+  late final int Function(int left, int right) _addU64 = _lib.lookupFunction<ffi.Uint64 Function(ffi.Uint64 left, ffi.Uint64 right), int Function(int left, int right)>('add_u64');
+
+  int addU64(int left, int right) {
+      return _addU64(left, right);
+  }
+
   late final ffi.Pointer<Utf8> Function() _brokenGreet = _lib.lookupFunction<ffi.Pointer<Utf8> Function(), ffi.Pointer<Utf8> Function()>('broken_greet');
 
   String brokenGreet() {
@@ -108,6 +114,18 @@ class SimpleFnsBindings {
       return _scale(value, factor);
   }
 
+  late final double Function(double value, double factor) _scale32 = _lib.lookupFunction<ffi.Float Function(ffi.Float value, ffi.Float factor), double Function(double value, double factor)>('scale32');
+
+  double scale32(double value, double factor) {
+      return _scale32(value, factor);
+  }
+
+  late final int Function(int left, int right) _subtractI64 = _lib.lookupFunction<ffi.Int64 Function(ffi.Int64 left, ffi.Int64 right), int Function(int left, int right)>('subtract_i64');
+
+  int subtractI64(int left, int right) {
+      return _subtractI64(left, right);
+  }
+
   late final void Function() _tick = _lib.lookupFunction<ffi.Void Function(), void Function()>('tick');
 
   void tick() {
@@ -129,6 +147,10 @@ void resetDefaultBindings() {
 
 int add(int left, int right) {
   return _bindings().add(left, right);
+}
+
+int addU64(int left, int right) {
+  return _bindings().addU64(left, right);
 }
 
 String brokenGreet() {
@@ -157,6 +179,14 @@ int negate(int value) {
 
 double scale(double value, double factor) {
   return _bindings().scale(value, factor);
+}
+
+double scale32(double value, double factor) {
+  return _bindings().scale32(value, factor);
+}
+
+int subtractI64(int left, int right) {
+  return _bindings().subtractI64(left, right);
 }
 
 void tick() {

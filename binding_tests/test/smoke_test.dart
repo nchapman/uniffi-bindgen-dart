@@ -20,15 +20,19 @@ void main() {
     expect(contents, contains('class SimpleFnsBindings {'));
     expect(contents, contains("libraryName = 'uniffi_simple_fns';"));
     expect(contents, contains('int add(int left, int right) {'));
+    expect(contents, contains('int addU64(int left, int right) {'));
     expect(contents, contains('int negate(int value) {'));
     expect(contents, contains('String brokenGreet() {'));
     expect(contents, contains('String greet(String name) {'));
     expect(contents, contains('String? maybeGreet(String? name) {'));
     expect(contents, contains('bool isEven(int value) {'));
     expect(contents, contains('double scale(double value, double factor) {'));
+    expect(contents, contains('double scale32(double value, double factor) {'));
+    expect(contents, contains('int subtractI64(int left, int right) {'));
     expect(contents, contains('void tick() {'));
     expect(contents, contains('int currentTick() {'));
     expect(contents, contains('late final int Function(int left, int right) _add ='));
+    expect(contents, contains('late final int Function(int left, int right) _addU64 ='));
     expect(contents, contains('late final bool Function(int value) _isEven ='));
     expect(contents, contains('ffi.Pointer<Utf8> nameNative = name.toNativeUtf8();'));
     expect(
@@ -60,7 +64,12 @@ void main() {
 
     final bindings = SimpleFnsBindings(libraryPath: libPath);
     expect(bindings.add(20, 22), 42);
+    expect(bindings.addU64(10000000000, 25), 10000000025);
     expect(bindings.negate(7), -7);
+    expect(
+      bindings.subtractI64(9000000000000000000, 1000000000000000000),
+      8000000000000000000,
+    );
     expect(bindings.greet('dart'), 'hello, dart');
     expect(bindings.maybeGreet('dart'), 'maybe, dart');
     expect(bindings.maybeGreet(null), isNull);
@@ -68,13 +77,16 @@ void main() {
     expect(bindings.isEven(8), isTrue);
     expect(bindings.isEven(9), isFalse);
     expect(bindings.scale(2.5, 4.0), closeTo(10.0, 0.000001));
+    expect(bindings.scale32(1.25, 8.0), closeTo(10.0, 0.0001));
     final before = bindings.currentTick();
     bindings.tick();
     expect(bindings.currentTick(), before + 1);
 
     configureDefaultBindings(libraryPath: libPath);
     expect(add(1, 2), 3);
+    expect(addU64(4000000000, 2), 4000000002);
     expect(negate(5), -5);
+    expect(subtractI64(5000000000, 2000000000), 3000000000);
     expect(greet('ffi'), 'hello, ffi');
     expect(maybeGreet('ffi'), 'maybe, ffi');
     expect(maybeGreet(null), isNull);
@@ -82,6 +94,7 @@ void main() {
     expect(isEven(10), isTrue);
     expect(isEven(11), isFalse);
     expect(scale(1.5, 3.0), closeTo(4.5, 0.000001));
+    expect(scale32(0.5, 6.0), closeTo(3.0, 0.0001));
     final globalBefore = currentTick();
     tick();
     expect(currentTick(), globalBefore + 1);

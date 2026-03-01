@@ -10,6 +10,11 @@ pub extern "C" fn add(left: u32, right: u32) -> u32 {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn add_u64(left: u64, right: u64) -> u64 {
+    left + right
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn greet(name: *const c_char) -> *mut c_char {
     if name.is_null() {
         return CString::new("hello, <null>")
@@ -56,8 +61,18 @@ pub extern "C" fn negate(value: i32) -> i32 {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn subtract_i64(left: i64, right: i64) -> i64 {
+    left - right
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn is_even(value: i32) -> bool {
     value % 2 == 0
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scale32(value: f32, factor: f32) -> f32 {
+    value * factor
 }
 
 #[unsafe(no_mangle)]
