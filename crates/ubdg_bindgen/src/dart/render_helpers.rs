@@ -207,6 +207,41 @@ pub(super) fn append_runtime_arg_marshalling(
         ));
         post_call.push(format!("    calloc.free({native_name});\n"));
         call_args.push(native_name);
+    } else if is_runtime_map_type(type_) {
+        let data_name = format!("{arg_name}Data");
+        let buffer_ptr_name = format!("{arg_name}BufferPtr");
+        let native_name = format!("{arg_name}Native");
+        let writer_name = format!("{arg_name}Writer");
+        let write_stmt =
+            render_uniffi_binary_write_statement(type_, arg_name, &writer_name, enums, "    ");
+        pre_call.push(format!(
+            "    final {writer_name} = _UniFfiBinaryWriter();\n"
+        ));
+        pre_call.push(write_stmt);
+        pre_call.push(format!(
+            "    final Uint8List {data_name}Bytes = {writer_name}.toBytes();\n"
+        ));
+        pre_call.push(format!(
+            "    final ffi.Pointer<ffi.Uint8> {data_name} = {data_name}Bytes.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>({data_name}Bytes.length);\n"
+        ));
+        pre_call.push(format!(
+            "    if ({data_name} != ffi.nullptr) {{\n      {data_name}.asTypedList({data_name}Bytes.length).setAll(0, {data_name}Bytes);\n    }}\n"
+        ));
+        pre_call.push(format!(
+            "    final ffi.Pointer<_RustBuffer> {buffer_ptr_name} = calloc<_RustBuffer>();\n"
+        ));
+        pre_call.push(format!("    {buffer_ptr_name}.ref.data = {data_name};\n"));
+        pre_call.push(format!(
+            "    {buffer_ptr_name}.ref.len = {data_name}Bytes.length;\n"
+        ));
+        pre_call.push(format!(
+            "    final _RustBuffer {native_name} = {buffer_ptr_name}.ref;\n"
+        ));
+        post_call.push(format!(
+            "    if ({data_name} != ffi.nullptr) calloc.free({data_name});\n"
+        ));
+        post_call.push(format!("    calloc.free({buffer_ptr_name});\n"));
+        call_args.push(native_name);
     } else if is_runtime_timestamp_type(type_) {
         call_args.push(format!("{arg_name}.toUtc().microsecondsSinceEpoch"));
     } else if is_runtime_duration_type(type_) {

@@ -397,6 +397,25 @@ pub extern "C" fn coveralls_get_metadata(handle: u64) -> *mut c_char {
     json_out(&metadata)
 }
 
+/// Return a map with non-string keys via RustBuffer binary encoding.
+#[no_mangle]
+pub extern "C" fn get_int_map(key: u32, value: u64) -> RustBuffer {
+    // Binary format: i32 length, then for each entry: u32 key, u64 value
+    // Big-endian, matching the UniFFI binary codec protocol.
+    let mut buf = Vec::new();
+    // Map length (1 entry)
+    buf.extend_from_slice(&1i32.to_be_bytes());
+    // Key (u32)
+    buf.extend_from_slice(&key.to_be_bytes());
+    // Value (u64)
+    buf.extend_from_slice(&value.to_be_bytes());
+
+    let len = buf.len() as u64;
+    let ptr = buf.as_mut_ptr();
+    std::mem::forget(buf);
+    RustBuffer { data: ptr, len }
+}
+
 // --- ThreadsafeCounter ---
 
 #[no_mangle]

@@ -37,6 +37,9 @@ namespace coverall_demo {
 
   /// Walk up a NodeTrait tree, collecting ancestor names.
   sequence<string> ancestor_names(NodeTrait node);
+
+  /// Round-trip a map with non-string keys (record<u32, u64>).
+  record<u32, u64> get_int_map(u32 key, u64 value);
 };
 
 /// Simple three-variant flat enum.

@@ -17,10 +17,16 @@ pub(super) fn render_json_encode_expr(value_expr: &str, type_: &Type) -> String 
             let inner = render_json_encode_expr("item", inner_type);
             format!("{value_expr}.map((item) => {inner}).toList()")
         }
+        // Only reached for string-keyed maps; non-string maps use the binary codec path.
         Type::Map {
-            key_type: _,
+            key_type,
             value_type,
         } => {
+            debug_assert!(
+                is_runtime_string_type(key_type),
+                "render_json_encode_expr called for non-string map key: {:?}",
+                key_type
+            );
             let inner = render_json_encode_expr("value", value_type);
             format!("{value_expr}.map((key, value) => MapEntry(key, {inner}))")
         }
@@ -61,10 +67,16 @@ pub(super) fn render_json_decode_expr(value_expr: &str, type_: &Type) -> String 
             let inner = render_json_decode_expr("item", inner_type);
             format!("({value_expr} as List).map((item) => {inner}).toList()")
         }
+        // Only reached for string-keyed maps; non-string maps use the binary codec path.
         Type::Map {
-            key_type: _,
+            key_type,
             value_type,
         } => {
+            debug_assert!(
+                is_runtime_string_type(key_type),
+                "render_json_decode_expr called for non-string map key: {:?}",
+                key_type
+            );
             let inner = render_json_decode_expr("value", value_type);
             format!("({value_expr} as Map<String, dynamic>).map((key, value) => MapEntry(key, {inner}))")
         }
@@ -376,9 +388,9 @@ pub(super) fn render_uniffi_binary_write_statement(
                 "{indent}{writer}.writeI32({value_expr}.length);\n{indent}for (final item in {value_expr}) {{\n{inner_stmt}{indent}}}\n"
             )
         }
-        Type::Map { value_type, .. } => {
+        Type::Map { key_type, value_type } => {
             let key_stmt =
-                render_uniffi_binary_write_statement(&Type::String, "entry.key", writer, enums, &(indent.to_string() + "  "));
+                render_uniffi_binary_write_statement(key_type, "entry.key", writer, enums, &(indent.to_string() + "  "));
             let value_stmt = render_uniffi_binary_write_statement(
                 value_type,
                 "entry.value",
@@ -446,11 +458,16 @@ pub(super) fn render_uniffi_binary_read_expression(
                 "(() {{ final int __len = {reader}.readI32(); final out = <{inner_type_name}>[]; for (var i = 0; i < __len; i++) {{ out.add({inner}); }} return out; }})()"
             )
         }
-        Type::Map { value_type, .. } => {
+        Type::Map {
+            key_type,
+            value_type,
+        } => {
+            let key = render_uniffi_binary_read_expression(key_type, reader, enums);
+            let key_type_name = map_uniffi_type_to_dart(key_type);
             let value = render_uniffi_binary_read_expression(value_type, reader, enums);
             let value_type_name = map_uniffi_type_to_dart(value_type);
             format!(
-                "(() {{ final int __len = {reader}.readI32(); final out = <String, {value_type_name}>{{}}; for (var i = 0; i < __len; i++) {{ final key = {reader}.readString(); final value = {value}; out[key] = value; }} return out; }})()"
+                "(() {{ final int __len = {reader}.readI32(); final out = <{key_type_name}, {value_type_name}>{{}}; for (var i = 0; i < __len; i++) {{ final key = {key}; final value = {value}; out[key] = value; }} return out; }})()"
             )
         }
         Type::Record { name, .. } => {

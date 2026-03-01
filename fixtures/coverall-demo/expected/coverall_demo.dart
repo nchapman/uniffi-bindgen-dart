@@ -514,6 +514,26 @@ class CoverallDemoFfi {
     }
   }
 
+  late final _RustBuffer Function(int key, int value) _getIntMap = _lib.lookupFunction<_RustBuffer Function(ffi.Uint32 key, ffi.Uint64 value), _RustBuffer Function(int key, int value)>('get_int_map');
+
+  Map<int, int> getIntMap(int key, int value) {
+      final _RustBuffer resultBuf = _getIntMap(key, value);
+      final ffi.Pointer<ffi.Uint8> resultData = resultBuf.data;
+      final int resultLen = resultBuf.len;
+      if (resultData == ffi.nullptr) {
+        _rustBytesFree(resultBuf);
+        final mapReader = _UniFfiBinaryReader(Uint8List(0));
+        return (() { final int __len = mapReader.readI32(); final out = <int, int>{}; for (var i = 0; i < __len; i++) { final key = mapReader.readU32(); final value = mapReader.readU64(); out[key] = value; } return out; })();
+      }
+      try {
+        final Uint8List resultBytes = Uint8List.fromList(resultData.asTypedList(resultLen));
+        final mapReader = _UniFfiBinaryReader(resultBytes);
+        return (() { final int __len = mapReader.readI32(); final out = <int, int>{}; for (var i = 0; i < __len; i++) { final key = mapReader.readU32(); final value = mapReader.readU64(); out[key] = value; } return out; })();
+      } finally {
+        _rustBytesFree(resultBuf);
+      }
+  }
+
   late final ffi.Pointer<Utf8> Function(int index) _getMaybeSimpleDict = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Int8 index), ffi.Pointer<Utf8> Function(int index)>('get_maybe_simple_dict');
 
   MaybeSimpleDict getMaybeSimpleDict(int index) {
@@ -1176,6 +1196,11 @@ SimpleDict createSomeDict() {
 /// Divide a float by a text-parsed divisor; exercises error paths.
 double divideByText(double value, String divisor) {
   return _bindings().divideByText(value, divisor);
+}
+
+/// Round-trip a map with non-string keys (record<u32, u64>).
+Map<int, int> getIntMap(int key, int value) {
+  return _bindings().getIntMap(key, value);
 }
 
 /// Return an enum variant based on a numeric selector.

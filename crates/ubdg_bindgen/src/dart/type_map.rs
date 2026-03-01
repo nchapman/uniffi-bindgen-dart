@@ -146,7 +146,8 @@ pub(super) fn map_uniffi_type_to_dart(type_: &Type) -> String {
 
 pub(super) fn uniffi_type_uses_json(type_: &Type) -> bool {
     match type_ {
-        Type::Record { .. } | Type::Enum { .. } | Type::Map { .. } => true,
+        Type::Record { .. } | Type::Enum { .. } => true,
+        Type::Map { key_type, .. } if is_runtime_string_type(key_type) => true,
         Type::Optional { inner_type } | Type::Sequence { inner_type } => {
             uniffi_type_uses_json(inner_type)
         }
@@ -182,6 +183,14 @@ pub(super) fn is_runtime_map_with_string_key_type(type_: &Type) -> bool {
         Type::Map { key_type, .. } => is_runtime_string_type(key_type),
         _ => false,
     }
+}
+
+pub(super) fn is_runtime_map_type(type_: &Type) -> bool {
+    matches!(runtime_unwrapped_type(type_), Type::Map { .. })
+}
+
+pub(super) fn is_runtime_non_string_map_type(type_: &Type) -> bool {
+    is_runtime_map_type(type_) && !is_runtime_map_with_string_key_type(type_)
 }
 
 pub(super) fn is_runtime_utf8_pointer_marshaled_type(
@@ -315,6 +324,7 @@ pub(super) fn map_runtime_native_ffi_type(
             Some("_RustBufferVec")
         }
         Type::Map { key_type, .. } if is_runtime_string_type(key_type) => Some("ffi.Pointer<Utf8>"),
+        Type::Map { .. } => Some("_RustBuffer"),
         Type::Optional { inner_type } if is_runtime_string_type(inner_type) => {
             Some("ffi.Pointer<Utf8>")
         }
@@ -355,6 +365,7 @@ pub(super) fn map_runtime_dart_ffi_type(
             Some("_RustBufferVec")
         }
         Type::Map { key_type, .. } if is_runtime_string_type(key_type) => Some("ffi.Pointer<Utf8>"),
+        Type::Map { .. } => Some("_RustBuffer"),
         Type::Optional { inner_type } if is_runtime_string_type(inner_type) => {
             Some("ffi.Pointer<Utf8>")
         }

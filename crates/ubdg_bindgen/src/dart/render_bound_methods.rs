@@ -166,24 +166,28 @@ pub(super) fn render_bound_methods(
                 })
             });
     let needs_bytes_free = functions.iter().any(|f| {
-        is_runtime_ffi_compatible_function(f, records, enums) && function_returns_runtime_bytes(f)
+        is_runtime_ffi_compatible_function(f, records, enums)
+            && (function_returns_runtime_bytes(f)
+                || f.return_type
+                    .as_ref()
+                    .is_some_and(is_runtime_non_string_map_type))
     }) || objects.iter().any(|o| {
         o.methods.iter().any(|m| {
             m.return_type
                 .as_ref()
-                .is_some_and(is_runtime_bytes_like_type)
+                .is_some_and(|t| is_runtime_bytes_like_type(t) || is_runtime_non_string_map_type(t))
         })
     }) || records.iter().any(|r| {
         r.methods.iter().any(|m| {
             m.return_type
                 .as_ref()
-                .is_some_and(is_runtime_bytes_like_type)
+                .is_some_and(|t| is_runtime_bytes_like_type(t) || is_runtime_non_string_map_type(t))
         })
     }) || enums.iter().any(|e| {
         e.methods.iter().any(|m| {
             m.return_type
                 .as_ref()
-                .is_some_and(is_runtime_bytes_like_type)
+                .is_some_and(|t| is_runtime_bytes_like_type(t) || is_runtime_non_string_map_type(t))
         })
     });
     let needs_bytes_vec_free = functions.iter().any(|f| {
@@ -413,6 +417,8 @@ pub(super) fn render_bound_methods(
                     let arg_name = safe_dart_identifier(&to_lower_camel(&arg.name));
                     match ffi_type {
                         FfiType::RustBuffer(_) => {
+                            let is_map_type =
+                                matches!(runtime_unwrapped_type(&arg.type_), Type::Map { .. });
                             let encode_expr = match runtime_unwrapped_type(&arg.type_) {
                                 Type::Record { name, .. } | Type::Enum { name, .. } => {
                                     format!("_uniffiEncode{}({arg_name})", to_upper_camel(name))
@@ -421,6 +427,9 @@ pub(super) fn render_bound_methods(
                                     format!("Uint8List.fromList(utf8.encode({arg_name}))")
                                 }
                                 Type::Bytes => arg_name.clone(),
+                                Type::Map { .. } => {
+                                    format!("{arg_name}MapWriter.toBytes()")
+                                }
                                 _ => {
                                     out.push_str(&format!(
                                         "      throw UnsupportedError('{escaped_reason} ({})');\n",
@@ -429,6 +438,19 @@ pub(super) fn render_bound_methods(
                                     continue;
                                 }
                             };
+                            if is_map_type {
+                                let write_stmt = render_uniffi_binary_write_statement(
+                                    &arg.type_,
+                                    &arg_name,
+                                    &format!("{arg_name}MapWriter"),
+                                    enums,
+                                    "      ",
+                                );
+                                out.push_str(&format!(
+                                    "      final {arg_name}MapWriter = _UniFfiBinaryWriter();\n"
+                                ));
+                                out.push_str(&write_stmt);
+                            }
                             out.push_str(&format!(
                                 "      final Uint8List {arg_name}Bytes = {encode_expr};\n"
                             ));
@@ -851,6 +873,8 @@ pub(super) fn render_bound_methods(
                     let arg_name = safe_dart_identifier(&to_lower_camel(&arg.name));
                     match ffi_type {
                         FfiType::RustBuffer(_) => {
+                            let is_map_type =
+                                matches!(runtime_unwrapped_type(&arg.type_), Type::Map { .. });
                             let encode_expr = match runtime_unwrapped_type(&arg.type_) {
                                 Type::Record { name, .. } | Type::Enum { name, .. } => {
                                     format!("_uniffiEncode{}({arg_name})", to_upper_camel(name))
@@ -859,6 +883,9 @@ pub(super) fn render_bound_methods(
                                     format!("Uint8List.fromList(utf8.encode({arg_name}))")
                                 }
                                 Type::Bytes => arg_name.clone(),
+                                Type::Map { .. } => {
+                                    format!("{arg_name}MapWriter.toBytes()")
+                                }
                                 _ => {
                                     let escaped_reason = reason.replace('\'', "\\'");
                                     out.push_str(&format!(
@@ -868,6 +895,19 @@ pub(super) fn render_bound_methods(
                                     continue;
                                 }
                             };
+                            if is_map_type {
+                                let write_stmt = render_uniffi_binary_write_statement(
+                                    &arg.type_,
+                                    &arg_name,
+                                    &format!("{arg_name}MapWriter"),
+                                    enums,
+                                    "      ",
+                                );
+                                out.push_str(&format!(
+                                    "      final {arg_name}MapWriter = _UniFfiBinaryWriter();\n"
+                                ));
+                                out.push_str(&write_stmt);
+                            }
                             out.push_str(&format!(
                                 "      final Uint8List {arg_name}Bytes = {encode_expr};\n"
                             ));
@@ -1573,6 +1613,29 @@ pub(super) fn render_bound_methods(
                     out.push_str("          } finally {\n");
                     out.push_str("            _rustStringFree(resultPtr);\n");
                     out.push_str("          }\n");
+                } else if is_runtime_map_type(ret_type) {
+                    let decode = render_uniffi_binary_read_expression(ret_type, "mapReader", enums);
+                    out.push_str("          final _RustBuffer resultBuf = resultValue;\n");
+                    out.push_str(
+                        "          final ffi.Pointer<ffi.Uint8> resultData = resultBuf.data;\n",
+                    );
+                    out.push_str("          final int resultLen = resultBuf.len;\n");
+                    out.push_str("          if (resultData == ffi.nullptr) {\n");
+                    out.push_str("            _rustBytesFree(resultBuf);\n");
+                    out.push_str(
+                        "            final mapReader = _UniFfiBinaryReader(Uint8List(0));\n",
+                    );
+                    out.push_str(&format!("            return {decode};\n"));
+                    out.push_str("          }\n");
+                    out.push_str("          try {\n");
+                    out.push_str("            final Uint8List resultBytes = Uint8List.fromList(resultData.asTypedList(resultLen));\n");
+                    out.push_str(
+                        "            final mapReader = _UniFfiBinaryReader(resultBytes);\n",
+                    );
+                    out.push_str(&format!("            return {decode};\n"));
+                    out.push_str("          } finally {\n");
+                    out.push_str("            _rustBytesFree(resultBuf);\n");
+                    out.push_str("          }\n");
                 } else if is_runtime_bytes_type(ret_type) {
                     out.push_str("          final _RustBuffer resultBuf = resultValue;\n");
                     out.push_str(
@@ -1995,6 +2058,28 @@ pub(super) fn render_bound_methods(
                     out.push_str("        _rustStringFree(resultPtr);\n");
                     out.push_str("      }\n");
                 }
+                Some(type_) if is_runtime_map_type(type_) => {
+                    let decode = render_uniffi_binary_read_expression(type_, "mapReader", enums);
+                    out.push_str(&format!(
+                        "      final _RustBuffer resultBuf = {call_expr};\n"
+                    ));
+                    out.push_str(
+                        "      final ffi.Pointer<ffi.Uint8> resultData = resultBuf.data;\n",
+                    );
+                    out.push_str("      final int resultLen = resultBuf.len;\n");
+                    out.push_str("      if (resultData == ffi.nullptr) {\n");
+                    out.push_str("        _rustBytesFree(resultBuf);\n");
+                    out.push_str("        final mapReader = _UniFfiBinaryReader(Uint8List(0));\n");
+                    out.push_str(&format!("        return {decode};\n"));
+                    out.push_str("      }\n");
+                    out.push_str("      try {\n");
+                    out.push_str("        final Uint8List resultBytes = Uint8List.fromList(resultData.asTypedList(resultLen));\n");
+                    out.push_str("        final mapReader = _UniFfiBinaryReader(resultBytes);\n");
+                    out.push_str(&format!("        return {decode};\n"));
+                    out.push_str("      } finally {\n");
+                    out.push_str("        _rustBytesFree(resultBuf);\n");
+                    out.push_str("      }\n");
+                }
                 Some(_) => {
                     out.push_str(&format!("      return {call_expr};\n"));
                 }
@@ -2123,9 +2208,14 @@ pub(super) fn render_bound_methods(
                         let arg_name = safe_dart_identifier(&to_lower_camel(&arg.name));
                         match ffi_type {
                             FfiType::RustBuffer(_) => {
-                                let encode_expr = match &arg.type_ {
+                                let is_map_type =
+                                    matches!(runtime_unwrapped_type(&arg.type_), Type::Map { .. });
+                                let encode_expr = match runtime_unwrapped_type(&arg.type_) {
                                     Type::Record { name, .. } | Type::Enum { name, .. } => {
                                         format!("_uniffiEncode{}({arg_name})", to_upper_camel(name))
+                                    }
+                                    Type::Map { .. } => {
+                                        format!("{arg_name}MapWriter.toBytes()")
                                     }
                                     _ => {
                                         out.push_str(&format!(
@@ -2135,6 +2225,17 @@ pub(super) fn render_bound_methods(
                                         continue;
                                     }
                                 };
+                                if is_map_type {
+                                    let write_stmt = render_uniffi_binary_write_statement(
+                                        &arg.type_,
+                                        &arg_name,
+                                        &format!("{arg_name}MapWriter"),
+                                        enums,
+                                        "      ",
+                                    );
+                                    out.push_str(&format!("      final {arg_name}MapWriter = _UniFfiBinaryWriter();\n"));
+                                    out.push_str(&write_stmt);
+                                }
                                 out.push_str(&format!(
                                     "      final Uint8List {arg_name}Bytes = {encode_expr};\n"
                                 ));
@@ -2603,9 +2704,14 @@ pub(super) fn render_bound_methods(
                         let arg_name = safe_dart_identifier(&to_lower_camel(&arg.name));
                         match ffi_type {
                             FfiType::RustBuffer(_) => {
-                                let encode_expr = match &arg.type_ {
+                                let is_map_type =
+                                    matches!(runtime_unwrapped_type(&arg.type_), Type::Map { .. });
+                                let encode_expr = match runtime_unwrapped_type(&arg.type_) {
                                     Type::Record { name, .. } | Type::Enum { name, .. } => {
                                         format!("_uniffiEncode{}({arg_name})", to_upper_camel(name))
+                                    }
+                                    Type::Map { .. } => {
+                                        format!("{arg_name}MapWriter.toBytes()")
                                     }
                                     _ => {
                                         out.push_str(&format!(
@@ -2615,6 +2721,17 @@ pub(super) fn render_bound_methods(
                                         continue;
                                     }
                                 };
+                                if is_map_type {
+                                    let write_stmt = render_uniffi_binary_write_statement(
+                                        &arg.type_,
+                                        &arg_name,
+                                        &format!("{arg_name}MapWriter"),
+                                        enums,
+                                        "      ",
+                                    );
+                                    out.push_str(&format!("      final {arg_name}MapWriter = _UniFfiBinaryWriter();\n"));
+                                    out.push_str(&write_stmt);
+                                }
                                 out.push_str(&format!(
                                     "      final Uint8List {arg_name}Bytes = {encode_expr};\n"
                                 ));
@@ -2768,10 +2885,17 @@ pub(super) fn render_bound_methods(
                         }
                         Some(ret_type) => match &ffi_return_type {
                             FfiType::RustBuffer(_) => {
-                                let decode_expr = match ret_type {
+                                let is_map_type =
+                                    matches!(runtime_unwrapped_type(ret_type), Type::Map { .. });
+                                let decode_expr = match runtime_unwrapped_type(ret_type) {
                                     Type::Record { name, .. } | Type::Enum { name, .. } => {
                                         format!("_uniffiDecode{}(retBytes)", to_upper_camel(name))
                                     }
+                                    Type::Map { .. } => render_uniffi_binary_read_expression(
+                                        ret_type,
+                                        "retReader",
+                                        enums,
+                                    ),
                                     _ => {
                                         out.push_str(&format!(
                                             "      throw UnsupportedError('{escaped_reason} ({})');\n",
@@ -2791,6 +2915,9 @@ pub(super) fn render_bound_methods(
                                     out.push_str(
                                         "      final Uint8List retBytes = retBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(retBufPtr.ref.data.asTypedList(retBufPtr.ref.len));\n",
                                     );
+                                    if is_map_type {
+                                        out.push_str("      final _UniFfiBinaryReader retReader = _UniFfiBinaryReader(retBytes);\n");
+                                    }
                                     out.push_str(&format!("      return {decode_expr};\n"));
                                 }
                             }
@@ -3226,6 +3353,33 @@ pub(super) fn render_bound_methods(
                     out.push_str("          } finally {\n");
                     out.push_str("            _rustStringFree(resultPtr);\n");
                     out.push_str("          }\n");
+                } else if method.return_type.as_ref().is_some_and(is_runtime_map_type) {
+                    let decode = method
+                        .return_type
+                        .as_ref()
+                        .map(|t| render_uniffi_binary_read_expression(t, "mapReader", enums))
+                        .unwrap_or_else(|| "null".to_string());
+                    out.push_str("          final _RustBuffer resultBuf = resultValue;\n");
+                    out.push_str(
+                        "          final ffi.Pointer<ffi.Uint8> resultData = resultBuf.data;\n",
+                    );
+                    out.push_str("          final int resultLen = resultBuf.len;\n");
+                    out.push_str("          if (resultData == ffi.nullptr) {\n");
+                    out.push_str("            _rustBytesFree(resultBuf);\n");
+                    out.push_str(
+                        "            final mapReader = _UniFfiBinaryReader(Uint8List(0));\n",
+                    );
+                    out.push_str(&format!("            return {decode};\n"));
+                    out.push_str("          }\n");
+                    out.push_str("          try {\n");
+                    out.push_str("            final Uint8List resultBytes = Uint8List.fromList(resultData.asTypedList(resultLen));\n");
+                    out.push_str(
+                        "            final mapReader = _UniFfiBinaryReader(resultBytes);\n",
+                    );
+                    out.push_str(&format!("            return {decode};\n"));
+                    out.push_str("          } finally {\n");
+                    out.push_str("            _rustBytesFree(resultBuf);\n");
+                    out.push_str("          }\n");
                 } else if method
                     .return_type
                     .as_ref()
@@ -3539,6 +3693,23 @@ pub(super) fn render_bound_methods(
                     out.push_str(&format!("      return {decode};\n"));
                     out.push_str("    } finally {\n");
                     out.push_str("      _rustStringFree(resultPtr);\n");
+                    out.push_str("    }\n");
+                } else if is_runtime_map_type(ret) {
+                    let decode = render_uniffi_binary_read_expression(ret, "mapReader", enums);
+                    out.push_str(&format!("    final _RustBuffer resultBuf = {call_expr};\n"));
+                    out.push_str("    final ffi.Pointer<ffi.Uint8> resultData = resultBuf.data;\n");
+                    out.push_str("    final int resultLen = resultBuf.len;\n");
+                    out.push_str("    if (resultData == ffi.nullptr) {\n");
+                    out.push_str("      _rustBytesFree(resultBuf);\n");
+                    out.push_str("      final mapReader = _UniFfiBinaryReader(Uint8List(0));\n");
+                    out.push_str(&format!("      return {decode};\n"));
+                    out.push_str("    }\n");
+                    out.push_str("    try {\n");
+                    out.push_str("      final Uint8List resultBytes = Uint8List.fromList(resultData.asTypedList(resultLen));\n");
+                    out.push_str("      final mapReader = _UniFfiBinaryReader(resultBytes);\n");
+                    out.push_str(&format!("      return {decode};\n"));
+                    out.push_str("    } finally {\n");
+                    out.push_str("      _rustBytesFree(resultBuf);\n");
                     out.push_str("    }\n");
                 } else if is_runtime_bytes_type(ret) {
                     out.push_str(&format!("    final _RustBuffer resultBuf = {call_expr};\n"));
