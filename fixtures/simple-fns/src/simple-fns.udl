@@ -4,6 +4,12 @@ typedef string Label;
 typedef u32 Count;
 [Custom]
 typedef bytes Blob;
+[Custom]
+typedef sequence<Count> CountList;
+[Custom]
+typedef record<string, CountList> CountBuckets;
+[Custom]
+typedef record<string, Blob?> MaybeBlobMap;
 
 namespace simple_fns {
   u32 add(u32 left, u32 right);
@@ -51,6 +57,12 @@ namespace simple_fns {
   record<string, Count> count_map_echo(record<string, Count> items);
   [Async]
   record<string, Count> async_count_map_echo(record<string, Count> items);
+  CountBuckets count_buckets_echo(CountBuckets input);
+  [Async]
+  CountBuckets async_count_buckets_echo(CountBuckets input);
+  MaybeBlobMap maybe_blob_map_echo(MaybeBlobMap input);
+  [Async]
+  MaybeBlobMap async_maybe_blob_map_echo(MaybeBlobMap input);
   [Async]
   string async_fail_string();
   [Async]
@@ -175,6 +187,12 @@ interface Counter {
   record<string, Count> count_map_echo(record<string, Count> items);
   [Async]
   record<string, Count> async_count_map_echo(record<string, Count> items);
+  CountBuckets count_buckets_echo(CountBuckets input);
+  [Async]
+  CountBuckets async_count_buckets_echo(CountBuckets input);
+  MaybeBlobMap maybe_blob_map_echo(MaybeBlobMap input);
+  [Async]
+  MaybeBlobMap async_maybe_blob_map_echo(MaybeBlobMap input);
   [Throws=MathError]
   i32 divide_by(i32 divisor);
   [Throws=MathError]

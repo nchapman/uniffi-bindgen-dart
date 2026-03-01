@@ -20,7 +20,7 @@ class Person {
     return {
       'name': this.name,
       'age': this.age,
-      'nickname': this.nickname == null ? null : (() { final value = this.nickname; return value; })(),
+      'nickname': this.nickname == null ? null : (() { final __tmp = this.nickname; return __tmp; })(),
     };
   }
 
@@ -28,7 +28,7 @@ class Person {
     return Person(
       name: json['name'] as String,
       age: (json['age'] as num).toInt(),
-      nickname: json['nickname'] == null ? null : (() { final value = json['nickname']; return value as String; })(),
+      nickname: json['nickname'] == null ? null : (() { final __tmp = json['nickname']; return __tmp as String; })(),
     );
   }
 

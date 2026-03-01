@@ -1231,8 +1231,10 @@ fn render_json_encode_expr(value_expr: &str, type_: &Type) -> String {
         Type::Duration => format!("{value_expr}.inMicroseconds"),
         Type::Bytes => format!("base64Encode({value_expr})"),
         Type::Optional { inner_type } => {
-            let inner = render_json_encode_expr("value", inner_type);
-            format!("{value_expr} == null ? null : (() {{ final value = {value_expr}; return {inner}; }})()")
+            let inner = render_json_encode_expr("__tmp", inner_type);
+            format!(
+                "{value_expr} == null ? null : (() {{ final __tmp = {value_expr}; return {inner}; }})()"
+            )
         }
         Type::Sequence { inner_type } => {
             let inner = render_json_encode_expr("item", inner_type);
@@ -1273,8 +1275,10 @@ fn render_json_decode_expr(value_expr: &str, type_: &Type) -> String {
         Type::Duration => format!("Duration(microseconds: ({value_expr} as num).toInt())"),
         Type::Bytes => format!("base64Decode({value_expr} as String)"),
         Type::Optional { inner_type } => {
-            let inner = render_json_decode_expr("value", inner_type);
-            format!("{value_expr} == null ? null : (() {{ final value = {value_expr}; return {inner}; }})()")
+            let inner = render_json_decode_expr("__tmp", inner_type);
+            format!(
+                "{value_expr} == null ? null : (() {{ final __tmp = {value_expr}; return {inner}; }})()"
+            )
         }
         Type::Sequence { inner_type } => {
             let inner = render_json_decode_expr("item", inner_type);

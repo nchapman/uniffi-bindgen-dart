@@ -149,6 +149,16 @@ void main() {
     expect(contents, contains('Future<Uint8List?> asyncBlobMaybeEcho(Uint8List? input) {'));
     expect(contents, contains('Map<String, int> countMapEcho(Map<String, int> items) {'));
     expect(contents, contains('Future<Map<String, int>> asyncCountMapEcho(Map<String, int> items) {'));
+    expect(contents, contains('Map<String, List<int>> countBucketsEcho(Map<String, List<int>> input) {'));
+    expect(
+      contents,
+      contains('Future<Map<String, List<int>>> asyncCountBucketsEcho(Map<String, List<int>> input) {'),
+    );
+    expect(contents, contains('Map<String, Uint8List?> maybeBlobMapEcho(Map<String, Uint8List?> input) {'));
+    expect(
+      contents,
+      contains('Future<Map<String, Uint8List?>> asyncMaybeBlobMapEcho(Map<String, Uint8List?> input) {'),
+    );
     expect(contents, contains('Future<String> asyncFailString() {'));
     expect(contents, contains('Future<String> asyncNeverString() {'));
     expect(contents, contains('Future<Counter> asyncCounterCreateNew(int initial) {'));
@@ -294,6 +304,16 @@ void main() {
     expect(contents, contains('Future<Uint8List?> asyncBlobMaybeEcho(Uint8List? input) {'));
     expect(contents, contains('Map<String, int> countMapEcho(Map<String, int> items) {'));
     expect(contents, contains('Future<Map<String, int>> asyncCountMapEcho(Map<String, int> items) {'));
+    expect(contents, contains('Map<String, List<int>> countBucketsEcho(Map<String, List<int>> input) {'));
+    expect(
+      contents,
+      contains('Future<Map<String, List<int>>> asyncCountBucketsEcho(Map<String, List<int>> input) {'),
+    );
+    expect(contents, contains('Map<String, Uint8List?> maybeBlobMapEcho(Map<String, Uint8List?> input) {'));
+    expect(
+      contents,
+      contains('Future<Map<String, Uint8List?>> asyncMaybeBlobMapEcho(Map<String, Uint8List?> input) {'),
+    );
     expect(contents, contains('Person snapshotPerson() {'));
     expect(contents, contains('Outcome snapshotOutcome() {'));
     expect(contents, contains('Uint8List snapshotBytes() {'));
@@ -509,6 +529,32 @@ void main() {
     expect(bindingsAsyncCountMapEcho['c'], 1);
     expect(bindingsAsyncCountMapEcho['d'], 2);
     expect(bindingsAsyncCountMapEcho['total'], 3);
+    final bindingsBuckets = bindings.countBucketsEcho({
+      'a': [1, 2],
+      'b': [3],
+    });
+    expect(bindingsBuckets['a'], [1, 2]);
+    expect(bindingsBuckets['b'], [3]);
+    expect(bindingsBuckets['totals'], [6]);
+    final bindingsAsyncBuckets = await bindings.asyncCountBucketsEcho({
+      'x': [4],
+      'y': [1, 1],
+    });
+    expect(bindingsAsyncBuckets['x'], [4]);
+    expect(bindingsAsyncBuckets['y'], [1, 1]);
+    expect(bindingsAsyncBuckets['totals'], [6]);
+    final bindingsBlobMap = bindings.maybeBlobMapEcho({
+      'a': Uint8List.fromList([1, 2]),
+      'b': null,
+    });
+    expect(bindingsBlobMap['a'], Uint8List.fromList([1, 2]));
+    expect(bindingsBlobMap['b'], isNull);
+    final bindingsAsyncBlobMap = await bindings.asyncMaybeBlobMapEcho({
+      'k': Uint8List.fromList([9]),
+      'n': null,
+    });
+    expect(bindingsAsyncBlobMap['k'], Uint8List.fromList([9]));
+    expect(bindingsAsyncBlobMap['n'], isNull);
     final cancelBeforeFail = bindings.asyncCancelCount();
     final freeBeforeFail = bindings.asyncFreeCount();
     await expectLater(bindings.asyncFailString(), throwsA(isA<StateError>()));
@@ -522,7 +568,8 @@ void main() {
     );
     expect(bindings.asyncCancelCount(), cancelBeforeTimeout);
     expect(bindings.asyncFreeCount(), freeBeforeTimeout);
-    expect(bindings.freeCount(), 12);
+    final freeBeforeCheckedDivide = bindings.freeCount();
+    expect(freeBeforeCheckedDivide, greaterThanOrEqualTo(12));
     expect(bindings.checkedDivide(12, 3), 4);
     expect(
       () => bindings.checkedDivide(10, 0),
@@ -538,7 +585,7 @@ void main() {
         ),
       ),
     );
-    expect(bindings.freeCount(), 15);
+    expect(bindings.freeCount(), freeBeforeCheckedDivide + 3);
     final counter = bindings.counterCreateNew(10);
     expect(counter.currentValue(), 10);
     counter.addValue(5);
@@ -596,6 +643,32 @@ void main() {
     expect(counterAsyncCountMap['y'], 3);
     expect(counterAsyncCountMap['counter'], 5);
     expect(counterAsyncCountMap['total'], 8);
+    final counterBuckets = counter.countBucketsEcho({
+      'p': [2, 3],
+    });
+    expect(counterBuckets['p'], [2, 3]);
+    expect(counterBuckets['counter'], [5]);
+    expect(counterBuckets['totals'], [10]);
+    final counterAsyncBuckets = await counter.asyncCountBucketsEcho({
+      'q': [1, 1],
+    });
+    expect(counterAsyncBuckets['q'], [1, 1]);
+    expect(counterAsyncBuckets['counter'], [5]);
+    expect(counterAsyncBuckets['totals'], [7]);
+    final counterBlobMap = counter.maybeBlobMapEcho({
+      'x': Uint8List.fromList([5, 6]),
+      'z': null,
+    });
+    expect(counterBlobMap['x'], Uint8List.fromList([5, 6]));
+    expect(counterBlobMap['z'], isNull);
+    expect(counterBlobMap['counter'], isNull);
+    final counterAsyncBlobMap = await counter.asyncMaybeBlobMapEcho({
+      'm': Uint8List.fromList([7]),
+      'o': null,
+    });
+    expect(counterAsyncBlobMap['m'], Uint8List.fromList([7]));
+    expect(counterAsyncBlobMap['o'], isNull);
+    expect(counterAsyncBlobMap['counter'], isNull);
     expect(counter.maybeLabel('tail'), 'counter:5:tail');
     expect(counter.maybeLabel(null), 'counter:5:none');
     counter.ingestPerson(const Person(name: 'Eve', age: 9));
@@ -830,6 +903,32 @@ void main() {
     expect(topAsyncCountMapEcho['n'], 4);
     expect(topAsyncCountMapEcho['o'], 1);
     expect(topAsyncCountMapEcho['total'], 5);
+    final topBuckets = countBucketsEcho({
+      'a': [1, 2],
+      'b': [3],
+    });
+    expect(topBuckets['a'], [1, 2]);
+    expect(topBuckets['b'], [3]);
+    expect(topBuckets['totals'], [6]);
+    final topAsyncBuckets = await asyncCountBucketsEcho({
+      'c': [2, 2],
+      'd': [1],
+    });
+    expect(topAsyncBuckets['c'], [2, 2]);
+    expect(topAsyncBuckets['d'], [1]);
+    expect(topAsyncBuckets['totals'], [5]);
+    final topBlobMap = maybeBlobMapEcho({
+      'g': Uint8List.fromList([3, 4]),
+      'h': null,
+    });
+    expect(topBlobMap['g'], Uint8List.fromList([3, 4]));
+    expect(topBlobMap['h'], isNull);
+    final topAsyncBlobMap = await asyncMaybeBlobMapEcho({
+      'i': Uint8List.fromList([8]),
+      'j': null,
+    });
+    expect(topAsyncBlobMap['i'], Uint8List.fromList([8]));
+    expect(topAsyncBlobMap['j'], isNull);
     final topCancelBeforeFail = asyncCancelCount();
     final topFreeBeforeFail = asyncFreeCount();
     await expectLater(asyncFailString(), throwsA(isA<StateError>()));
@@ -843,7 +942,8 @@ void main() {
     );
     expect(asyncCancelCount(), topCancelBeforeTimeout);
     expect(asyncFreeCount(), topFreeBeforeTimeout);
-    expect(freeCount(), 12);
+    final topFreeBeforeCheckedDivide = freeCount();
+    expect(topFreeBeforeCheckedDivide, greaterThanOrEqualTo(12));
     expect(checkedDivide(20, 4), 5);
     expect(
       () => checkedDivide(7, 0),
@@ -859,13 +959,14 @@ void main() {
         ),
       ),
     );
-    expect(freeCount(), 15);
+    expect(freeCount(), topFreeBeforeCheckedDivide + 3);
+    final topFreeBeforeMaybeGreet = freeCount();
     expect(maybeGreet('ffi'), 'maybe, ffi');
-    expect(freeCount(), 16);
+    expect(freeCount(), topFreeBeforeMaybeGreet + 1);
     expect(maybeGreet(null), isNull);
-    expect(freeCount(), 16);
+    expect(freeCount(), topFreeBeforeMaybeGreet + 1);
     expect(() => brokenGreet(), throwsA(isA<StateError>()));
-    expect(freeCount(), 16);
+    expect(freeCount(), topFreeBeforeMaybeGreet + 1);
     expect(isEven(10), isTrue);
     expect(cycleColor(Color.red), Color.green);
     final freeBeforeTopOutcome = freeCount();
@@ -909,6 +1010,32 @@ void main() {
     expect(topCounterAsyncCountMap['w'], 5);
     expect(topCounterAsyncCountMap['counter'], 3);
     expect(topCounterAsyncCountMap['total'], 8);
+    final topCounterBuckets = topCounter.countBucketsEcho({
+      'u': [2],
+    });
+    expect(topCounterBuckets['u'], [2]);
+    expect(topCounterBuckets['counter'], [3]);
+    expect(topCounterBuckets['totals'], [5]);
+    final topCounterAsyncBuckets = await topCounter.asyncCountBucketsEcho({
+      'v': [4],
+    });
+    expect(topCounterAsyncBuckets['v'], [4]);
+    expect(topCounterAsyncBuckets['counter'], [3]);
+    expect(topCounterAsyncBuckets['totals'], [7]);
+    final topCounterBlobMap = topCounter.maybeBlobMapEcho({
+      'r': Uint8List.fromList([1]),
+      's': null,
+    });
+    expect(topCounterBlobMap['r'], Uint8List.fromList([1]));
+    expect(topCounterBlobMap['s'], isNull);
+    expect(topCounterBlobMap['counter'], isNull);
+    final topCounterAsyncBlobMap = await topCounter.asyncMaybeBlobMapEcho({
+      't': Uint8List.fromList([2]),
+      'q': null,
+    });
+    expect(topCounterAsyncBlobMap['t'], Uint8List.fromList([2]));
+    expect(topCounterAsyncBlobMap['q'], isNull);
+    expect(topCounterAsyncBlobMap['counter'], isNull);
     expect(
       () => topCounter.checkedApplyAdderWith(const _TestAdder(2), 2, 0),
       throwsA(isA<MathErrorExceptionDivisionByZero>()),

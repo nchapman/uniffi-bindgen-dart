@@ -926,6 +926,68 @@ pub extern "C" fn async_count_map_echo(items: *const c_char) -> u64 {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn count_buckets_echo(input: *const c_char) -> *mut c_char {
+    let mut buckets = if input.is_null() {
+        HashMap::<String, Vec<u32>>::new()
+    } else {
+        let payload = unsafe { CStr::from_ptr(input) }
+            .to_string_lossy()
+            .into_owned();
+        serde_json::from_str::<HashMap<String, Vec<u32>>>(&payload).unwrap_or_default()
+    };
+    let total = buckets
+        .values()
+        .flat_map(|values| values.iter())
+        .copied()
+        .sum::<u32>();
+    buckets.insert("totals".to_string(), vec![total]);
+    CString::new(serde_json::to_string(&buckets).unwrap_or_else(|_| "{}".to_string()))
+        .expect("valid CString")
+        .into_raw()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn async_count_buckets_echo(input: *const c_char) -> u64 {
+    let mut buckets = if input.is_null() {
+        HashMap::<String, Vec<u32>>::new()
+    } else {
+        let payload = unsafe { CStr::from_ptr(input) }
+            .to_string_lossy()
+            .into_owned();
+        serde_json::from_str::<HashMap<String, Vec<u32>>>(&payload).unwrap_or_default()
+    };
+    let total = buckets
+        .values()
+        .flat_map(|values| values.iter())
+        .copied()
+        .sum::<u32>();
+    buckets.insert("totals".to_string(), vec![total]);
+    enqueue_string_future(serde_json::to_string(&buckets).unwrap_or_else(|_| "{}".to_string()))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn maybe_blob_map_echo(input: *const c_char) -> *mut c_char {
+    if input.is_null() {
+        return CString::new("{}").expect("valid CString").into_raw();
+    }
+    let payload = unsafe { CStr::from_ptr(input) }
+        .to_string_lossy()
+        .into_owned();
+    CString::new(payload).expect("valid CString").into_raw()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn async_maybe_blob_map_echo(input: *const c_char) -> u64 {
+    if input.is_null() {
+        return enqueue_string_future("{}".to_string());
+    }
+    let payload = unsafe { CStr::from_ptr(input) }
+        .to_string_lossy()
+        .into_owned();
+    enqueue_string_future(payload)
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn async_fail_string() -> u64 {
     enqueue_async_future(AsyncFutureResult::Failed(
         "forced async failure".to_string(),
@@ -2136,6 +2198,98 @@ pub extern "C" fn counter_async_count_map_echo(handle: u64, items: *const c_char
     let total = counts.values().copied().sum::<u32>();
     counts.insert("total".to_string(), total);
     enqueue_string_future(serde_json::to_string(&counts).unwrap_or_else(|_| "{}".to_string()))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_count_buckets_echo(handle: u64, input: *const c_char) -> *mut c_char {
+    let mut buckets = if input.is_null() {
+        HashMap::<String, Vec<u32>>::new()
+    } else {
+        let payload = unsafe { CStr::from_ptr(input) }
+            .to_string_lossy()
+            .into_owned();
+        serde_json::from_str::<HashMap<String, Vec<u32>>>(&payload).unwrap_or_default()
+    };
+    let counter_value = COUNTERS
+        .lock()
+        .expect("counter map lock")
+        .get(&handle)
+        .copied()
+        .unwrap_or_default()
+        .max(0) as u32;
+    buckets.insert("counter".to_string(), vec![counter_value]);
+    let total = buckets
+        .values()
+        .flat_map(|values| values.iter())
+        .copied()
+        .sum::<u32>();
+    buckets.insert("totals".to_string(), vec![total]);
+    CString::new(serde_json::to_string(&buckets).unwrap_or_else(|_| "{}".to_string()))
+        .expect("valid CString")
+        .into_raw()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_async_count_buckets_echo(handle: u64, input: *const c_char) -> u64 {
+    let mut buckets = if input.is_null() {
+        HashMap::<String, Vec<u32>>::new()
+    } else {
+        let payload = unsafe { CStr::from_ptr(input) }
+            .to_string_lossy()
+            .into_owned();
+        serde_json::from_str::<HashMap<String, Vec<u32>>>(&payload).unwrap_or_default()
+    };
+    let counter_value = COUNTERS
+        .lock()
+        .expect("counter map lock")
+        .get(&handle)
+        .copied()
+        .unwrap_or_default()
+        .max(0) as u32;
+    buckets.insert("counter".to_string(), vec![counter_value]);
+    let total = buckets
+        .values()
+        .flat_map(|values| values.iter())
+        .copied()
+        .sum::<u32>();
+    buckets.insert("totals".to_string(), vec![total]);
+    enqueue_string_future(serde_json::to_string(&buckets).unwrap_or_else(|_| "{}".to_string()))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_maybe_blob_map_echo(handle: u64, input: *const c_char) -> *mut c_char {
+    let mut value = if input.is_null() {
+        serde_json::json!({})
+    } else {
+        let payload = unsafe { CStr::from_ptr(input) }
+            .to_string_lossy()
+            .into_owned();
+        serde_json::from_str::<Value>(&payload).unwrap_or_else(|_| serde_json::json!({}))
+    };
+    if let Value::Object(ref mut obj) = value {
+        let _ = handle;
+        obj.insert("counter".to_string(), Value::Null);
+    }
+    CString::new(value.to_string())
+        .expect("valid CString")
+        .into_raw()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn counter_async_maybe_blob_map_echo(handle: u64, input: *const c_char) -> u64 {
+    let mut value = if input.is_null() {
+        serde_json::json!({})
+    } else {
+        let payload = unsafe { CStr::from_ptr(input) }
+            .to_string_lossy()
+            .into_owned();
+        serde_json::from_str::<Value>(&payload).unwrap_or_else(|_| serde_json::json!({}))
+    };
+    if let Value::Object(ref mut obj) = value {
+        let _ = handle;
+        obj.insert("counter".to_string(), Value::Null);
+    }
+    enqueue_string_future(value.to_string())
 }
 
 #[unsafe(no_mangle)]
