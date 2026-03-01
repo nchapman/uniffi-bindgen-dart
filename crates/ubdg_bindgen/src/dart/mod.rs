@@ -1291,6 +1291,10 @@ fn render_json_decode_expr(value_expr: &str, type_: &Type) -> String {
             "{}.fromJson({value_expr} as Map<String, dynamic>)",
             to_upper_camel(name)
         ),
+        Type::Object { name, .. } => format!(
+            "{}FfiCodec.lift(({value_expr} as num).toInt())",
+            to_upper_camel(name)
+        ),
         Type::Enum { name, .. } => {
             format!(
                 "{}FfiCodec.decode({value_expr} as String)",
@@ -1460,6 +1464,14 @@ fn append_runtime_arg_marshalling(
         ));
         post_call.push(format!("    calloc.free({native_name});\n"));
         call_args.push(native_name);
+    } else if is_runtime_object_type(type_) {
+        let handle_name = format!("{arg_name}Handle");
+        let object_name = object_name_from_type(type_).unwrap_or("Object");
+        pre_call.push(format!(
+            "    final int {handle_name} = {}FfiCodec.lower({arg_name});\n",
+            to_upper_camel(object_name)
+        ));
+        call_args.push(handle_name);
     } else {
         call_args.push(arg_name.to_string());
     }
@@ -2374,6 +2386,13 @@ fn render_bound_methods(
                     out.push_str("          } finally {\n");
                     out.push_str("            _rustStringFree(resultPtr);\n");
                     out.push_str("          }\n");
+                } else if is_runtime_object_type(ret_type) {
+                    out.push_str("          return ");
+                    let object_name = object_name_from_type(ret_type).unwrap_or("Object");
+                    out.push_str(&format!(
+                        "{}FfiCodec.lift(resultValue);\n",
+                        to_upper_camel(object_name)
+                    ));
                 } else if is_runtime_map_with_string_key_type(ret_type) {
                     let decode = render_json_decode_expr("jsonDecode(payload)", ret_type);
                     out.push_str("          if (resultPtr == ffi.nullptr) {\n");
@@ -2786,6 +2805,13 @@ fn render_bound_methods(
                     out.push_str("      } finally {\n");
                     out.push_str("        _rustStringFree(resultPtr);\n");
                     out.push_str("      }\n");
+                }
+                Some(type_) if is_runtime_object_type(type_) => {
+                    let object_name = object_name_from_type(type_).unwrap_or("Object");
+                    out.push_str(&format!(
+                        "      return {}FfiCodec.lift({call_expr});\n",
+                        to_upper_camel(object_name)
+                    ));
                 }
                 Some(type_) if is_runtime_map_with_string_key_type(type_) => {
                     let decode = render_json_decode_expr("jsonDecode(payload)", type_);
@@ -3611,6 +3637,12 @@ fn render_bound_methods(
                     out.push_str("    } finally {\n");
                     out.push_str("      _rustStringFree(resultPtr);\n");
                     out.push_str("    }\n");
+                } else if is_runtime_object_type(ret) {
+                    let object_name = object_name_from_type(ret).unwrap_or("Object");
+                    out.push_str(&format!(
+                        "    return {}FfiCodec.lift({call_expr});\n",
+                        to_upper_camel(object_name)
+                    ));
                 } else if is_runtime_map_with_string_key_type(ret) {
                     let decode = render_json_decode_expr("jsonDecode(payload)", ret);
                     out.push_str(&format!(
@@ -4117,6 +4149,17 @@ fn render_object_classes(
             ));
             out.push_str("  }\n\n");
         }
+        out.push_str("}\n\n");
+        let object_type_name = to_upper_camel(&object.name);
+        let codec_name = format!("{object_type_name}FfiCodec");
+        out.push_str(&format!("final class {codec_name} {{\n"));
+        out.push_str(&format!("  const {codec_name}._();\n\n"));
+        out.push_str(&format!(
+            "  static int lower({object_name} value) => value._handle;\n\n"
+        ));
+        out.push_str(&format!(
+            "  static {object_name} lift(int handle) => {object_name}._(_bindings(), handle);\n"
+        ));
         out.push_str("}\n");
     }
 
@@ -4877,6 +4920,7 @@ fn map_runtime_native_ffi_type(
         }
         Type::Record { .. } => Some("ffi.Pointer<Utf8>"),
         Type::Enum { .. } => Some("ffi.Pointer<Utf8>"),
+        Type::Object { .. } => Some("ffi.Uint64"),
         _ => None,
     }
 }
@@ -4916,6 +4960,7 @@ fn map_runtime_dart_ffi_type(
         }
         Type::Record { .. } => Some("ffi.Pointer<Utf8>"),
         Type::Enum { .. } => Some("ffi.Pointer<Utf8>"),
+        Type::Object { .. } => Some("int"),
         _ => None,
     }
 }
@@ -4942,6 +4987,10 @@ fn is_runtime_record_type(type_: &Type) -> bool {
 
 fn is_runtime_enum_type(type_: &Type, _enums: &[UdlEnum]) -> bool {
     matches!(runtime_unwrapped_type(type_), Type::Enum { .. })
+}
+
+fn is_runtime_object_type(type_: &Type) -> bool {
+    matches!(runtime_unwrapped_type(type_), Type::Object { .. })
 }
 
 fn is_runtime_error_enum_type(type_: &Type, enums: &[UdlEnum]) -> bool {
@@ -4972,6 +5021,13 @@ fn enum_name_from_type(type_: &Type) -> Option<&str> {
 fn record_name_from_type(type_: &Type) -> Option<&str> {
     match runtime_unwrapped_type(type_) {
         Type::Record { name, .. } => Some(name.as_str()),
+        _ => None,
+    }
+}
+
+fn object_name_from_type(type_: &Type) -> Option<&str> {
+    match runtime_unwrapped_type(type_) {
+        Type::Object { name, .. } => Some(name.as_str()),
         _ => None,
     }
 }
@@ -5401,12 +5457,15 @@ typedef dictionary RemoteThing;
 typedef enum RemoteState;
 [External="other_crate"]
 typedef enum RemoteFailure;
+[External="other_crate"]
+typedef interface RemoteCounter;
 
 namespace ext_demo {
   RemoteThing echo_remote(RemoteThing input);
   RemoteState echo_remote_state(RemoteState input);
   [Throws=RemoteFailure]
   u32 risky_remote_count(i32 input);
+  RemoteCounter echo_remote_counter(RemoteCounter input);
 };
 "#,
         )
@@ -5439,6 +5498,9 @@ external_packages = { other_crate = "package:other_bindings/other_bindings.dart"
         assert!(content.contains("RemoteStateFfiCodec.decode(payload)"));
         assert!(content.contains("int riskyRemoteCount(int input) {"));
         assert!(content.contains("throw RemoteFailureExceptionFfiCodec.decode(errRaw);"));
+        assert!(content.contains("RemoteCounter echoRemoteCounter(RemoteCounter input) {"));
+        assert!(content.contains("RemoteCounterFfiCodec.lower(input)"));
+        assert!(content.contains("RemoteCounterFfiCodec.lift("));
         assert!(!content.contains("TODO: bind to Rust FFI"));
     }
 

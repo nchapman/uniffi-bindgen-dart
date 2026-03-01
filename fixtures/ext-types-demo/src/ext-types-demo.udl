@@ -4,10 +4,13 @@ typedef dictionary RemoteThing;
 typedef enum RemoteState;
 [External="other_crate"]
 typedef enum RemoteFailure;
+[External="other_crate"]
+typedef interface RemoteCounter;
 
 namespace ext_types_demo {
   RemoteThing echo_remote(RemoteThing input);
   RemoteState echo_remote_state(RemoteState input);
   [Throws=RemoteFailure]
   u32 risky_remote_count(i32 input);
+  RemoteCounter echo_remote_counter(RemoteCounter input);
 };

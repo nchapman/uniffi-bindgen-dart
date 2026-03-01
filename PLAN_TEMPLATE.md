@@ -210,7 +210,7 @@ Use this checklist in the row notes before changing status to `Done`:
 | Async futures | `<module/file>` | `<future/promise mapping>` | `<needed>` | `<needed>` | `<test ids>` | Not started | |
 | Callback interfaces (sync/async) | `<module/file>` | `<callback idioms>` | `<needed>` | `<needed>` | `<test ids>` | Not started | |
 | Custom types | `<module/file>` | `<host conversion wrappers>` | `<needed>` | `<needed>` | `<test ids>` | Not started | |
-| External/remote types | `<module/file>` | `<cross-crate/package idioms>` | `<needed>` | `<needed>` | `<test ids>` | Not started | |
+| External/remote types | `<module/file>` | `<cross-crate/package idioms>` | `<needed>` | `<needed>` | `<test ids>` | Not started | include cross-package codec contract for enum/error/object (`*FfiCodec` / `*ExceptionFfiCodec`) |
 | Rename/exclude/docstrings | `<module/file>` | `<naming/docs idioms>` | `<needed>` | `<needed>` | `<test ids>` | Not started | |
 | Regression: <bug-id> | `<related upstream behavior>` | `<expected behavior>` | `<needed>` | `<needed>` | `<test ids>` | Not started | |
 

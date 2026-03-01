@@ -117,6 +117,14 @@ final class Meter {
 
 }
 
+final class CounterFfiCodec {
+  const CounterFfiCodec._();
+
+  static int lower(Meter value) => value._handle;
+
+  static Meter lift(int handle) => Meter._(_bindings(), handle);
+}
+
 RenameDemoFfi? _defaultBindings;
 
 RenameDemoFfi _bindings() => _defaultBindings ??= RenameDemoFfi();

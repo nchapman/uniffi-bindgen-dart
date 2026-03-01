@@ -50,6 +50,13 @@ class ExtTypesDemoFfi {
     }
   }
 
+  late final int Function(int input) _echoRemoteCounter = _lib.lookupFunction<ffi.Uint64 Function(ffi.Uint64 input), int Function(int input)>('echo_remote_counter');
+
+  RemoteCounter echoRemoteCounter(RemoteCounter input) {
+    final int inputHandle = RemoteCounterFfiCodec.lower(input);
+      return RemoteCounterFfiCodec.lift(_echoRemoteCounter(inputHandle));
+  }
+
   late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> input) _echoRemoteState = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> input), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> input)>('echo_remote_state');
 
   RemoteState echoRemoteState(RemoteState input) {
@@ -111,6 +118,10 @@ void resetDefaultBindings() {
 
 RemoteThing echoRemote(RemoteThing input) {
   return _bindings().echoRemote(input);
+}
+
+RemoteCounter echoRemoteCounter(RemoteCounter input) {
+  return _bindings().echoRemoteCounter(input);
 }
 
 RemoteState echoRemoteState(RemoteState input) {

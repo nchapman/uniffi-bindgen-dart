@@ -178,6 +178,14 @@ final class Counter {
 
 }
 
+final class CounterFfiCodec {
+  const CounterFfiCodec._();
+
+  static int lower(Counter value) => value._handle;
+
+  static Counter lift(int handle) => Counter._(_bindings(), handle);
+}
+
 DocstringsDemoFfi? _defaultBindings;
 
 DocstringsDemoFfi _bindings() => _defaultBindings ??= DocstringsDemoFfi();

@@ -1067,6 +1067,14 @@ final class CustomCounter {
 
 }
 
+final class CustomCounterFfiCodec {
+  const CustomCounterFfiCodec._();
+
+  static int lower(CustomCounter value) => value._handle;
+
+  static CustomCounter lift(int handle) => CustomCounter._(_bindings(), handle);
+}
+
 CustomTypesDemoFfi? _defaultBindings;
 
 CustomTypesDemoFfi _bindings() => _defaultBindings ??= CustomTypesDemoFfi();

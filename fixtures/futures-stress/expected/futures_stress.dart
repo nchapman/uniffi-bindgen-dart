@@ -1033,6 +1033,14 @@ final class Worker {
 
 }
 
+final class WorkerFfiCodec {
+  const WorkerFfiCodec._();
+
+  static int lower(Worker value) => value._handle;
+
+  static Worker lift(int handle) => Worker._(_bindings(), handle);
+}
+
 FuturesStressFfi? _defaultBindings;
 
 FuturesStressFfi _bindings() => _defaultBindings ??= FuturesStressFfi();

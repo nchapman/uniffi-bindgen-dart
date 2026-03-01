@@ -4159,6 +4159,14 @@ final class Counter {
 
 }
 
+final class CounterFfiCodec {
+  const CounterFfiCodec._();
+
+  static int lower(Counter value) => value._handle;
+
+  static Counter lift(int handle) => Counter._(_bindings(), handle);
+}
+
 SimpleFnsBindings? _defaultBindings;
 
 SimpleFnsBindings _bindings() => _defaultBindings ??= SimpleFnsBindings();
