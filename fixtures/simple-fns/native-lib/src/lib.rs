@@ -290,6 +290,32 @@ pub extern "C" fn free_count() -> u32 {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn checked_divide(left: i32, right: i32) -> *mut c_char {
+    let envelope = if right == 0 {
+        serde_json::json!({
+            "err": {
+                "tag": "divisionByZero"
+            }
+        })
+    } else if left < 0 || right < 0 {
+        serde_json::json!({
+            "err": {
+                "tag": "negativeInput",
+                "value": if left < 0 { left } else { right },
+            }
+        })
+    } else {
+        serde_json::json!({
+            "ok": left / right
+        })
+    };
+
+    CString::new(envelope.to_string())
+        .expect("valid CString")
+        .into_raw()
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn negate(value: i32) -> i32 {
     -value
 }

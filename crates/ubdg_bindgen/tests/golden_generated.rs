@@ -27,7 +27,8 @@ fn assert_matches_expected(actual: &Path, expected: &Path) {
     let actual_src = std::fs::read_to_string(actual).expect("read actual");
     let expected_src = std::fs::read_to_string(expected).expect("read expected");
     assert_eq!(
-        actual_src, expected_src,
+        actual_src,
+        expected_src,
         "generated output diverged from golden file: {}",
         expected.display()
     );

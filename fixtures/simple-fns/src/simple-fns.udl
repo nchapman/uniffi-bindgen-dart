@@ -11,6 +11,8 @@ namespace simple_fns {
   u32 bytes_free_count();
   u32 bytes_vec_free_count();
   u32 free_count();
+  [Throws=MathError]
+  i32 checked_divide(i32 left, i32 right);
   string greet(string name);
   duration multiply_duration(duration value, u32 factor);
   i64 subtract_i64(i64 left, i64 right);
@@ -42,4 +44,10 @@ enum Color {
 interface Outcome {
   Success(string message);
   Failure(i32 code, string reason);
+};
+
+[Error]
+interface MathError {
+  DivisionByZero();
+  NegativeInput(i32 value);
 };

@@ -31,6 +31,7 @@ void main() {
     expect(contents, contains('Uint8List? bytesMaybeEcho(Uint8List? input) {'));
     expect(contents, contains('int bytesFreeCount() {'));
     expect(contents, contains('int bytesVecFreeCount() {'));
+    expect(contents, contains('int checkedDivide(int left, int right) {'));
     expect(contents, contains('int negate(int value) {'));
     expect(contents, contains('void resetBytesFreeCount() {'));
     expect(contents, contains('void resetBytesVecFreeCount() {'));
@@ -90,6 +91,10 @@ void main() {
     expect(contents, contains('class Person {'));
     expect(contents, contains('enum Color {'));
     expect(contents, contains('sealed class Outcome {'));
+    expect(contents, contains('sealed class MathErrorException implements Exception {'));
+    expect(contents, contains('final class MathErrorExceptionDivisionByZero extends MathErrorException {'));
+    expect(contents, contains('final class MathErrorExceptionNegativeInput extends MathErrorException {'));
+    expect(contents, contains('MathErrorException _decodeMathErrorException(Object? raw) {'));
     expect(contents, contains('final class OutcomeSuccess extends Outcome {'));
     expect(contents, contains('final class OutcomeFailure extends Outcome {'));
     expect(contents, contains('String _encodeColor(Color value) {'));
@@ -164,12 +169,28 @@ void main() {
     );
     expect(bindings.greet('dart'), 'hello, dart');
     expect(bindings.freeCount(), 2);
+    expect(bindings.checkedDivide(12, 3), 4);
+    expect(
+      () => bindings.checkedDivide(10, 0),
+      throwsA(isA<MathErrorExceptionDivisionByZero>()),
+    );
+    expect(
+      () => bindings.checkedDivide(-8, 2),
+      throwsA(
+        isA<MathErrorExceptionNegativeInput>().having(
+          (e) => e.value,
+          'value',
+          -8,
+        ),
+      ),
+    );
+    expect(bindings.freeCount(), 5);
     expect(bindings.maybeGreet('dart'), 'maybe, dart');
-    expect(bindings.freeCount(), 3);
+    expect(bindings.freeCount(), 6);
     expect(bindings.maybeGreet(null), isNull);
-    expect(bindings.freeCount(), 3);
+    expect(bindings.freeCount(), 6);
     expect(() => bindings.brokenGreet(), throwsA(isA<StateError>()));
-    expect(bindings.freeCount(), 3);
+    expect(bindings.freeCount(), 6);
     expect(bindings.isEven(8), isTrue);
     expect(bindings.cycleColor(Color.red), Color.green);
     expect(bindings.cycleColor(Color.green), Color.blue);
@@ -236,12 +257,28 @@ void main() {
     );
     expect(greet('ffi'), 'hello, ffi');
     expect(freeCount(), 2);
+    expect(checkedDivide(20, 4), 5);
+    expect(
+      () => checkedDivide(7, 0),
+      throwsA(isA<MathErrorExceptionDivisionByZero>()),
+    );
+    expect(
+      () => checkedDivide(4, -2),
+      throwsA(
+        isA<MathErrorExceptionNegativeInput>().having(
+          (e) => e.value,
+          'value',
+          -2,
+        ),
+      ),
+    );
+    expect(freeCount(), 5);
     expect(maybeGreet('ffi'), 'maybe, ffi');
-    expect(freeCount(), 3);
+    expect(freeCount(), 6);
     expect(maybeGreet(null), isNull);
-    expect(freeCount(), 3);
+    expect(freeCount(), 6);
     expect(() => brokenGreet(), throwsA(isA<StateError>()));
-    expect(freeCount(), 3);
+    expect(freeCount(), 6);
     expect(isEven(10), isTrue);
     expect(cycleColor(Color.red), Color.green);
     final freeBeforeTopOutcome = freeCount();
