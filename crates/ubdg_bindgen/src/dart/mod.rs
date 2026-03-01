@@ -3,7 +3,7 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::{bail, Context, Result};
-use uniffi_bindgen::interface::{AsType, ComponentInterface, Type};
+use uniffi_bindgen::interface::{AsType, ComponentInterface, DefaultValue, Literal, Radix, Type};
 
 use crate::GenerateArgs;
 
@@ -122,6 +122,7 @@ struct UdlArg {
     name: String,
     type_: Type,
     docstring: Option<String>,
+    default: Option<DefaultValue>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -286,6 +287,7 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
                     name: a.name().to_string(),
                     type_: a.as_type(),
                     docstring: None,
+                    default: a.default_value().cloned(),
                 })
                 .collect(),
         })
@@ -310,6 +312,7 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
                     name: field.name().to_string(),
                     type_: field.as_type(),
                     docstring: field.docstring().map(ToString::to_string),
+                    default: field.default_value().cloned(),
                 })
                 .collect(),
         })
@@ -334,6 +337,7 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
                             name: field.name().to_string(),
                             type_: field.as_type(),
                             docstring: field.docstring().map(ToString::to_string),
+                            default: field.default_value().cloned(),
                         })
                         .collect(),
                 })
@@ -360,6 +364,7 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
                             name: a.name().to_string(),
                             type_: a.as_type(),
                             docstring: None,
+                            default: a.default_value().cloned(),
                         })
                         .collect(),
                 })
@@ -425,6 +430,7 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
                         name: "other".to_string(),
                         type_: Type::UInt64,
                         docstring: None,
+                        default: None,
                     }],
                 });
             }
@@ -440,6 +446,7 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
                         name: "other".to_string(),
                         type_: Type::UInt64,
                         docstring: None,
+                        default: None,
                     }],
                 });
             }
@@ -455,6 +462,7 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
                         name: "other".to_string(),
                         type_: Type::UInt64,
                         docstring: None,
+                        default: None,
                     }],
                 });
             }
@@ -478,6 +486,7 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
                                 name: a.name().to_string(),
                                 type_: a.as_type(),
                                 docstring: None,
+                                default: a.default_value().cloned(),
                             })
                             .collect(),
                         throws_type: ctor.throws_type().cloned(),
@@ -510,6 +519,7 @@ fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMeta
                             name: a.name().to_string(),
                             type_: a.as_type(),
                             docstring: None,
+                            default: a.default_value().cloned(),
                         })
                         .collect(),
                 })
@@ -929,6 +939,144 @@ fn render_doc_comment(docstring: Option<&str>, indent: &str) -> String {
     out
 }
 
+fn escape_dart_string_literal(value: &str) -> String {
+    value
+        .replace('\\', "\\\\")
+        .replace('\'', "\\'")
+        .replace('\n', "\\n")
+        .replace('\r', "\\r")
+        .replace('\t', "\\t")
+}
+
+fn render_default_value_expr(
+    default: &DefaultValue,
+    type_: &Type,
+    enums: &[UdlEnum],
+) -> Option<String> {
+    match default {
+        DefaultValue::Default => render_type_default_expr(type_, enums),
+        DefaultValue::Literal(lit) => render_literal_default_expr(lit, type_, enums),
+    }
+}
+
+fn render_type_default_expr(type_: &Type, enums: &[UdlEnum]) -> Option<String> {
+    match type_ {
+        Type::Boolean => Some("false".to_string()),
+        Type::String => Some("''".to_string()),
+        Type::Int8
+        | Type::Int16
+        | Type::Int32
+        | Type::Int64
+        | Type::UInt8
+        | Type::UInt16
+        | Type::UInt32
+        | Type::UInt64 => Some("0".to_string()),
+        Type::Float32 | Type::Float64 => Some("0.0".to_string()),
+        Type::Bytes => Some("Uint8List(0)".to_string()),
+        Type::Timestamp => Some("DateTime.fromMicrosecondsSinceEpoch(0, isUtc: true)".to_string()),
+        Type::Duration => Some("Duration.zero".to_string()),
+        Type::Optional { .. } => Some("null".to_string()),
+        Type::Sequence { .. } => Some("const []".to_string()),
+        Type::Map { .. } => Some("const {}".to_string()),
+        Type::Custom { builtin, .. } => render_type_default_expr(builtin, enums),
+        Type::Enum { name, .. } => {
+            let enum_name = to_upper_camel(name);
+            let enum_def = enums
+                .iter()
+                .find(|e| to_upper_camel(&e.name) == enum_name)?;
+            let variant = enum_def.variants.first()?;
+            if variant.fields.is_empty() && !enum_def.is_error {
+                Some(format!(
+                    "{enum_name}.{}",
+                    safe_dart_identifier(&to_lower_camel(&variant.name))
+                ))
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+fn render_literal_default_expr(lit: &Literal, type_: &Type, enums: &[UdlEnum]) -> Option<String> {
+    match lit {
+        Literal::Boolean(v) => Some(v.to_string()),
+        Literal::String(v) => Some(format!("'{}'", escape_dart_string_literal(v))),
+        Literal::UInt(v, radix, _) => Some(match radix {
+            Radix::Decimal => v.to_string(),
+            Radix::Octal => format!("0{o:o}", o = v),
+            Radix::Hexadecimal => format!("0x{v:x}"),
+        }),
+        Literal::Int(v, _radix, _) => Some(v.to_string()),
+        Literal::Float(v, _) => Some(v.to_string()),
+        Literal::Enum(variant, enum_type) => {
+            let enum_name = match enum_type {
+                Type::Enum { name, .. } => to_upper_camel(name),
+                _ => match type_ {
+                    Type::Enum { name, .. } => to_upper_camel(name),
+                    _ => return None,
+                },
+            };
+            Some(format!(
+                "{enum_name}.{}",
+                safe_dart_identifier(&to_lower_camel(variant))
+            ))
+        }
+        Literal::EmptySequence => Some("const []".to_string()),
+        Literal::EmptyMap => Some("const {}".to_string()),
+        Literal::None => Some("null".to_string()),
+        Literal::Some { inner } => render_default_value_expr(inner, type_, enums),
+    }
+}
+
+fn render_callable_args_signature(args: &[UdlArg], enums: &[UdlEnum]) -> String {
+    let defaults = args
+        .iter()
+        .map(|a| {
+            a.default
+                .as_ref()
+                .and_then(|d| render_default_value_expr(d, &a.type_, enums))
+        })
+        .collect::<Vec<_>>();
+    let has_defaults = defaults.iter().any(|d| d.is_some());
+    if !has_defaults {
+        return args
+            .iter()
+            .map(|a| {
+                format!(
+                    "{} {}",
+                    map_uniffi_type_to_dart(&a.type_),
+                    safe_dart_identifier(&to_lower_camel(&a.name))
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+    }
+
+    let params = args
+        .iter()
+        .zip(defaults.iter())
+        .map(|(a, default_expr)| {
+            let field_type = map_uniffi_type_to_dart(&a.type_);
+            let field_name = safe_dart_identifier(&to_lower_camel(&a.name));
+            if let Some(default_expr) = default_expr {
+                format!("{field_type} {field_name} = {default_expr}")
+            } else {
+                format!("required {field_type} {field_name}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("{{{params}}}")
+}
+
+fn render_callable_arg_names(args: &[UdlArg]) -> String {
+    args.iter()
+        .map(|a| safe_dart_identifier(&to_lower_camel(&a.name)))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 fn render_data_models(records: &[UdlRecord], enums: &[UdlEnum]) -> String {
     let mut out = String::new();
 
@@ -940,7 +1088,15 @@ fn render_data_models(records: &[UdlRecord], enums: &[UdlEnum]) -> String {
         for field in &record.fields {
             out.push_str(&render_doc_comment(field.docstring.as_deref(), "    "));
             let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
-            out.push_str(&format!("    required this.{field_name},\n"));
+            if let Some(default_expr) = field
+                .default
+                .as_ref()
+                .and_then(|d| render_default_value_expr(d, &field.type_, enums))
+            {
+                out.push_str(&format!("    this.{field_name} = {default_expr},\n"));
+            } else {
+                out.push_str(&format!("    required this.{field_name},\n"));
+            }
         }
         out.push_str("  });\n\n");
         for field in &record.fields {
@@ -968,7 +1124,17 @@ fn render_data_models(records: &[UdlRecord], enums: &[UdlEnum]) -> String {
         for field in &record.fields {
             let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
             let decode = render_json_decode_expr(&format!("json['{field_name}']"), &field.type_);
-            out.push_str(&format!("      {field_name}: {decode},\n"));
+            if let Some(default_expr) = field
+                .default
+                .as_ref()
+                .and_then(|d| render_default_value_expr(d, &field.type_, enums))
+            {
+                out.push_str(&format!(
+                    "      {field_name}: json.containsKey('{field_name}') ? {decode} : {default_expr},\n"
+                ));
+            } else {
+                out.push_str(&format!("      {field_name}: {decode},\n"));
+            }
         }
         out.push_str("    );\n");
         out.push_str("  }\n");
@@ -4005,24 +4171,8 @@ fn render_object_classes(
                     }
                 },
             ));
-            let args = ctor
-                .args
-                .iter()
-                .map(|a| {
-                    format!(
-                        "{} {}",
-                        map_uniffi_type_to_dart(&a.type_),
-                        safe_dart_identifier(&to_lower_camel(&a.name))
-                    )
-                })
-                .collect::<Vec<_>>()
-                .join(", ");
-            let arg_names = ctor
-                .args
-                .iter()
-                .map(|a| safe_dart_identifier(&to_lower_camel(&a.name)))
-                .collect::<Vec<_>>()
-                .join(", ");
+            let args = render_callable_args_signature(&ctor.args, enums);
+            let arg_names = render_callable_arg_names(&ctor.args);
             let invoke_expr = format!("_bindings().{ctor_invoker}({arg_names})");
             let signature_return = if ctor.is_async {
                 format!("Future<{object_name}>")
@@ -4083,24 +4233,8 @@ fn render_object_classes(
             } else {
                 return_type.clone()
             };
-            let args = method
-                .args
-                .iter()
-                .map(|a| {
-                    format!(
-                        "{} {}",
-                        map_uniffi_type_to_dart(&a.type_),
-                        safe_dart_identifier(&to_lower_camel(&a.name))
-                    )
-                })
-                .collect::<Vec<_>>()
-                .join(", ");
-            let arg_names = method
-                .args
-                .iter()
-                .map(|a| safe_dart_identifier(&to_lower_camel(&a.name)))
-                .collect::<Vec<_>>()
-                .join(", ");
+            let args = render_callable_args_signature(&method.args, enums);
+            let arg_names = render_callable_arg_names(&method.args);
             out.push_str(&render_doc_comment(method.docstring.as_deref(), "  "));
             out.push_str(&format!("  {signature_return} {method_name}({args}) {{\n"));
             out.push_str("    _ensureOpen();\n");
@@ -4257,24 +4391,8 @@ fn render_function_stubs(
         } else {
             value_return_type.clone()
         };
-        let args = f
-            .args
-            .iter()
-            .map(|a| {
-                format!(
-                    "{} {}",
-                    map_uniffi_type_to_dart(&a.type_),
-                    safe_dart_identifier(&to_lower_camel(&a.name))
-                )
-            })
-            .collect::<Vec<_>>()
-            .join(", ");
-        let arg_names = f
-            .args
-            .iter()
-            .map(|a| safe_dart_identifier(&to_lower_camel(&a.name)))
-            .collect::<Vec<_>>()
-            .join(", ");
+        let args = render_callable_args_signature(&f.args, enums);
+        let arg_names = render_callable_arg_names(&f.args);
 
         out.push_str(&render_doc_comment(f.docstring.as_deref(), ""));
         out.push_str(&format!(
@@ -6409,5 +6527,71 @@ interface Outcome {
         assert!(content.contains("final class OutcomeFailure extends Outcome {"));
         assert!(content.contains("String _encodeOutcome(Outcome value) {"));
         assert!(content.contains("Outcome _decodeOutcome(String raw) {"));
+    }
+
+    #[test]
+    fn renders_default_values_for_public_dart_apis() {
+        let callable_args = vec![
+            UdlArg {
+                name: "left".to_string(),
+                type_: Type::UInt32,
+                docstring: None,
+                default: Some(DefaultValue::Literal(Literal::new_uint(7))),
+            },
+            UdlArg {
+                name: "right".to_string(),
+                type_: Type::UInt32,
+                docstring: None,
+                default: Some(DefaultValue::Literal(Literal::new_uint(9))),
+            },
+            UdlArg {
+                name: "label".to_string(),
+                type_: Type::String,
+                docstring: None,
+                default: Some(DefaultValue::Literal(Literal::String("world".to_string()))),
+            },
+        ];
+        let rendered = render_callable_args_signature(&callable_args, &[]);
+        assert_eq!(
+            rendered,
+            "{int left = 7, int right = 9, String label = 'world'}"
+        );
+
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = temp.path().join("defaults.udl");
+        let out_dir = temp.path().join("out");
+        fs::write(
+            &source,
+            r#"
+namespace defaults {};
+
+dictionary Config {
+  boolean enabled = true;
+  string label = "alpha";
+  u32 count;
+};
+"#,
+        )
+        .expect("write source");
+
+        let args = GenerateArgs {
+            source,
+            out_dir: out_dir.clone(),
+            library: false,
+            config: None,
+            crate_name: None,
+            no_format: false,
+        };
+
+        generate_bindings(&args).expect("generate");
+        let content = fs::read_to_string(out_dir.join("defaults.dart")).expect("read generated");
+        assert!(content.contains("class Config {"));
+        assert!(content.contains("this.enabled = true,"));
+        assert!(content.contains("this.label = 'alpha',"));
+        assert!(content.contains("required this.count,"));
+        assert!(content
+            .contains("enabled: json.containsKey('enabled') ? json['enabled'] as bool : true,"));
+        assert!(content
+            .contains("label: json.containsKey('label') ? json['label'] as String : 'alpha',"));
     }
 }

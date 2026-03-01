@@ -10,10 +10,10 @@ Legend:
 
 | Area | Status | Notes |
 |---|---|---|
-| Top-level functions | Implemented | includes primitives, temporal, bytes, records/enums, and typed throws envelope paths |
+| Top-level functions | Implemented | includes primitives, temporal, bytes, records/enums, typed throws envelope paths, and metadata-backed default-argument rendering in generated Dart wrapper signatures |
 | Objects/interfaces | Partial | sync constructors/methods + lifecycle (`close`/finalizer) implemented; async wrappers for `[Async]` methods are generated across supported return families including bytes and string-keyed maps; trait edge-case parity still pending |
 | Trait methods | Partial | object-level `Display`/`Debug`/`Hash`/`Eq`/`Ord` traits map to idiomatic Dart `toString()`/`hashCode`/`operator ==`/`Comparable<T>.compareTo`; broader trait edge-case fixture depth still pending |
-| Records | Implemented | model generation + JSON codecs + `copyWith` |
+| Records | Implemented | model generation + JSON codecs + `copyWith`; record field defaults are rendered in Dart constructors and respected in `fromJson` when keys are absent |
 | Enums | Implemented | flat + data-carrying codecs |
 | Errors (`[Error]` + `[Throws]`) | Partial | typed Dart exception mapping for supported runtime-compatible paths, including external enum throw-contract paths via `*ExceptionFfiCodec.decode` |
 | Optionals/sequences/maps | Partial | optionals/sequences are covered in top-level + object paths (including async bytes families); string-keyed maps are covered in top-level and object sync/async paths; broader nested map parity still pending |
@@ -23,6 +23,7 @@ Legend:
 | Custom types | Partial | builtin-backed typedef unwrapping is implemented for runtime-compatible paths and validated for string, integer, bytes/optional-bytes, and string-keyed custom-map aliases across sync/async top-level + object calls; nested/container custom aliases (for example `record<string, sequence<Count>>` and `record<string, Blob?>`) are now covered in runtime smoke for top-level and object sync/async paths; dedicated `custom-types-demo` golden fixture is in place; broader custom lift/lower coverage is still pending |
 | External/remote types | Partial | external record/enum/interface typedef references bind through runtime wrappers with mapped `external_packages` imports; generator emits stable public `*FfiCodec` helpers for enum/error/object cross-package conversion contracts (including external enum throw decode via `*ExceptionFfiCodec.decode`, external interface handle lower/lift paths in top-level runtime-compatible calls, and async external-interface handle return paths); dedicated `ext-types-demo` golden coverage is in place; full external parity (broader object/trait/error paths across crates) still needs deeper metadata/library-mode integration |
 | Rename/exclude/docstrings | Implemented | `rename`/`exclude` config keys are implemented for generated Dart public API wrappers (top-level functions + object class/constructor/method names) with dedicated `rename-demo` golden coverage; docstring emission is implemented across generated public Dart API/model surfaces with dedicated `docstrings-demo` golden coverage |
+| Record/enum methods (proc-macro metadata) | Planned | UniFFI `0.31` supports methods on records/enums; Dart backend still needs library-mode metadata ingestion + dedicated fixtures to expose these idiomatically |
 
 ## Notes
 - Current fixture coverage is centered on `simple-fns` (rich runtime interactions) plus focused golden fixtures.

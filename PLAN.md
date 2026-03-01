@@ -51,6 +51,7 @@ A repeatable backend-development process that can be applied with minimal change
 - Deterministic generation with golden tests for `simple-fns`, `compound-demo`, `model-types-demo`, `futures-stress`, and `custom-types-demo`.
 - Top-level functions for primitive, temporal, bytes, record, enum, and fallible envelope paths.
 - Record models with JSON codec helpers and `copyWith`.
+- Record field default-value rendering in generated Dart constructors and `fromJson` fallback paths.
 - Flat + data-carrying enums with runtime encode/decode helpers.
 - Typed Dart exception hierarchy and throw mapping from `[Throws=...]` / `[Error]`.
 - Object wrappers with explicit `close()` plus finalizer fallback.
@@ -63,6 +64,7 @@ A repeatable backend-development process that can be applied with minimal change
 - External record/enum/interface typedef wrapper generation is now wired with `external_packages` import mapping, including external enum throw-contract decode and external interface handle lower/lift paths, with deterministic `ext-types-demo` golden coverage.
 - Callback interface bridge support for sync/async/throwing top-level and object-method function-argument callbacks, including callback-interface method-level async/throws paths for primitive + string/optional string/record/enum return families, with fixture/runtime verification.
 - Trait helper mapping for UDL `[Traits=(...)]` object interfaces now generates idiomatic Dart `toString()`, `hashCode`, and `operator ==` via UniFFI trait-method exports (`Display`/`Debug`/`Hash`/`Eq`), with generator + runtime fixture coverage.
+- Callable default-value rendering helpers are in place for metadata-backed defaults, generating idiomatic named Dart parameters with defaults when default metadata is available.
 
 ## Scope
 ### In Scope
@@ -441,6 +443,7 @@ These rules are part of the template and should not be skipped:
 ## Immediate Next Steps (Dart Instance)
 1. Add broader trait fixture coverage around `Eq` semantics (edge cases/lifecycle scenarios) and keep trait behavior synchronized with upstream `uniffi-rs`.
 2. Extend remaining async parity for external/custom families and add broader cancellation-path runtime hooks where host-side explicit cancellation is available.
-3. Keep `docs/supported-features.md` synchronized with every parity change.
-4. Extend remaining custom/external parity (nested custom/container lift/lower families + cross-crate/ext-type scenarios).
-5. Add CI jobs for clippy strict mode and artifact-split runtime binding tests (Linux + macOS).
+3. Implement library-mode metadata ingestion for Dart generation, then add fixtures for UniFFI `0.31` record/enum method surfaces.
+4. Keep `docs/supported-features.md` synchronized with every parity change.
+5. Extend remaining custom/external parity (nested custom/container lift/lower families + cross-crate/ext-type scenarios).
+6. Add CI jobs for clippy strict mode and artifact-split runtime binding tests (Linux + macOS).
