@@ -21,12 +21,15 @@ void main() {
     expect(contents, contains("libraryName = 'uniffi_simple_fns';"));
     expect(contents, contains('int add(int left, int right) {'));
     expect(contents, contains('int negate(int value) {'));
+    expect(contents, contains('String greet(String name) {'));
     expect(contents, contains('bool isEven(int value) {'));
     expect(contents, contains('double scale(double value, double factor) {'));
     expect(contents, contains('void tick() {'));
     expect(contents, contains('int currentTick() {'));
     expect(contents, contains('late final int Function(int left, int right) _add ='));
     expect(contents, contains('late final bool Function(int value) _isEven ='));
+    expect(contents, contains('ffi.Pointer<Utf8> nameNative = name.toNativeUtf8();'));
+    expect(contents, contains('_rustStringFree(resultPtr);'));
     expect(
       contents,
       contains(
@@ -50,6 +53,7 @@ void main() {
     final bindings = SimpleFnsBindings(libraryPath: libPath);
     expect(bindings.add(20, 22), 42);
     expect(bindings.negate(7), -7);
+    expect(bindings.greet('dart'), 'hello, dart');
     expect(bindings.isEven(8), isTrue);
     expect(bindings.isEven(9), isFalse);
     expect(bindings.scale(2.5, 4.0), closeTo(10.0, 0.000001));
@@ -60,6 +64,7 @@ void main() {
     configureDefaultBindings(libraryPath: libPath);
     expect(add(1, 2), 3);
     expect(negate(5), -5);
+    expect(greet('ffi'), 'hello, ffi');
     expect(isEven(10), isTrue);
     expect(isEven(11), isFalse);
     expect(scale(1.5, 3.0), closeTo(4.5, 0.000001));

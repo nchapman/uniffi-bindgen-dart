@@ -2,6 +2,7 @@
 library simple_fns;
 
 import 'dart:ffi' as ffi;
+import 'package:ffi/ffi.dart';
 
 class SimpleFnsBindings {
   SimpleFnsBindings({ffi.DynamicLibrary? dynamicLibrary, String? libraryPath})
@@ -23,40 +24,61 @@ class SimpleFnsBindings {
 
   late final ffi.DynamicLibrary _lib = open();
 
+  late final void Function(ffi.Pointer<Utf8>) _rustStringFree = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<Utf8>), void Function(ffi.Pointer<Utf8>)>('rust_string_free');
+
   late final int Function(int left, int right) _add = _lib.lookupFunction<ffi.Uint32 Function(ffi.Uint32 left, ffi.Uint32 right), int Function(int left, int right)>('add');
 
   int add(int left, int right) {
-    return _add(left, right);
+      return _add(left, right);
   }
 
   late final int Function() _currentTick = _lib.lookupFunction<ffi.Uint32 Function(), int Function()>('current_tick');
 
   int currentTick() {
-    return _currentTick();
+      return _currentTick();
+  }
+
+  late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> name) _greet = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> name), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> name)>('greet');
+
+  String greet(String name) {
+    final ffi.Pointer<Utf8> nameNative = name.toNativeUtf8();
+    try {
+      final ffi.Pointer<Utf8> resultPtr = _greet(nameNative);
+      if (resultPtr == ffi.nullptr) {
+        throw StateError('Rust returned null for greet');
+      }
+      try {
+        return resultPtr.toDartString();
+      } finally {
+        _rustStringFree(resultPtr);
+      }
+    } finally {
+    calloc.free(nameNative);
+    }
   }
 
   late final bool Function(int value) _isEven = _lib.lookupFunction<ffi.Bool Function(ffi.Int32 value), bool Function(int value)>('is_even');
 
   bool isEven(int value) {
-    return _isEven(value);
+      return _isEven(value);
   }
 
   late final int Function(int value) _negate = _lib.lookupFunction<ffi.Int32 Function(ffi.Int32 value), int Function(int value)>('negate');
 
   int negate(int value) {
-    return _negate(value);
+      return _negate(value);
   }
 
   late final double Function(double value, double factor) _scale = _lib.lookupFunction<ffi.Double Function(ffi.Double value, ffi.Double factor), double Function(double value, double factor)>('scale');
 
   double scale(double value, double factor) {
-    return _scale(value, factor);
+      return _scale(value, factor);
   }
 
   late final void Function() _tick = _lib.lookupFunction<ffi.Void Function(), void Function()>('tick');
 
   void tick() {
-    _tick();
+      _tick();
   }
 }
 
@@ -78,6 +100,10 @@ int add(int left, int right) {
 
 int currentTick() {
   return _bindings().currentTick();
+}
+
+String greet(String name) {
+  return _bindings().greet(name);
 }
 
 bool isEven(int value) {
