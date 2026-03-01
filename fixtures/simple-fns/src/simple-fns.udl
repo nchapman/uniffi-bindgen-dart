@@ -55,6 +55,8 @@ namespace simple_fns {
   string async_fail_string();
   [Async]
   string async_never_string();
+  [Async]
+  Counter async_counter_create_new(u32 initial);
   u32 async_cancel_count();
   u32 async_free_count();
   void reset_async_future_counts();

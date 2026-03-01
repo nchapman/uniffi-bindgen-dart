@@ -131,6 +131,7 @@ enum AsyncFuturePollState {
 enum AsyncFutureResult {
     String(String),
     U32(u32),
+    U64(u64),
     Bytes(Vec<u8>),
     BytesOpt(Option<Vec<u8>>),
     BytesVec(Vec<Vec<u8>>),
@@ -271,6 +272,10 @@ fn enqueue_string_future(result: String) -> u64 {
 
 fn enqueue_u32_future(result: u32) -> u64 {
     enqueue_async_future(AsyncFutureResult::U32(result))
+}
+
+fn enqueue_u64_future(result: u64) -> u64 {
+    enqueue_async_future(AsyncFutureResult::U64(result))
 }
 
 fn enqueue_bytes_future(result: Vec<u8>) -> u64 {
@@ -933,6 +938,11 @@ pub extern "C" fn async_never_string() -> u64 {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn async_counter_create_new(initial: u32) -> u64 {
+    enqueue_u64_future(counter_new(initial))
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn async_cancel_count() -> u32 {
     ASYNC_CANCEL_COUNT.load(Ordering::Relaxed)
 }
@@ -1276,6 +1286,68 @@ pub extern "C" fn rust_future_complete_u32(handle: u64, out_status: *mut RustCal
 
 #[unsafe(no_mangle)]
 pub extern "C" fn rust_future_free_u32(handle: u64) {
+    free_async_future(handle);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_future_poll_u64(
+    handle: u64,
+    callback: extern "C" fn(u64, i8),
+    callback_data: u64,
+) {
+    poll_async_future(handle, callback, callback_data);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_future_cancel_u64(handle: u64) {
+    cancel_async_future(handle);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_future_complete_u64(handle: u64, out_status: *mut RustCallStatus) -> u64 {
+    let futures = ASYNC_FUTURES.lock().expect("async futures lock");
+    let Some(state) = futures.get(&handle) else {
+        write_out_status(
+            out_status,
+            RUST_CALL_STATUS_UNEXPECTED_ERROR,
+            CString::new("missing u64 future handle")
+                .expect("valid CString")
+                .into_raw(),
+        );
+        return 0;
+    };
+    if state.cancelled {
+        write_out_status(out_status, RUST_CALL_STATUS_CANCELLED, std::ptr::null_mut());
+        return 0;
+    }
+    match &state.result {
+        AsyncFutureResult::U64(value) => {
+            write_out_status(out_status, RUST_CALL_STATUS_SUCCESS, std::ptr::null_mut());
+            *value
+        }
+        AsyncFutureResult::Failed(message) => {
+            write_out_status(
+                out_status,
+                RUST_CALL_STATUS_UNEXPECTED_ERROR,
+                CString::new(message.as_str()).expect("valid CString").into_raw(),
+            );
+            0
+        }
+        _ => {
+            write_out_status(
+                out_status,
+                RUST_CALL_STATUS_UNEXPECTED_ERROR,
+                CString::new("invalid async result type for u64")
+                    .expect("valid CString")
+                    .into_raw(),
+            );
+            0
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_future_free_u64(handle: u64) {
     free_async_future(handle);
 }
 

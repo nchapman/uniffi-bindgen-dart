@@ -866,6 +866,7 @@ fn render_dart_scaffold(
         functions,
         objects,
         callback_interfaces,
+        local_module_path,
         ffi_class_name,
         records,
         enums,
@@ -1878,6 +1879,7 @@ fn render_bound_methods(
     functions: &[UdlFunction],
     objects: &[UdlObject],
     callback_interfaces: &[UdlCallbackInterface],
+    local_module_path: &str,
     _ffi_class_name: &str,
     records: &[UdlRecord],
     enums: &[UdlEnum],
@@ -2387,12 +2389,9 @@ fn render_bound_methods(
                     out.push_str("            _rustStringFree(resultPtr);\n");
                     out.push_str("          }\n");
                 } else if is_runtime_object_type(ret_type) {
-                    out.push_str("          return ");
-                    let object_name = object_name_from_type(ret_type).unwrap_or("Object");
-                    out.push_str(&format!(
-                        "{}FfiCodec.lift(resultValue);\n",
-                        to_upper_camel(object_name)
-                    ));
+                    let lift =
+                        render_object_lift_expr(ret_type, "resultValue", local_module_path, "this");
+                    out.push_str(&format!("          return {lift};\n"));
                 } else if is_runtime_map_with_string_key_type(ret_type) {
                     let decode = render_json_decode_expr("jsonDecode(payload)", ret_type);
                     out.push_str("          if (resultPtr == ffi.nullptr) {\n");
@@ -2807,11 +2806,9 @@ fn render_bound_methods(
                     out.push_str("      }\n");
                 }
                 Some(type_) if is_runtime_object_type(type_) => {
-                    let object_name = object_name_from_type(type_).unwrap_or("Object");
-                    out.push_str(&format!(
-                        "      return {}FfiCodec.lift({call_expr});\n",
-                        to_upper_camel(object_name)
-                    ));
+                    let lift =
+                        render_object_lift_expr(type_, &call_expr, local_module_path, "this");
+                    out.push_str(&format!("      return {lift};\n"));
                 }
                 Some(type_) if is_runtime_map_with_string_key_type(type_) => {
                     let decode = render_json_decode_expr("jsonDecode(payload)", type_);
@@ -4722,6 +4719,11 @@ fn async_rust_future_spec(
                 complete_dart_type: "_RustBufferVec",
             })
         }
+        Some(Type::Object { .. }) => Some(AsyncRustFutureSpec {
+            suffix: "u64",
+            complete_native_type: "ffi.Uint64",
+            complete_dart_type: "int",
+        }),
         Some(Type::UInt8) => Some(AsyncRustFutureSpec {
             suffix: "u8",
             complete_native_type: "ffi.Uint8",
@@ -5029,6 +5031,31 @@ fn object_name_from_type(type_: &Type) -> Option<&str> {
     match runtime_unwrapped_type(type_) {
         Type::Object { name, .. } => Some(name.as_str()),
         _ => None,
+    }
+}
+
+fn is_external_object_type(type_: &Type, local_module_path: &str) -> bool {
+    let local_crate = local_module_path.split("::").next().unwrap_or_default();
+    match runtime_unwrapped_type(type_) {
+        Type::Object { module_path, .. } => {
+            let crate_name = module_path.split("::").next().unwrap_or_default();
+            !crate_name.is_empty() && !local_crate.is_empty() && crate_name != local_crate
+        }
+        _ => false,
+    }
+}
+
+fn render_object_lift_expr(
+    type_: &Type,
+    handle_expr: &str,
+    local_module_path: &str,
+    binding_expr: &str,
+) -> String {
+    let object_name = to_upper_camel(object_name_from_type(type_).unwrap_or("Object"));
+    if is_external_object_type(type_, local_module_path) {
+        format!("{object_name}FfiCodec.lift({handle_expr})")
+    } else {
+        format!("{object_name}._({binding_expr}, {handle_expr})")
     }
 }
 
@@ -5466,6 +5493,8 @@ namespace ext_demo {
   [Throws=RemoteFailure]
   u32 risky_remote_count(i32 input);
   RemoteCounter echo_remote_counter(RemoteCounter input);
+  [Async]
+  RemoteCounter echo_remote_counter_async(RemoteCounter input);
 };
 "#,
         )
@@ -5501,6 +5530,10 @@ external_packages = { other_crate = "package:other_bindings/other_bindings.dart"
         assert!(content.contains("RemoteCounter echoRemoteCounter(RemoteCounter input) {"));
         assert!(content.contains("RemoteCounterFfiCodec.lower(input)"));
         assert!(content.contains("RemoteCounterFfiCodec.lift("));
+        assert!(
+            content.contains("Future<RemoteCounter> echoRemoteCounterAsync(RemoteCounter input) {")
+        );
+        assert!(content.contains("rust_future_complete_u64"));
         assert!(!content.contains("TODO: bind to Rust FFI"));
     }
 
@@ -5650,6 +5683,8 @@ namespace async_demo {
   Blob blob_echo_async(Blob input);
   [Async]
   Blob? blob_echo_maybe_async(Blob? input);
+  [Async]
+  Counter counter_new_async(u32 initial);
 };
 
 interface Counter {
@@ -5701,10 +5736,13 @@ interface Counter {
         assert!(content.contains("Future<int> countEchoAsync(int input) {"));
         assert!(content.contains("Future<Uint8List> blobEchoAsync(Uint8List input) {"));
         assert!(content.contains("Future<Uint8List?> blobEchoMaybeAsync(Uint8List? input) {"));
+        assert!(content.contains("Future<Counter> counterNewAsync(int initial) {"));
         assert!(content.contains("rust_future_poll_string"));
         assert!(content.contains("rust_future_complete_string"));
         assert!(content.contains("rust_future_poll_u32"));
         assert!(content.contains("rust_future_complete_u32"));
+        assert!(content.contains("rust_future_poll_u64"));
+        assert!(content.contains("rust_future_complete_u64"));
         assert!(content.contains("rust_future_poll_void"));
         assert!(content.contains("rust_future_complete_void"));
         assert!(content.contains("rust_future_poll_bytes"));

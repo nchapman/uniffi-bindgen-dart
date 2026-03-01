@@ -13,4 +13,6 @@ namespace ext_types_demo {
   [Throws=RemoteFailure]
   u32 risky_remote_count(i32 input);
   RemoteCounter echo_remote_counter(RemoteCounter input);
+  [Async]
+  RemoteCounter echo_remote_counter_async(RemoteCounter input);
 };

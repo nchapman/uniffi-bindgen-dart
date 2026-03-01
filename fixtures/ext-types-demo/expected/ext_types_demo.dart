@@ -2,10 +2,25 @@
 // ignore_for_file: unused_element
 library ext_types_demo;
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi' as ffi;
 import 'package:ffi/ffi.dart';
 import 'package:other_bindings/other_bindings.dart';
+
+final class _RustCallStatus extends ffi.Struct {
+  @ffi.Int8()
+  external int code;
+
+  external ffi.Pointer<Utf8> errorBuf;
+}
+
+const int _rustCallStatusSuccess = 0;
+const int _rustCallStatusError = 1;
+const int _rustCallStatusUnexpectedError = 2;
+const int _rustCallStatusCancelled = 3;
+const int _rustFuturePollReady = 0;
+const int _rustFuturePollWake = 1;
 
 class ExtTypesDemoFfi {
   ExtTypesDemoFfi({ffi.DynamicLibrary? dynamicLibrary, String? libraryPath})
@@ -55,6 +70,65 @@ class ExtTypesDemoFfi {
   RemoteCounter echoRemoteCounter(RemoteCounter input) {
     final int inputHandle = RemoteCounterFfiCodec.lower(input);
       return RemoteCounterFfiCodec.lift(_echoRemoteCounter(inputHandle));
+  }
+
+  late final int Function(int input) _echoRemoteCounterAsync = _lib.lookupFunction<ffi.Uint64 Function(ffi.Uint64 input), int Function(int input)>('echo_remote_counter_async');
+  late final void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData) _echoRemoteCounterAsyncRustFuturePoll = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, ffi.Uint64 callbackData), void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData)>('rust_future_poll_u64');
+  late final void Function(int handle) _echoRemoteCounterAsyncRustFutureCancel = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_cancel_u64');
+  late final int Function(int handle, ffi.Pointer<_RustCallStatus> outStatus) _echoRemoteCounterAsyncRustFutureComplete = _lib.lookupFunction<ffi.Uint64 Function(ffi.Uint64 handle, ffi.Pointer<_RustCallStatus> outStatus), int Function(int handle, ffi.Pointer<_RustCallStatus> outStatus)>('rust_future_complete_u64');
+  late final void Function(int handle) _echoRemoteCounterAsyncRustFutureFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_free_u64');
+
+  Future<RemoteCounter> echoRemoteCounterAsync(RemoteCounter input) async {
+    final int inputHandle = RemoteCounterFfiCodec.lower(input);
+    final int futureHandle;
+    futureHandle = _echoRemoteCounterAsync(inputHandle);
+    final StreamController<int> pollEvents = StreamController<int>.broadcast();
+    final callback = ffi.NativeCallable<ffi.Void Function(ffi.Uint64, ffi.Int8)>.listener((int _, int pollResult) {
+      pollEvents.add(pollResult);
+    });
+    try {
+      _echoRemoteCounterAsyncRustFuturePoll(futureHandle, callback.nativeFunction, 0);
+      while (true) {
+        final int pollResult = await pollEvents.stream.first;
+        if (pollResult == _rustFuturePollReady) {
+          break;
+        }
+        if (pollResult == _rustFuturePollWake) {
+          _echoRemoteCounterAsyncRustFuturePoll(futureHandle, callback.nativeFunction, 0);
+          continue;
+        }
+        throw StateError('Rust future poll returned invalid status for echo_remote_counter_async: $pollResult');
+      }
+      final ffi.Pointer<_RustCallStatus> outStatusPtr = calloc<_RustCallStatus>();
+      try {
+        final int resultValue = _echoRemoteCounterAsyncRustFutureComplete(futureHandle, outStatusPtr);
+        final int statusCode = outStatusPtr.ref.code;
+        if (statusCode == _rustCallStatusSuccess) {
+          return RemoteCounterFfiCodec.lift(resultValue);
+        }
+        if (statusCode == _rustCallStatusCancelled) {
+          throw StateError('Rust future was cancelled for echo_remote_counter_async');
+        }
+        final ffi.Pointer<Utf8> errorPtr = outStatusPtr.ref.errorBuf;
+        if (errorPtr != ffi.nullptr) {
+          try {
+            throw StateError(errorPtr.toDartString());
+          } finally {
+            _rustStringFree(errorPtr);
+          }
+        }
+        throw StateError('Rust future failed for echo_remote_counter_async with status code: $statusCode');
+      } finally {
+        calloc.free(outStatusPtr);
+      }
+    } catch (_) {
+      _echoRemoteCounterAsyncRustFutureCancel(futureHandle);
+      rethrow;
+    } finally {
+      await pollEvents.close();
+      callback.close();
+      _echoRemoteCounterAsyncRustFutureFree(futureHandle);
+    }
   }
 
   late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> input) _echoRemoteState = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> input), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> input)>('echo_remote_state');
@@ -122,6 +196,10 @@ RemoteThing echoRemote(RemoteThing input) {
 
 RemoteCounter echoRemoteCounter(RemoteCounter input) {
   return _bindings().echoRemoteCounter(input);
+}
+
+Future<RemoteCounter> echoRemoteCounterAsync(RemoteCounter input) {
+  return _bindings().echoRemoteCounterAsync(input);
 }
 
 RemoteState echoRemoteState(RemoteState input) {

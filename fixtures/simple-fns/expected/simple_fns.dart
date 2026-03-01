@@ -1845,6 +1845,64 @@ class SimpleFnsBindings {
     }
   }
 
+  late final int Function(int initial) _asyncCounterCreateNew = _lib.lookupFunction<ffi.Uint64 Function(ffi.Uint32 initial), int Function(int initial)>('async_counter_create_new');
+  late final void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData) _asyncCounterCreateNewRustFuturePoll = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, ffi.Uint64 callbackData), void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData)>('rust_future_poll_u64');
+  late final void Function(int handle) _asyncCounterCreateNewRustFutureCancel = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_cancel_u64');
+  late final int Function(int handle, ffi.Pointer<_RustCallStatus> outStatus) _asyncCounterCreateNewRustFutureComplete = _lib.lookupFunction<ffi.Uint64 Function(ffi.Uint64 handle, ffi.Pointer<_RustCallStatus> outStatus), int Function(int handle, ffi.Pointer<_RustCallStatus> outStatus)>('rust_future_complete_u64');
+  late final void Function(int handle) _asyncCounterCreateNewRustFutureFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_free_u64');
+
+  Future<Counter> asyncCounterCreateNew(int initial) async {
+    final int futureHandle;
+    futureHandle = _asyncCounterCreateNew(initial);
+    final StreamController<int> pollEvents = StreamController<int>.broadcast();
+    final callback = ffi.NativeCallable<ffi.Void Function(ffi.Uint64, ffi.Int8)>.listener((int _, int pollResult) {
+      pollEvents.add(pollResult);
+    });
+    try {
+      _asyncCounterCreateNewRustFuturePoll(futureHandle, callback.nativeFunction, 0);
+      while (true) {
+        final int pollResult = await pollEvents.stream.first;
+        if (pollResult == _rustFuturePollReady) {
+          break;
+        }
+        if (pollResult == _rustFuturePollWake) {
+          _asyncCounterCreateNewRustFuturePoll(futureHandle, callback.nativeFunction, 0);
+          continue;
+        }
+        throw StateError('Rust future poll returned invalid status for async_counter_create_new: $pollResult');
+      }
+      final ffi.Pointer<_RustCallStatus> outStatusPtr = calloc<_RustCallStatus>();
+      try {
+        final int resultValue = _asyncCounterCreateNewRustFutureComplete(futureHandle, outStatusPtr);
+        final int statusCode = outStatusPtr.ref.code;
+        if (statusCode == _rustCallStatusSuccess) {
+          return Counter._(this, resultValue);
+        }
+        if (statusCode == _rustCallStatusCancelled) {
+          throw StateError('Rust future was cancelled for async_counter_create_new');
+        }
+        final ffi.Pointer<Utf8> errorPtr = outStatusPtr.ref.errorBuf;
+        if (errorPtr != ffi.nullptr) {
+          try {
+            throw StateError(errorPtr.toDartString());
+          } finally {
+            _rustStringFree(errorPtr);
+          }
+        }
+        throw StateError('Rust future failed for async_counter_create_new with status code: $statusCode');
+      } finally {
+        calloc.free(outStatusPtr);
+      }
+    } catch (_) {
+      _asyncCounterCreateNewRustFutureCancel(futureHandle);
+      rethrow;
+    } finally {
+      await pollEvents.close();
+      callback.close();
+      _asyncCounterCreateNewRustFutureFree(futureHandle);
+    }
+  }
+
   late final int Function(ffi.Pointer<Utf8> items) _asyncCounts = _lib.lookupFunction<ffi.Uint64 Function(ffi.Pointer<Utf8> items), int Function(ffi.Pointer<Utf8> items)>('async_counts');
   late final void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData) _asyncCountsRustFuturePoll = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, ffi.Uint64 callbackData), void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData)>('rust_future_poll_string');
   late final void Function(int handle) _asyncCountsRustFutureCancel = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_cancel_string');
@@ -4253,6 +4311,10 @@ Future<int> asyncCountAdd(int left, int right) {
 
 Future<Map<String, int>> asyncCountMapEcho(Map<String, int> items) {
   return _bindings().asyncCountMapEcho(items);
+}
+
+Future<Counter> asyncCounterCreateNew(int initial) {
+  return _bindings().asyncCounterCreateNew(initial);
 }
 
 Future<Map<String, int>> asyncCounts(Map<String, int> items) {

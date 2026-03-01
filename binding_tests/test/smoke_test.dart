@@ -151,6 +151,7 @@ void main() {
     expect(contents, contains('Future<Map<String, int>> asyncCountMapEcho(Map<String, int> items) {'));
     expect(contents, contains('Future<String> asyncFailString() {'));
     expect(contents, contains('Future<String> asyncNeverString() {'));
+    expect(contents, contains('Future<Counter> asyncCounterCreateNew(int initial) {'));
     expect(contents, contains('int asyncCancelCount() {'));
     expect(contents, contains('int asyncFreeCount() {'));
     expect(contents, contains('void resetAsyncFutureCounts() {'));
@@ -163,6 +164,8 @@ void main() {
     expect(contents, contains('rust_future_free_string'));
     expect(contents, contains('rust_future_poll_u32'));
     expect(contents, contains('rust_future_complete_u32'));
+    expect(contents, contains('rust_future_poll_u64'));
+    expect(contents, contains('rust_future_complete_u64'));
     expect(contents, contains('rust_future_poll_void'));
     expect(contents, contains('rust_future_complete_void'));
     expect(contents, contains('rust_future_poll_bytes'));
@@ -640,6 +643,9 @@ void main() {
     );
     counter.close();
     expect(() => counter.currentValue(), throwsA(isA<StateError>()));
+    final asyncCreatedCounter = await bindings.asyncCounterCreateNew(11);
+    expect(asyncCreatedCounter.currentValue(), 11);
+    asyncCreatedCounter.close();
     final counterFromPerson = bindings.counterCreateWithPerson(
       const Person(name: 'Neo', age: 4),
     );
@@ -908,6 +914,9 @@ void main() {
       throwsA(isA<MathErrorExceptionDivisionByZero>()),
     );
     topCounter.close();
+    final topAsyncCreatedCounter = await asyncCounterCreateNew(6);
+    expect(topAsyncCreatedCounter.currentValue(), 6);
+    topAsyncCreatedCounter.close();
     final globalBefore = currentTick();
     tick();
     expect(currentTick(), globalBefore + 1);
