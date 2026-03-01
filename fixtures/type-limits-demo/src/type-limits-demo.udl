@@ -11,6 +11,10 @@ namespace type_limits_demo {
   f64 take_f64(f64 v);
   string take_string(string v);
   bytes take_bytes(bytes v);
+
+  LargeEnum take_enum(LargeEnum v);
+  [Throws=LargeError]
+  void maybe_throw(u32 idx);
 };
 
 enum LargeEnum {

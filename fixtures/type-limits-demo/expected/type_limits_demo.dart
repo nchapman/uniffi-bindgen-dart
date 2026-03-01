@@ -1001,6 +1001,27 @@ class TypeLimitsDemoFfi {
 
   late final void Function(_RustBuffer) _rustBytesFree = _lib.lookupFunction<ffi.Void Function(_RustBuffer), void Function(_RustBuffer)>('rust_bytes_free');
 
+  late final ffi.Pointer<Utf8> Function(int idx) _maybeThrow = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint32 idx), ffi.Pointer<Utf8> Function(int idx)>('maybe_throw');
+
+  void maybeThrow(int idx) {
+      final ffi.Pointer<Utf8> resultPtr = _maybeThrow(idx);
+      if (resultPtr == ffi.nullptr) {
+        throw StateError('Rust returned null for maybe_throw');
+      }
+      final String payload;
+      try {
+        payload = resultPtr.toDartString();
+      } finally {
+        _rustStringFree(resultPtr);
+      }
+      final Map<String, dynamic> envelope = jsonDecode(payload) as Map<String, dynamic>;
+      final Object? errRaw = envelope['err'];
+      if (errRaw != null) {
+        throw LargeErrorExceptionFfiCodec.decode(errRaw);
+      }
+      return;
+  }
+
   late final _RustBuffer Function(_RustBuffer v) _takeBytes = _lib.lookupFunction<_RustBuffer Function(_RustBuffer v), _RustBuffer Function(_RustBuffer v)>('take_bytes');
 
   Uint8List takeBytes(Uint8List v) {
@@ -1031,6 +1052,27 @@ class TypeLimitsDemoFfi {
     } finally {
     if (vData != ffi.nullptr) calloc.free(vData);
     calloc.free(vBufferPtr);
+    }
+  }
+
+  late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> v) _takeEnum = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> v), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> v)>('take_enum');
+
+  LargeEnum takeEnum(LargeEnum v) {
+    final String vNativeJson = LargeEnumFfiCodec.encode(v);
+    final ffi.Pointer<Utf8> vNative = vNativeJson.toNativeUtf8();
+    try {
+      final ffi.Pointer<Utf8> resultPtr = _takeEnum(vNative);
+      if (resultPtr == ffi.nullptr) {
+        throw StateError('Rust returned null for take_enum');
+      }
+      try {
+        final String payload = resultPtr.toDartString();
+        return LargeEnumFfiCodec.decode(payload);
+      } finally {
+        _rustStringFree(resultPtr);
+      }
+    } finally {
+    calloc.free(vNative);
     }
   }
 
@@ -1126,8 +1168,16 @@ void resetDefaultBindings() {
   _defaultBindings = null;
 }
 
+void maybeThrow(int idx) {
+  _bindings().maybeThrow(idx);
+}
+
 Uint8List takeBytes(Uint8List v) {
   return _bindings().takeBytes(v);
+}
+
+LargeEnum takeEnum(LargeEnum v) {
+  return _bindings().takeEnum(v);
 }
 
 double takeF32(double v) {
