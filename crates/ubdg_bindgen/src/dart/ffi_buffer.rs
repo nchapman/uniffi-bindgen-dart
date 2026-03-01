@@ -40,30 +40,6 @@ pub(super) fn runtime_unsupported_reason_for_ffi_func(
     None
 }
 
-#[allow(dead_code)]
-pub(super) fn is_ffibuffer_supported_ffi_type(type_: &FfiType) -> bool {
-    match type_ {
-        FfiType::UInt8
-        | FfiType::Int8
-        | FfiType::UInt16
-        | FfiType::Int16
-        | FfiType::UInt32
-        | FfiType::Int32
-        | FfiType::UInt64
-        | FfiType::Int64
-        | FfiType::Float32
-        | FfiType::Float64
-        | FfiType::Handle
-        | FfiType::RustBuffer(_)
-        | FfiType::RustCallStatus => true,
-        FfiType::Reference(inner) | FfiType::MutReference(inner) => {
-            matches!(inner.as_ref(), FfiType::VoidPointer)
-        }
-        _ => false,
-    }
-}
-
-#[allow(dead_code)]
 pub(super) fn is_ffibuffer_eligible_function(function: &UdlFunction) -> bool {
     function.ffi_symbol.is_some() && !function.is_async
 }

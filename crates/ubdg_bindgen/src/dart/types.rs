@@ -2,8 +2,6 @@ use std::collections::{HashMap, HashSet};
 
 use uniffi_bindgen::interface::{ffi::FfiType, DefaultValue, Type};
 
-use super::*;
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct UdlFunction {
     pub(super) name: String,
@@ -120,47 +118,6 @@ pub(super) struct UdlEnumVariant {
 pub(super) struct UdlApiChecksum {
     pub(super) symbol: String,
     pub(super) expected: u16,
-}
-
-impl UdlFunction {
-    pub(super) fn uses_bytes(&self) -> bool {
-        self.return_type
-            .as_ref()
-            .is_some_and(uniffi_type_uses_bytes)
-            || self.args.iter().any(|a| uniffi_type_uses_bytes(&a.type_))
-    }
-
-    pub(super) fn uses_runtime_string(&self) -> bool {
-        self.return_type
-            .as_ref()
-            .is_some_and(is_runtime_string_like_type)
-            || self
-                .args
-                .iter()
-                .any(|a| is_runtime_string_like_type(&a.type_))
-    }
-
-    pub(super) fn returns_runtime_string(&self) -> bool {
-        self.return_type
-            .as_ref()
-            .is_some_and(is_runtime_string_like_type)
-    }
-
-    pub(super) fn uses_runtime_bytes(&self) -> bool {
-        self.return_type
-            .as_ref()
-            .is_some_and(is_runtime_bytes_like_type)
-            || self
-                .args
-                .iter()
-                .any(|a| is_runtime_bytes_like_type(&a.type_))
-    }
-
-    pub(super) fn returns_runtime_bytes(&self) -> bool {
-        self.return_type
-            .as_ref()
-            .is_some_and(is_runtime_bytes_like_type)
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]

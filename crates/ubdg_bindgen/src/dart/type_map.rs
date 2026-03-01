@@ -80,20 +80,6 @@ pub(super) fn is_external_object_type(type_: &Type, local_module_path: &str) -> 
     }
 }
 
-pub(super) fn render_object_lift_expr(
-    type_: &Type,
-    handle_expr: &str,
-    local_module_path: &str,
-    binding_expr: &str,
-) -> String {
-    let object_name = to_upper_camel(object_name_from_type(type_).unwrap_or("Object"));
-    if is_external_object_type(type_, local_module_path) {
-        format!("{object_name}FfiCodec.lift({handle_expr})")
-    } else {
-        format!("{object_name}._({binding_expr}, {handle_expr})")
-    }
-}
-
 pub(super) fn is_runtime_optional_bytes_type(type_: &Type) -> bool {
     matches!(runtime_unwrapped_type(type_), Type::Optional { inner_type } if is_runtime_bytes_type(inner_type))
 }
@@ -204,6 +190,37 @@ pub(super) fn is_runtime_utf8_pointer_marshaled_type(
     enums: &[UdlEnum],
 ) -> bool {
     map_runtime_native_ffi_type(type_, records, enums) == Some("ffi.Pointer<Utf8>")
+}
+
+pub(super) fn function_uses_bytes(f: &UdlFunction) -> bool {
+    f.return_type.as_ref().is_some_and(uniffi_type_uses_bytes)
+        || f.args.iter().any(|a| uniffi_type_uses_bytes(&a.type_))
+}
+
+pub(super) fn function_uses_runtime_string(f: &UdlFunction) -> bool {
+    f.return_type
+        .as_ref()
+        .is_some_and(is_runtime_string_like_type)
+        || f.args.iter().any(|a| is_runtime_string_like_type(&a.type_))
+}
+
+pub(super) fn function_returns_runtime_string(f: &UdlFunction) -> bool {
+    f.return_type
+        .as_ref()
+        .is_some_and(is_runtime_string_like_type)
+}
+
+pub(super) fn function_uses_runtime_bytes(f: &UdlFunction) -> bool {
+    f.return_type
+        .as_ref()
+        .is_some_and(is_runtime_bytes_like_type)
+        || f.args.iter().any(|a| is_runtime_bytes_like_type(&a.type_))
+}
+
+pub(super) fn function_returns_runtime_bytes(f: &UdlFunction) -> bool {
+    f.return_type
+        .as_ref()
+        .is_some_and(is_runtime_bytes_like_type)
 }
 
 pub(super) fn is_runtime_ffi_compatible_function(

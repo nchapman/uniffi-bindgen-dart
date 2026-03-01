@@ -106,7 +106,7 @@ pub(super) fn render_bound_methods(
             || functions.iter().any(|f| {
                 f.runtime_unsupported.is_none()
                     && is_runtime_ffi_compatible_function(f, records, enums)
-                    && (f.returns_runtime_string()
+                    && (function_returns_runtime_string(f)
                         || f.return_type.as_ref().is_some_and(|t| {
                             is_runtime_utf8_pointer_marshaled_type(t, records, enums)
                         })
@@ -166,7 +166,7 @@ pub(super) fn render_bound_methods(
                 })
             });
     let needs_bytes_free = functions.iter().any(|f| {
-        is_runtime_ffi_compatible_function(f, records, enums) && f.returns_runtime_bytes()
+        is_runtime_ffi_compatible_function(f, records, enums) && function_returns_runtime_bytes(f)
     }) || objects.iter().any(|o| {
         o.methods.iter().any(|m| {
             m.return_type

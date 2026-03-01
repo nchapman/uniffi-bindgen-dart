@@ -60,24 +60,24 @@ pub fn generate_bindings(args: &GenerateArgs) -> Result<()> {
     fs::create_dir_all(&args.out_dir)?;
 
     let output_file = args.out_dir.join(format!("{namespace}.dart"));
-    let content = render_dart_scaffold(
-        &module_name,
-        &ffi_class_name,
-        &library_name,
-        metadata.namespace_docstring.as_deref(),
-        &metadata.local_module_path,
-        metadata.uniffi_contract_version,
-        metadata.ffi_uniffi_contract_version_symbol.as_deref(),
-        &metadata.api_checksums,
-        &cfg.external_packages,
-        &cfg.rename,
-        &cfg.exclude,
-        &metadata.functions,
-        &metadata.objects,
-        &metadata.callback_interfaces,
-        &metadata.records,
-        &metadata.enums,
-    );
+    let ctx = RenderContext {
+        module_name: &module_name,
+        ffi_class_name: &ffi_class_name,
+        library_name: &library_name,
+        namespace_docstring: metadata.namespace_docstring.as_deref(),
+        local_module_path: &metadata.local_module_path,
+        uniffi_contract_version: metadata.uniffi_contract_version,
+        ffi_uniffi_contract_version_symbol: metadata.ffi_uniffi_contract_version_symbol.as_deref(),
+        api_checksums: &metadata.api_checksums,
+        external_packages: &cfg.external_packages,
+        api_overrides: ApiOverrides::new(&cfg.rename, &cfg.exclude),
+        functions: &metadata.functions,
+        objects: &metadata.objects,
+        callback_interfaces: &metadata.callback_interfaces,
+        records: &metadata.records,
+        enums: &metadata.enums,
+    };
+    let content = render_dart_scaffold(&ctx);
     fs::write(&output_file, content).with_context(|| {
         format!(
             "failed to write generated dart bindings: {}",
@@ -88,26 +88,42 @@ pub fn generate_bindings(args: &GenerateArgs) -> Result<()> {
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
-fn render_dart_scaffold(
-    module_name: &str,
-    ffi_class_name: &str,
-    library_name: &str,
-    namespace_docstring: Option<&str>,
-    local_module_path: &str,
+struct RenderContext<'a> {
+    module_name: &'a str,
+    ffi_class_name: &'a str,
+    library_name: &'a str,
+    namespace_docstring: Option<&'a str>,
+    local_module_path: &'a str,
     uniffi_contract_version: Option<u32>,
-    ffi_uniffi_contract_version_symbol: Option<&str>,
-    api_checksums: &[UdlApiChecksum],
-    external_packages: &HashMap<String, String>,
-    rename: &HashMap<String, String>,
-    exclude: &[String],
-    functions: &[UdlFunction],
-    objects: &[UdlObject],
-    callback_interfaces: &[UdlCallbackInterface],
-    records: &[UdlRecord],
-    enums: &[UdlEnum],
-) -> String {
-    let api_overrides = ApiOverrides::new(rename, exclude);
+    ffi_uniffi_contract_version_symbol: Option<&'a str>,
+    api_checksums: &'a [UdlApiChecksum],
+    external_packages: &'a HashMap<String, String>,
+    api_overrides: ApiOverrides,
+    functions: &'a [UdlFunction],
+    objects: &'a [UdlObject],
+    callback_interfaces: &'a [UdlCallbackInterface],
+    records: &'a [UdlRecord],
+    enums: &'a [UdlEnum],
+}
+
+fn render_dart_scaffold(ctx: &RenderContext<'_>) -> String {
+    let RenderContext {
+        module_name,
+        ffi_class_name,
+        library_name,
+        namespace_docstring,
+        local_module_path,
+        uniffi_contract_version,
+        ffi_uniffi_contract_version_symbol,
+        api_checksums,
+        external_packages,
+        ref api_overrides,
+        functions,
+        objects,
+        callback_interfaces,
+        records,
+        enums,
+    } = *ctx;
     let external_import_uris =
         collect_external_import_uris(local_module_path, external_packages, functions, objects);
     let needs_callback_runtime =
@@ -137,7 +153,7 @@ fn render_dart_scaffold(
             .flat_map(|e| e.methods.iter())
             .any(|m| m.runtime_unsupported.is_some());
     let needs_typed_data = has_runtime_unsupported
-        || functions.iter().any(UdlFunction::uses_bytes)
+        || functions.iter().any(function_uses_bytes)
         || objects.iter().any(|o| {
             o.methods.iter().any(|m| {
                 m.return_type.as_ref().is_some_and(uniffi_type_uses_bytes)
@@ -176,8 +192,8 @@ fn render_dart_scaffold(
         || needs_callback_runtime
         || functions.iter().any(|f| {
             is_runtime_ffi_compatible_function(f, records, enums)
-                && (f.uses_runtime_string()
-                    || f.uses_runtime_bytes()
+                && (function_uses_runtime_string(f)
+                    || function_uses_runtime_bytes(f)
                     || f.return_type
                         .as_ref()
                         .is_some_and(|t| is_runtime_utf8_pointer_marshaled_type(t, records, enums))
@@ -194,31 +210,30 @@ fn render_dart_scaffold(
         || !objects.is_empty()
         || records.iter().any(|r| !r.methods.is_empty())
         || enums.iter().any(|e| !e.methods.is_empty());
-    let needs_runtime_bytes =
-        functions.iter().any(|f| {
-            is_runtime_ffi_compatible_function(f, records, enums) && f.uses_runtime_bytes()
-        }) || objects.iter().any(|o| {
-            o.methods.iter().any(|m| {
-                m.return_type
-                    .as_ref()
-                    .is_some_and(is_runtime_bytes_like_type)
-                    || m.args.iter().any(|a| is_runtime_bytes_like_type(&a.type_))
-            })
-        }) || records.iter().any(|r| {
-            r.methods.iter().any(|m| {
-                m.return_type
-                    .as_ref()
-                    .is_some_and(is_runtime_bytes_like_type)
-                    || m.args.iter().any(|a| is_runtime_bytes_like_type(&a.type_))
-            })
-        }) || enums.iter().any(|e| {
-            e.methods.iter().any(|m| {
-                m.return_type
-                    .as_ref()
-                    .is_some_and(is_runtime_bytes_like_type)
-                    || m.args.iter().any(|a| is_runtime_bytes_like_type(&a.type_))
-            })
-        });
+    let needs_runtime_bytes = functions.iter().any(|f| {
+        is_runtime_ffi_compatible_function(f, records, enums) && function_uses_runtime_bytes(f)
+    }) || objects.iter().any(|o| {
+        o.methods.iter().any(|m| {
+            m.return_type
+                .as_ref()
+                .is_some_and(is_runtime_bytes_like_type)
+                || m.args.iter().any(|a| is_runtime_bytes_like_type(&a.type_))
+        })
+    }) || records.iter().any(|r| {
+        r.methods.iter().any(|m| {
+            m.return_type
+                .as_ref()
+                .is_some_and(is_runtime_bytes_like_type)
+                || m.args.iter().any(|a| is_runtime_bytes_like_type(&a.type_))
+        })
+    }) || enums.iter().any(|e| {
+        e.methods.iter().any(|m| {
+            m.return_type
+                .as_ref()
+                .is_some_and(is_runtime_bytes_like_type)
+                || m.args.iter().any(|a| is_runtime_bytes_like_type(&a.type_))
+        })
+    });
     let needs_runtime_optional_bytes = functions.iter().any(|f| {
         is_runtime_ffi_compatible_function(f, records, enums)
             && (f
@@ -507,7 +522,7 @@ fn render_dart_scaffold(
         objects,
         callback_interfaces,
         ffi_class_name,
-        &api_overrides,
+        api_overrides,
         records,
         enums,
     ));
@@ -516,7 +531,7 @@ fn render_dart_scaffold(
         objects,
         callback_interfaces,
         ffi_class_name,
-        &api_overrides,
+        api_overrides,
         records,
         enums,
     ));
@@ -1672,24 +1687,23 @@ interface Outcome {
             }],
         }];
 
-        let content = render_dart_scaffold(
-            "models",
-            "ModelsFfi",
-            "uniffi_models",
-            None,
-            "crate_name",
-            None,
-            None,
-            &[],
-            &HashMap::new(),
-            &HashMap::new(),
-            &[],
-            &[],
-            &[],
-            &[],
-            &records,
-            &enums,
-        );
+        let content = render_dart_scaffold(&RenderContext {
+            module_name: "models",
+            ffi_class_name: "ModelsFfi",
+            library_name: "uniffi_models",
+            namespace_docstring: None,
+            local_module_path: "crate_name",
+            uniffi_contract_version: None,
+            ffi_uniffi_contract_version_symbol: None,
+            api_checksums: &[],
+            external_packages: &HashMap::new(),
+            api_overrides: ApiOverrides::new(&HashMap::new(), &[]),
+            functions: &[],
+            objects: &[],
+            callback_interfaces: &[],
+            records: &records,
+            enums: &enums,
+        });
 
         assert!(content.contains("int checksum() {"));
         assert!(content.contains("return _bindings().pointChecksum(this);"));
@@ -1829,24 +1843,23 @@ interface Outcome {
             trait_methods: UdlObjectTraitMethods::default(),
         }];
 
-        let content = render_dart_scaffold(
-            "demo",
-            "DemoFfi",
-            "uniffi_demo",
-            None,
-            "crate_name",
-            None,
-            None,
-            &[],
-            &HashMap::new(),
-            &HashMap::new(),
-            &[],
-            &[],
-            &objects,
-            &[],
-            &[],
-            &[],
-        );
+        let content = render_dart_scaffold(&RenderContext {
+            module_name: "demo",
+            ffi_class_name: "DemoFfi",
+            library_name: "uniffi_demo",
+            namespace_docstring: None,
+            local_module_path: "crate_name",
+            uniffi_contract_version: None,
+            ffi_uniffi_contract_version_symbol: None,
+            api_checksums: &[],
+            external_packages: &HashMap::new(),
+            api_overrides: ApiOverrides::new(&HashMap::new(), &[]),
+            functions: &[],
+            objects: &objects,
+            callback_interfaces: &[],
+            records: &[],
+            enums: &[],
+        });
 
         assert!(content.contains("_widgetCtorNewFfiBuffer"));
         assert!(content.contains("uniffi_ffibuffer_demo_ctor_widget_new"));
@@ -1878,24 +1891,23 @@ interface Outcome {
             }],
         }];
 
-        let content = render_dart_scaffold(
-            "demo",
-            "DemoFfi",
-            "uniffi_demo",
-            None,
-            "crate_name",
-            None,
-            None,
-            &[],
-            &HashMap::new(),
-            &HashMap::new(),
-            &[],
-            &functions,
-            &[],
-            &[],
-            &[],
-            &[],
-        );
+        let content = render_dart_scaffold(&RenderContext {
+            module_name: "demo",
+            ffi_class_name: "DemoFfi",
+            library_name: "uniffi_demo",
+            namespace_docstring: None,
+            local_module_path: "crate_name",
+            uniffi_contract_version: None,
+            ffi_uniffi_contract_version_symbol: None,
+            api_checksums: &[],
+            external_packages: &HashMap::new(),
+            api_overrides: ApiOverrides::new(&HashMap::new(), &[]),
+            functions: &functions,
+            objects: &[],
+            callback_interfaces: &[],
+            records: &[],
+            enums: &[],
+        });
 
         assert!(content.contains("uniffi_ffibuffer_uniffi_demo_fn_func_greet_async"));
         assert!(content.contains("ffi_uniffi_demo_rust_future_complete_rust_buffer"));

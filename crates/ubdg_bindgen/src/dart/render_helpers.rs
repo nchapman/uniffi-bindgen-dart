@@ -338,6 +338,20 @@ pub(super) fn append_runtime_arg_marshalling(
     }
 }
 
+pub(super) fn render_object_lift_expr(
+    type_: &Type,
+    handle_expr: &str,
+    local_module_path: &str,
+    binding_expr: &str,
+) -> String {
+    let object_name = to_upper_camel(object_name_from_type(type_).unwrap_or("Object"));
+    if is_external_object_type(type_, local_module_path) {
+        format!("{object_name}FfiCodec.lift({handle_expr})")
+    } else {
+        format!("{object_name}._({binding_expr}, {handle_expr})")
+    }
+}
+
 pub(super) fn crate_name_from_module_path(module_path: &str) -> &str {
     module_path.split("::").next().unwrap_or(module_path)
 }
