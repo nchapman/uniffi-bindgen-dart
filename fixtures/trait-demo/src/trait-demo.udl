@@ -1,0 +1,14 @@
+namespace trait_demo {
+  /// Use a greeter to greet someone.
+  string use_greeter(Greeter greeter, string name);
+
+  /// Get a Rust-implemented greeter.
+  Greeter get_default_greeter();
+};
+
+/// A trait that can be implemented in either Rust or Dart.
+[Trait, WithForeign]
+interface Greeter {
+  /// Produce a greeting for the given name.
+  string greet(string name);
+};

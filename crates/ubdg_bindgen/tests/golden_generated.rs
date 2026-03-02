@@ -252,3 +252,16 @@ fn golden_non_exhaustive_demo() {
     generate(&source, &out_dir, None);
     assert_matches_expected(&out_dir.join("non_exhaustive_demo.dart"), &expected);
 }
+
+#[test]
+fn golden_trait_demo() {
+    let root = repo_root();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let out_dir = temp.path().join("out");
+
+    let source = root.join("fixtures/trait-demo/src/trait-demo.udl");
+    let expected = root.join("fixtures/trait-demo/expected/trait_demo.dart");
+
+    generate(&source, &out_dir, None);
+    assert_matches_expected(&out_dir.join("trait_demo.dart"), &expected);
+}

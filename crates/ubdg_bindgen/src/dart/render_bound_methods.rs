@@ -255,6 +255,24 @@ pub(super) fn render_bound_methods(
             "  late final bool {init_done_field} = (() {{\n    {init_field}({vtable_field});\n    return true;\n  }})();\n"
         ));
     }
+    for trait_object in objects.iter().filter(|o| o.has_callback_interface) {
+        let vtable_name = trait_callback_vtable_struct_name(&trait_object.name);
+        let init_field = trait_callback_init_field_name(&trait_object.name);
+        let init_done_field = trait_callback_init_done_field_name(&trait_object.name);
+        let vtable_field = trait_callback_vtable_field_name(&trait_object.name);
+        let bridge_name = trait_callback_bridge_class_name(&trait_object.name);
+        let init_symbol = trait_callback_init_symbol(&trait_object.name);
+        out.push('\n');
+        out.push_str(&format!(
+            "  late final void Function(ffi.Pointer<{vtable_name}>) {init_field} = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<{vtable_name}>), void Function(ffi.Pointer<{vtable_name}>)>('{init_symbol}');\n"
+        ));
+        out.push_str(&format!(
+            "  late final ffi.Pointer<{vtable_name}> {vtable_field} = {bridge_name}.createVTable();\n"
+        ));
+        out.push_str(&format!(
+            "  late final bool {init_done_field} = (() {{\n    {init_field}({vtable_field});\n    return true;\n  }})();\n"
+        ));
+    }
 
     for function in &runtime_functions {
         let method_name = safe_dart_identifier(&to_lower_camel(&function.name));
@@ -677,11 +695,12 @@ pub(super) fn render_bound_methods(
                     }
                 } else if let Some(ret_type) = function.return_type.as_ref() {
                     if is_runtime_object_type(ret_type) {
-                        let lift = render_object_lift_expr(
+                        let lift = render_object_lift_expr_with_objects(
                             ret_type,
                             "resultValue",
                             local_module_path,
                             "this",
+                            objects,
                         );
                         out.push_str(&format!("            return {lift};\n"));
                     } else if is_runtime_timestamp_type(ret_type) {
@@ -1607,8 +1626,13 @@ pub(super) fn render_bound_methods(
                     out.push_str("            _rustStringFree(resultPtr);\n");
                     out.push_str("          }\n");
                 } else if is_runtime_object_type(ret_type) {
-                    let lift =
-                        render_object_lift_expr(ret_type, "resultValue", local_module_path, "this");
+                    let lift = render_object_lift_expr_with_objects(
+                        ret_type,
+                        "resultValue",
+                        local_module_path,
+                        "this",
+                        objects,
+                    );
                     out.push_str(&format!("          return {lift};\n"));
                 } else if is_runtime_sequence_json_type(ret_type) {
                     let inner_type = match runtime_unwrapped_type(ret_type) {
@@ -2164,8 +2188,13 @@ pub(super) fn render_bound_methods(
                     out.push_str("      }\n");
                 }
                 Some(type_) if is_runtime_object_type(type_) => {
-                    let lift =
-                        render_object_lift_expr(type_, &call_expr, local_module_path, "this");
+                    let lift = render_object_lift_expr_with_objects(
+                        type_,
+                        &call_expr,
+                        local_module_path,
+                        "this",
+                        objects,
+                    );
                     out.push_str(&format!("      return {lift};\n"));
                 }
                 Some(type_) if is_runtime_sequence_json_type(type_) => {
@@ -2252,6 +2281,12 @@ pub(super) fn render_bound_methods(
 
     for object in objects {
         let object_name = to_upper_camel(&object.name);
+        // For [Trait, WithForeign] objects, use the _Impl class for handle-based construction
+        let object_construct_name = if object.has_callback_interface {
+            format!("_{}Impl", object_name)
+        } else {
+            object_name.clone()
+        };
         let object_lower = safe_dart_identifier(&to_lower_camel(&object.name));
         let object_symbol = dart_identifier(&object.name);
         let free_field = format!("_{}Free", object_lower);
@@ -2535,7 +2570,9 @@ pub(super) fn render_bound_methods(
                     match ffi_return_type {
                         FfiType::Handle | FfiType::UInt64 | FfiType::Int64 => {
                             out.push_str("      final int handle = (returnBuf + 0).ref.u64;\n");
-                            out.push_str(&format!("      return {object_name}._(this, handle);\n"));
+                            out.push_str(&format!(
+                                "      return {object_construct_name}._(this, handle);\n"
+                            ));
                         }
                         _ => {
                             out.push_str(&format!(
@@ -2741,7 +2778,7 @@ pub(super) fn render_bound_methods(
                 out.push_str("        final int statusCode = outStatusPtr.ref.code;\n");
                 out.push_str("        if (statusCode == _rustCallStatusSuccess) {\n");
                 out.push_str(&format!(
-                    "          return {object_name}._(this, resultValue);\n"
+                    "          return {object_construct_name}._(this, resultValue);\n"
                 ));
                 out.push_str("        }\n");
                 if let Some(throws_type) = ctor.throws_type.as_ref() {
@@ -2873,13 +2910,17 @@ pub(super) fn render_bound_methods(
                 out.push_str("    }\n");
                 out.push_str("    final Object? okRaw = envelope['ok'];\n");
                 out.push_str("    final int handle = (okRaw as num).toInt();\n");
-                out.push_str(&format!("    return {object_name}._(this, handle);\n"));
+                out.push_str(&format!(
+                    "    return {object_construct_name}._(this, handle);\n"
+                ));
             } else {
                 out.push_str(&format!(
                     "    final int handle = {ctor_field}({});\n",
                     call_args.join(", ")
                 ));
-                out.push_str(&format!("    return {object_name}._(this, handle);\n"));
+                out.push_str(&format!(
+                    "    return {object_construct_name}._(this, handle);\n"
+                ));
             }
             if !post_call.is_empty() {
                 out.push_str("    } finally {\n");
@@ -3218,11 +3259,12 @@ pub(super) fn render_bound_methods(
                             out.push_str("      return (returnBuf + 0).ref.i8 == 1;\n");
                         }
                         Some(ret_type) if is_runtime_object_type(ret_type) => {
-                            let lift = render_object_lift_expr(
+                            let lift = render_object_lift_expr_with_objects(
                                 ret_type,
                                 "(returnBuf + 0).ref.u64",
                                 local_module_path,
                                 "this",
+                                objects,
                             );
                             out.push_str(&format!("      return {lift};\n"));
                         }

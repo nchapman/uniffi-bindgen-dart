@@ -31,6 +31,9 @@ pub(super) struct UdlObject {
     pub(super) docstring: Option<String>,
     /// True when this object is used as a `[Throws=...]` error type.
     pub(super) is_error: bool,
+    /// True when this object is a `[Trait, WithForeign]` interface that can be
+    /// implemented by both Rust and Dart code.
+    pub(super) has_callback_interface: bool,
     pub(super) constructors: Vec<UdlObjectConstructor>,
     pub(super) methods: Vec<UdlObjectMethod>,
     pub(super) trait_methods: UdlObjectTraitMethods,

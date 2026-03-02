@@ -391,17 +391,27 @@ pub(super) fn append_runtime_arg_marshalling(
     }
 }
 
-pub(super) fn render_object_lift_expr(
+pub(super) fn render_object_lift_expr_with_objects(
     type_: &Type,
     handle_expr: &str,
     local_module_path: &str,
     binding_expr: &str,
+    objects: &[UdlObject],
 ) -> String {
-    let object_name = to_upper_camel(object_name_from_type(type_).unwrap_or("Object"));
+    let raw_name = object_name_from_type(type_).unwrap_or("Object");
+    let object_name = to_upper_camel(raw_name);
     if is_external_object_type(type_, local_module_path) {
         format!("{object_name}FfiCodec.lift({handle_expr})")
     } else {
-        format!("{object_name}._({binding_expr}, {handle_expr})")
+        let is_trait = objects
+            .iter()
+            .any(|o| o.name == raw_name && o.has_callback_interface);
+        if is_trait {
+            let impl_name = format!("_{object_name}Impl");
+            format!("{impl_name}._({binding_expr}, {handle_expr})")
+        } else {
+            format!("{object_name}._({binding_expr}, {handle_expr})")
+        }
     }
 }
 

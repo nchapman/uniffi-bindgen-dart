@@ -136,7 +136,9 @@ fn render_dart_scaffold(ctx: &RenderContext<'_>) -> String {
             records,
             enums,
         ) || has_runtime_unsupported_async_ffibuffer_support(functions, records, enums);
-    let needs_rust_call_status = needs_async_rust_future || needs_callback_runtime;
+    let has_trait_callback_interfaces = objects.iter().any(|o| o.has_callback_interface);
+    let needs_rust_call_status =
+        needs_async_rust_future || needs_callback_runtime || has_trait_callback_interfaces;
     let has_runtime_unsupported = functions.iter().any(|f| f.runtime_unsupported.is_some())
         || objects.iter().any(|o| {
             o.constructors
@@ -1891,6 +1893,7 @@ interface Outcome {
             name: "widget".to_string(),
             docstring: None,
             is_error: false,
+            has_callback_interface: false,
             constructors: vec![UdlObjectConstructor {
                 name: "new".to_string(),
                 ffi_symbol: Some("uniffi_demo_ctor_widget_new".to_string()),
