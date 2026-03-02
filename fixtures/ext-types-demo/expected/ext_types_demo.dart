@@ -22,6 +22,40 @@ const int _rustCallStatusCancelled = 3;
 const int _rustFuturePollReady = 0;
 const int _rustFuturePollWake = 1;
 
+class WrapperRecord {
+  const WrapperRecord({
+    required this.inner,
+    required this.label,
+  });
+
+  final RemoteThing inner;
+  final String label;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'inner': this.inner.toJson(),
+      'label': this.label,
+    };
+  }
+
+  static WrapperRecord fromJson(Map<String, dynamic> json) {
+    return WrapperRecord(
+      inner: RemoteThing.fromJson(json['inner'] as Map<String, dynamic>),
+      label: json['label'] as String,
+    );
+  }
+
+  WrapperRecord copyWith({
+    RemoteThing? inner,
+    String? label,
+  }) {
+    return WrapperRecord(
+      inner: inner ?? this.inner,
+      label: label ?? this.label,
+    );
+  }
+}
+
 class ExtTypesDemoFfi {
   ExtTypesDemoFfi({ffi.DynamicLibrary? dynamicLibrary, String? libraryPath})
       : _dynamicLibrary = dynamicLibrary,
@@ -51,6 +85,16 @@ class ExtTypesDemoFfi {
     }
     if (bindingsContractVersion != scaffoldingContractVersion) {
       throw StateError('UniFFI contract version mismatch: expected $bindingsContractVersion, got $scaffoldingContractVersion');
+    }
+    final int _checksum_uniffi_crate_name_checksum_func_echo_records;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_func_echo_records');
+      _checksum_uniffi_crate_name_checksum_func_echo_records = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_func_echo_records`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_func_echo_records != 1046) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_echo_records`: expected 1046, got $_checksum_uniffi_crate_name_checksum_func_echo_records');
     }
     final int _checksum_uniffi_crate_name_checksum_func_echo_remote;
     try {
@@ -92,6 +136,16 @@ class ExtTypesDemoFfi {
     if (_checksum_uniffi_crate_name_checksum_func_echo_remote_state != 57866) {
       throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_echo_remote_state`: expected 57866, got $_checksum_uniffi_crate_name_checksum_func_echo_remote_state');
     }
+    final int _checksum_uniffi_crate_name_checksum_func_get_maybe_record;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_func_get_maybe_record');
+      _checksum_uniffi_crate_name_checksum_func_get_maybe_record = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_func_get_maybe_record`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_func_get_maybe_record != 9211) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_get_maybe_record`: expected 9211, got $_checksum_uniffi_crate_name_checksum_func_get_maybe_record');
+    }
     final int _checksum_uniffi_crate_name_checksum_func_risky_remote_count;
     try {
       final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_func_risky_remote_count');
@@ -111,6 +165,27 @@ class ExtTypesDemoFfi {
   })();
 
   late final void Function(ffi.Pointer<Utf8>) _rustStringFree = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<Utf8>), void Function(ffi.Pointer<Utf8>)>('rust_string_free');
+
+  late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> items) _echoRecords = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> items), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> items)>('echo_records');
+
+  List<RemoteThing> echoRecords(List<RemoteThing> items) {
+    final String itemsNativeJson = jsonEncode(items.map((item) => item.toJson()).toList());
+    final ffi.Pointer<Utf8> itemsNative = itemsNativeJson.toNativeUtf8();
+    try {
+      final ffi.Pointer<Utf8> resultPtr = _echoRecords(itemsNative);
+      if (resultPtr == ffi.nullptr) {
+        throw StateError('Rust returned null for echo_records');
+      }
+      try {
+        final String payload = resultPtr.toDartString();
+        return (jsonDecode(payload) as List).map((item) => RemoteThing.fromJson(item as Map<String, dynamic>)).toList();
+      } finally {
+        _rustStringFree(resultPtr);
+      }
+    } finally {
+    calloc.free(itemsNative);
+    }
+  }
 
   late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> input) _echoRemote = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> input), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> input)>('echo_remote');
 
@@ -220,6 +295,21 @@ class ExtTypesDemoFfi {
     }
   }
 
+  late final ffi.Pointer<Utf8> Function(bool present) _getMaybeRecord = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Bool present), ffi.Pointer<Utf8> Function(bool present)>('get_maybe_record');
+
+  RemoteThing? getMaybeRecord(bool present) {
+      final ffi.Pointer<Utf8> resultPtr = _getMaybeRecord(present);
+      if (resultPtr == ffi.nullptr) {
+        return null;
+      }
+      try {
+        final String payload = resultPtr.toDartString();
+        return RemoteThing.fromJson(jsonDecode(payload) as Map<String, dynamic>);
+      } finally {
+        _rustStringFree(resultPtr);
+      }
+  }
+
   late final ffi.Pointer<Utf8> Function(int input) _riskyRemoteCount = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Int32 input), ffi.Pointer<Utf8> Function(int input)>('risky_remote_count');
 
   int riskyRemoteCount(int input) {
@@ -258,6 +348,10 @@ void resetDefaultBindings() {
   _defaultBindings = null;
 }
 
+List<RemoteThing> echoRecords(List<RemoteThing> items) {
+  return _bindings().echoRecords(items);
+}
+
 RemoteThing echoRemote(RemoteThing input) {
   return _bindings().echoRemote(input);
 }
@@ -272,6 +366,10 @@ Future<RemoteCounter> echoRemoteCounterAsync(RemoteCounter input) {
 
 RemoteState echoRemoteState(RemoteState input) {
   return _bindings().echoRemoteState(input);
+}
+
+RemoteThing? getMaybeRecord(bool present) {
+  return _bindings().getMaybeRecord(present);
 }
 
 int riskyRemoteCount(int input) {

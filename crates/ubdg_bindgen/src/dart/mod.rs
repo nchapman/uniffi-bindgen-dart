@@ -124,8 +124,14 @@ fn render_dart_scaffold(ctx: &RenderContext<'_>) -> String {
         records,
         enums,
     } = *ctx;
-    let external_import_uris =
-        collect_external_import_uris(local_module_path, external_packages, functions, objects);
+    let external_import_uris = collect_external_import_uris(
+        local_module_path,
+        external_packages,
+        functions,
+        objects,
+        records,
+        enums,
+    );
     let needs_callback_runtime =
         has_runtime_callback_support(functions, objects, callback_interfaces, records, enums);
     let needs_async_rust_future =

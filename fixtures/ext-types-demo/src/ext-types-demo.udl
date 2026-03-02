@@ -7,6 +7,11 @@ typedef enum RemoteFailure;
 [External="other_crate"]
 typedef interface RemoteCounter;
 
+dictionary WrapperRecord {
+  RemoteThing inner;
+  string label;
+};
+
 namespace ext_types_demo {
   RemoteThing echo_remote(RemoteThing input);
   RemoteState echo_remote_state(RemoteState input);
@@ -15,4 +20,6 @@ namespace ext_types_demo {
   RemoteCounter echo_remote_counter(RemoteCounter input);
   [Async]
   RemoteCounter echo_remote_counter_async(RemoteCounter input);
+  RemoteThing? get_maybe_record(boolean present);
+  sequence<RemoteThing> echo_records(sequence<RemoteThing> items);
 };

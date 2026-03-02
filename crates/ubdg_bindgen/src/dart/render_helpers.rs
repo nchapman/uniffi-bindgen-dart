@@ -471,6 +471,8 @@ pub(super) fn collect_external_import_uris(
     external_packages: &HashMap<String, String>,
     functions: &[UdlFunction],
     objects: &[UdlObject],
+    records: &[UdlRecord],
+    enums: &[UdlEnum],
 ) -> Vec<String> {
     if local_module_path.is_empty() || external_packages.is_empty() {
         return Vec::new();
@@ -509,6 +511,20 @@ pub(super) fn collect_external_import_uris(
             }
             for a in &m.args {
                 collect_external_crates_from_type(&a.type_, local_crate, &mut crates);
+            }
+        }
+    }
+
+    for r in records {
+        for f in &r.fields {
+            collect_external_crates_from_type(&f.type_, local_crate, &mut crates);
+        }
+    }
+
+    for e in enums {
+        for v in &e.variants {
+            for f in &v.fields {
+                collect_external_crates_from_type(&f.type_, local_crate, &mut crates);
             }
         }
     }
