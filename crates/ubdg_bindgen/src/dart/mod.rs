@@ -2064,6 +2064,81 @@ interface Outcome {
     }
 
     #[test]
+    fn renders_throwing_async_ffibuffer_with_typed_error_dispatch() {
+        let functions = vec![UdlFunction {
+            name: "divide_async".to_string(),
+            ffi_symbol: Some("uniffi_uniffi_demo_fn_func_divide_async".to_string()),
+            ffi_arg_types: vec![FfiType::UInt32, FfiType::UInt32],
+            ffi_return_type: Some(FfiType::Handle),
+            ffi_has_rust_call_status: true,
+            runtime_unsupported: Some("placeholder".to_string()),
+            docstring: None,
+            is_async: true,
+            return_type: Some(Type::UInt32),
+            throws_type: Some(Type::Enum {
+                module_path: "crate_name".to_string(),
+                name: "MathError".to_string(),
+            }),
+            args: vec![
+                UdlArg {
+                    name: "a".to_string(),
+                    type_: Type::UInt32,
+                    docstring: None,
+                    default: None,
+                },
+                UdlArg {
+                    name: "b".to_string(),
+                    type_: Type::UInt32,
+                    docstring: None,
+                    default: None,
+                },
+            ],
+        }];
+        let enums = vec![UdlEnum {
+            name: "MathError".to_string(),
+            docstring: None,
+            is_error: true,
+            is_non_exhaustive: false,
+            has_discr_type: false,
+            variants: vec![UdlEnumVariant {
+                name: "DivisionByZero".to_string(),
+                docstring: None,
+                fields: vec![],
+                discr: None,
+            }],
+            methods: vec![],
+            traits: vec![],
+        }];
+
+        let content = render_dart_scaffold(&RenderContext {
+            module_name: "demo",
+            ffi_class_name: "DemoFfi",
+            library_name: "uniffi_demo",
+            namespace_docstring: None,
+            local_module_path: "crate_name",
+            uniffi_contract_version: None,
+            ffi_uniffi_contract_version_symbol: None,
+            api_checksums: &[],
+            external_packages: &HashMap::new(),
+            api_overrides: ApiOverrides::new(&HashMap::new(), &[]),
+            functions: &functions,
+            objects: &[],
+            callback_interfaces: &[],
+            records: &[],
+            enums: &enums,
+        });
+
+        // Should generate ffi_buffer async path, not UnsupportedError
+        assert!(content.contains("uniffi_ffibuffer_uniffi_demo_fn_func_divide_async"));
+        assert!(!content.contains("throw UnsupportedError('placeholder (divide_async)');"));
+        // Should have typed error dispatch
+        assert!(content.contains("_uniffiLiftMathErrorException(errorBytes)"));
+        // Should still have the ffi-buffer async polling infrastructure
+        assert!(content.contains("ffi_uniffi_demo_rust_future_poll_u32"));
+        assert!(content.contains("Future<int> divideAsync(int a, int b)"));
+    }
+
+    #[test]
     fn renders_default_values_for_public_dart_apis() {
         let callable_args = vec![
             UdlArg {

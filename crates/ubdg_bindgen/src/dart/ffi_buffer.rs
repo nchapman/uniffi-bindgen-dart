@@ -47,10 +47,7 @@ pub(super) fn is_ffibuffer_eligible_function(function: &UdlFunction) -> bool {
 pub(super) fn is_runtime_unsupported_async_ffibuffer_eligible_function(
     function: &UdlFunction,
 ) -> bool {
-    if function.runtime_unsupported.is_none()
-        || !function.is_async
-        || function.throws_type.is_some()
-        || function.ffi_symbol.is_none()
+    if function.runtime_unsupported.is_none() || !function.is_async || function.ffi_symbol.is_none()
     {
         return false;
     }
@@ -147,11 +144,7 @@ pub(super) fn is_ffibuffer_eligible_object_constructor(ctor: &UdlObjectConstruct
 pub(super) fn is_runtime_unsupported_async_ffibuffer_eligible_method(
     method: &UdlObjectMethod,
 ) -> bool {
-    if method.runtime_unsupported.is_none()
-        || !method.is_async
-        || method.throws_type.is_some()
-        || method.ffi_symbol.is_none()
-    {
+    if method.runtime_unsupported.is_none() || !method.is_async || method.ffi_symbol.is_none() {
         return false;
     }
     async_rust_future_spec_from_uniffi_return_type(method.return_type.as_ref()).is_some()
@@ -409,6 +402,7 @@ pub(super) fn render_ffibuffer_async_complete_and_decode(
     free_field: &str,
     async_spec: &AsyncRustFutureSpec,
     return_type: Option<&Type>,
+    throws_type: Option<&Type>,
     error_name: &str,
     local_module_path: &str,
     objects: &[UdlObject],
@@ -548,6 +542,30 @@ pub(super) fn render_ffibuffer_async_complete_and_decode(
     out.push_str(
         "            final Uint8List errorBytes = errorBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(errorBufPtr.ref.data.asTypedList(errorBufPtr.ref.len));\n",
     );
+    if let Some(throws_type) = throws_type {
+        if let Some(throws_name) = throws_name_from_type(throws_type).map(to_upper_camel) {
+            out.push_str(
+                "            if (completeStatusCode == _uniFfiRustCallStatusError && errorBytes.isNotEmpty) {\n",
+            );
+            if is_throws_object_type(throws_type) {
+                out.push_str(
+                    "              final ByteData _errBd = ByteData.sublistView(errorBytes);\n",
+                );
+                out.push_str(
+                    "              final int _errHandle = _errBd.getUint64(0, Endian.little);\n",
+                );
+                out.push_str(&format!(
+                    "              throw {throws_name}._(this, _errHandle);\n"
+                ));
+            } else {
+                let exception_name = format!("{throws_name}Exception");
+                out.push_str(&format!(
+                    "              throw _uniffiLift{exception_name}(errorBytes);\n"
+                ));
+            }
+            out.push_str("            }\n");
+        }
+    }
     out.push_str("            if (errorBytes.isNotEmpty) {\n");
     out.push_str(
         "              throw StateError(utf8.decode(errorBytes, allowMalformed: true));\n",
