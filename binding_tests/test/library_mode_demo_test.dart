@@ -104,7 +104,7 @@ void main() {
       final c = Counter.create(42);
       expect(await c.asyncGet(), 42);
       c.close();
-    }, skip: 'async object methods require rust-future polling (not yet implemented)');
+    });
 
     test('Counter throws after close', () {
       final c = Counter.create(0);

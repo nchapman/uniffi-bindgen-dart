@@ -141,7 +141,7 @@ fn render_dart_scaffold(ctx: &RenderContext<'_>) -> String {
             callback_interfaces,
             records,
             enums,
-        ) || has_runtime_unsupported_async_ffibuffer_support(functions, records, enums);
+        ) || has_runtime_unsupported_async_ffibuffer_support(functions, objects, records, enums);
     let has_trait_callback_interfaces = objects.iter().any(|o| o.has_callback_interface);
     let needs_rust_call_status =
         needs_async_rust_future || needs_callback_runtime || has_trait_callback_interfaces;

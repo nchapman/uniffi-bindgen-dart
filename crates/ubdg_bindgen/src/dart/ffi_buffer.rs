@@ -159,12 +159,18 @@ pub(super) fn is_runtime_unsupported_async_ffibuffer_eligible_method(
 
 pub(super) fn has_runtime_unsupported_async_ffibuffer_support(
     functions: &[UdlFunction],
+    objects: &[UdlObject],
     records: &[UdlRecord],
     enums: &[UdlEnum],
 ) -> bool {
     functions
         .iter()
         .any(is_runtime_unsupported_async_ffibuffer_eligible_function)
+        || objects.iter().any(|o| {
+            o.methods
+                .iter()
+                .any(is_runtime_unsupported_async_ffibuffer_eligible_method)
+        })
         || records.iter().any(|r| {
             r.methods
                 .iter()
