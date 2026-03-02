@@ -497,6 +497,16 @@ class LibraryModeDemoFfi {
     if (_checksum_uniffi_uniffi_library_mode_demo_checksum_func_divide != 55250) {
       throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_func_divide`: expected 55250, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_func_divide');
     }
+    final int _checksum_uniffi_uniffi_library_mode_demo_checksum_func_divide_async;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_uniffi_library_mode_demo_checksum_func_divide_async');
+      _checksum_uniffi_uniffi_library_mode_demo_checksum_func_divide_async = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_uniffi_library_mode_demo_checksum_func_divide_async`: $err');
+    }
+    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_func_divide_async != 15218) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_func_divide_async`: expected 15218, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_func_divide_async');
+    }
     final int _checksum_uniffi_uniffi_library_mode_demo_checksum_func_echo_label;
     try {
       final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_uniffi_library_mode_demo_checksum_func_echo_label');
@@ -566,6 +576,16 @@ class LibraryModeDemoFfi {
     }
     if (_checksum_uniffi_uniffi_library_mode_demo_checksum_func_maybe_greet != 46882) {
       throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_func_maybe_greet`: expected 46882, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_func_maybe_greet');
+    }
+    final int _checksum_uniffi_uniffi_library_mode_demo_checksum_method_counter_async_divide;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_uniffi_library_mode_demo_checksum_method_counter_async_divide');
+      _checksum_uniffi_uniffi_library_mode_demo_checksum_method_counter_async_divide = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_uniffi_library_mode_demo_checksum_method_counter_async_divide`: $err');
+    }
+    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_method_counter_async_divide != 27466) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_method_counter_async_divide`: expected 27466, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_method_counter_async_divide');
     }
     final int _checksum_uniffi_uniffi_library_mode_demo_checksum_method_counter_async_get;
     try {
@@ -728,6 +748,117 @@ class LibraryModeDemoFfi {
         throw StateError('UniFFI ffibuffer call failed with status $statusCode');
       }
       return (returnBuf + 0).ref.u32;
+    } finally {
+      for (final ptr in foreignArgPtrs) {
+        if (ptr != ffi.nullptr) {
+          calloc.free(ptr);
+        }
+      }
+      for (final bufPtr in rustRetBufferPtrs) {
+        if (bufPtr.ref.data == ffi.nullptr && bufPtr.ref.len == 0 && bufPtr.ref.capacity == 0) {
+          continue;
+        }
+        final ffi.Pointer<_UniFfiRustCallStatus> freeStatusPtr = calloc<_UniFfiRustCallStatus>();
+        freeStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
+        freeStatusPtr.ref.errorBuf
+          ..capacity = 0
+          ..len = 0
+          ..data = ffi.nullptr;
+        _uniFfiRustBufferFree(bufPtr.ref, freeStatusPtr);
+        calloc.free(freeStatusPtr);
+        calloc.free(bufPtr);
+      }
+      calloc.free(argBuf);
+      calloc.free(returnBuf);
+    }
+  }
+
+  late final void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr) _divideAsyncFfiBuffer = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr), void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)>('uniffi_ffibuffer_uniffi_library_mode_demo_fn_func_divide_async');
+  late final void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData) _divideAsyncFfiBufferRustFuturePoll = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, ffi.Uint64 callbackData), void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData)>('ffi_uniffi_library_mode_demo_rust_future_poll_u32');
+  late final void Function(int handle) _divideAsyncFfiBufferRustFutureCancel = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('ffi_uniffi_library_mode_demo_rust_future_cancel_u32');
+  late final int Function(int handle, ffi.Pointer<_UniFfiRustCallStatus> outStatus) _divideAsyncFfiBufferRustFutureComplete = _lib.lookupFunction<ffi.Uint32 Function(ffi.Uint64 handle, ffi.Pointer<_UniFfiRustCallStatus> outStatus), int Function(int handle, ffi.Pointer<_UniFfiRustCallStatus> outStatus)>('ffi_uniffi_library_mode_demo_rust_future_complete_u32');
+  late final void Function(int handle) _divideAsyncFfiBufferRustFutureFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('ffi_uniffi_library_mode_demo_rust_future_free_u32');
+
+  Future<int> divideAsync(int a, int b) async {
+    final ffi.Pointer<_UniFfiFfiBufferElement> argBuf = calloc<_UniFfiFfiBufferElement>(2);
+    final ffi.Pointer<_UniFfiFfiBufferElement> returnBuf = calloc<_UniFfiFfiBufferElement>(5);
+    final foreignArgPtrs = <ffi.Pointer<ffi.Uint8>>[];
+    final rustRetBufferPtrs = <ffi.Pointer<_UniFfiRustBuffer>>[];
+    try {
+      (argBuf + 0).ref.u32 = a;
+      (argBuf + 1).ref.u32 = b;
+      _divideAsyncFfiBuffer(argBuf, returnBuf);
+      final int statusCode = (returnBuf + 1).ref.i8;
+      if (statusCode != _uniFfiRustCallStatusSuccess) {
+        final ffi.Pointer<_UniFfiRustBuffer> errBufPtr = calloc<_UniFfiRustBuffer>();
+        errBufPtr.ref
+          ..capacity = (returnBuf + 2).ref.u64
+          ..len = (returnBuf + 3).ref.u64
+          ..data = (returnBuf + 4).ref.ptr.cast<ffi.Uint8>();
+        rustRetBufferPtrs.add(errBufPtr);
+        throw StateError('UniFFI ffibuffer async start failed with status $statusCode');
+      }
+      final int futureHandle = (returnBuf + 0).ref.u64;
+      final StreamController<int> pollEvents = StreamController<int>.broadcast();
+      final callback = ffi.NativeCallable<ffi.Void Function(ffi.Uint64, ffi.Int8)>.listener((int _, int pollResult) {
+        pollEvents.add(pollResult);
+      });
+      try {
+        _divideAsyncFfiBufferRustFuturePoll(futureHandle, callback.nativeFunction, 0);
+        while (true) {
+          final int pollResult = await pollEvents.stream.first;
+          if (pollResult == _rustFuturePollReady) {
+            break;
+          }
+          if (pollResult == _rustFuturePollWake) {
+            _divideAsyncFfiBufferRustFuturePoll(futureHandle, callback.nativeFunction, 0);
+            continue;
+          }
+          throw StateError('Rust future poll returned invalid status for divide_async: $pollResult');
+        }
+        final ffi.Pointer<_UniFfiRustCallStatus> outStatusPtr = calloc<_UniFfiRustCallStatus>();
+        outStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
+        outStatusPtr.ref.errorBuf
+          ..capacity = 0
+          ..len = 0
+          ..data = ffi.nullptr;
+        try {
+          final int resultValue = _divideAsyncFfiBufferRustFutureComplete(futureHandle, outStatusPtr);
+          final int completeStatusCode = outStatusPtr.ref.code;
+          if (completeStatusCode == _uniFfiRustCallStatusSuccess) {
+            return resultValue;
+          }
+          if (completeStatusCode == _uniFfiRustCallStatusCancelled) {
+            throw StateError('Rust future was cancelled for divide_async');
+          }
+          final _UniFfiRustBuffer errorBuf = outStatusPtr.ref.errorBuf;
+          if (!(errorBuf.data == ffi.nullptr && errorBuf.len == 0 && errorBuf.capacity == 0)) {
+            final ffi.Pointer<_UniFfiRustBuffer> errorBufPtr = calloc<_UniFfiRustBuffer>();
+            errorBufPtr.ref
+              ..capacity = errorBuf.capacity
+              ..len = errorBuf.len
+              ..data = errorBuf.data;
+            rustRetBufferPtrs.add(errorBufPtr);
+            final Uint8List errorBytes = errorBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(errorBufPtr.ref.data.asTypedList(errorBufPtr.ref.len));
+            if (completeStatusCode == _uniFfiRustCallStatusError && errorBytes.isNotEmpty) {
+              throw _uniffiLiftArithErrorException(errorBytes);
+            }
+            if (errorBytes.isNotEmpty) {
+              throw StateError(utf8.decode(errorBytes, allowMalformed: true));
+            }
+          }
+          throw StateError('Rust future failed for divide_async with status code: $completeStatusCode');
+        } finally {
+          calloc.free(outStatusPtr);
+        }
+      } catch (_) {
+        _divideAsyncFfiBufferRustFutureCancel(futureHandle);
+        rethrow;
+      } finally {
+        await pollEvents.close();
+        callback.close();
+        _divideAsyncFfiBufferRustFutureFree(futureHandle);
+      }
     } finally {
       for (final ptr in foreignArgPtrs) {
         if (ptr != ffi.nullptr) {
@@ -1463,6 +1594,134 @@ class LibraryModeDemoFfi {
     }
   }
 
+  late final void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr) _counterAsyncDivideFfiBuffer = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr), void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)>('uniffi_ffibuffer_uniffi_library_mode_demo_fn_method_counter_async_divide');
+  late final void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData) _counterAsyncDivideFfiBufferRustFuturePoll = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, ffi.Uint64 callbackData), void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData)>('ffi_uniffi_library_mode_demo_rust_future_poll_i32');
+  late final void Function(int handle) _counterAsyncDivideFfiBufferRustFutureCancel = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('ffi_uniffi_library_mode_demo_rust_future_cancel_i32');
+  late final int Function(int handle, ffi.Pointer<_UniFfiRustCallStatus> outStatus) _counterAsyncDivideFfiBufferRustFutureComplete = _lib.lookupFunction<ffi.Int32 Function(ffi.Uint64 handle, ffi.Pointer<_UniFfiRustCallStatus> outStatus), int Function(int handle, ffi.Pointer<_UniFfiRustCallStatus> outStatus)>('ffi_uniffi_library_mode_demo_rust_future_complete_i32');
+  late final void Function(int handle) _counterAsyncDivideFfiBufferRustFutureFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('ffi_uniffi_library_mode_demo_rust_future_free_i32');
+
+  Future<int> counterInvokeAsyncDivide(int handle, int divisor) async {
+    final ffi.Pointer<_UniFfiFfiBufferElement> argBuf = calloc<_UniFfiFfiBufferElement>(2);
+    final ffi.Pointer<_UniFfiFfiBufferElement> returnBuf = calloc<_UniFfiFfiBufferElement>(5);
+    final foreignArgPtrs = <ffi.Pointer<ffi.Uint8>>[];
+    final rustRetBufferPtrs = <ffi.Pointer<_UniFfiRustBuffer>>[];
+    try {
+      final int clonedHandle;
+      {
+        final cloneStatusPtr = calloc<_UniFfiRustCallStatus>();
+        try {
+          cloneStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
+          cloneStatusPtr.ref.errorBuf
+            ..capacity = 0
+            ..len = 0
+            ..data = ffi.nullptr;
+          clonedHandle = _counterClone(handle, cloneStatusPtr);
+          if (cloneStatusPtr.ref.code != _uniFfiRustCallStatusSuccess) {
+            throw StateError('UniFFI clone failed with status ${cloneStatusPtr.ref.code}');
+          }
+        } finally {
+          calloc.free(cloneStatusPtr);
+        }
+      }
+      (argBuf + 0).ref.u64 = clonedHandle;
+      (argBuf + 1).ref.i32 = divisor;
+      _counterAsyncDivideFfiBuffer(argBuf, returnBuf);
+      final int statusCode = (returnBuf + 1).ref.i8;
+      if (statusCode != _uniFfiRustCallStatusSuccess) {
+        final ffi.Pointer<_UniFfiRustBuffer> errBufPtr = calloc<_UniFfiRustBuffer>();
+        errBufPtr.ref
+          ..capacity = (returnBuf + 2).ref.u64
+          ..len = (returnBuf + 3).ref.u64
+          ..data = (returnBuf + 4).ref.ptr.cast<ffi.Uint8>();
+        rustRetBufferPtrs.add(errBufPtr);
+        throw StateError('UniFFI ffibuffer async start failed with status $statusCode');
+      }
+      final int futureHandle = (returnBuf + 0).ref.u64;
+      final StreamController<int> pollEvents = StreamController<int>.broadcast();
+      final callback = ffi.NativeCallable<ffi.Void Function(ffi.Uint64, ffi.Int8)>.listener((int _, int pollResult) {
+        pollEvents.add(pollResult);
+      });
+      try {
+        _counterAsyncDivideFfiBufferRustFuturePoll(futureHandle, callback.nativeFunction, 0);
+        while (true) {
+          final int pollResult = await pollEvents.stream.first;
+          if (pollResult == _rustFuturePollReady) {
+            break;
+          }
+          if (pollResult == _rustFuturePollWake) {
+            _counterAsyncDivideFfiBufferRustFuturePoll(futureHandle, callback.nativeFunction, 0);
+            continue;
+          }
+          throw StateError('Rust future poll returned invalid status for async_divide: $pollResult');
+        }
+        final ffi.Pointer<_UniFfiRustCallStatus> outStatusPtr = calloc<_UniFfiRustCallStatus>();
+        outStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
+        outStatusPtr.ref.errorBuf
+          ..capacity = 0
+          ..len = 0
+          ..data = ffi.nullptr;
+        try {
+          final int resultValue = _counterAsyncDivideFfiBufferRustFutureComplete(futureHandle, outStatusPtr);
+          final int completeStatusCode = outStatusPtr.ref.code;
+          if (completeStatusCode == _uniFfiRustCallStatusSuccess) {
+            return resultValue;
+          }
+          if (completeStatusCode == _uniFfiRustCallStatusCancelled) {
+            throw StateError('Rust future was cancelled for async_divide');
+          }
+          final _UniFfiRustBuffer errorBuf = outStatusPtr.ref.errorBuf;
+          if (!(errorBuf.data == ffi.nullptr && errorBuf.len == 0 && errorBuf.capacity == 0)) {
+            final ffi.Pointer<_UniFfiRustBuffer> errorBufPtr = calloc<_UniFfiRustBuffer>();
+            errorBufPtr.ref
+              ..capacity = errorBuf.capacity
+              ..len = errorBuf.len
+              ..data = errorBuf.data;
+            rustRetBufferPtrs.add(errorBufPtr);
+            final Uint8List errorBytes = errorBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(errorBufPtr.ref.data.asTypedList(errorBufPtr.ref.len));
+            if (completeStatusCode == _uniFfiRustCallStatusError && errorBytes.isNotEmpty) {
+              throw _uniffiLiftArithErrorException(errorBytes);
+            }
+            if (errorBytes.isNotEmpty) {
+              throw StateError(utf8.decode(errorBytes, allowMalformed: true));
+            }
+          }
+          throw StateError('Rust future failed for async_divide with status code: $completeStatusCode');
+        } finally {
+          calloc.free(outStatusPtr);
+        }
+      } catch (_) {
+        _counterAsyncDivideFfiBufferRustFutureCancel(futureHandle);
+        rethrow;
+      } finally {
+        await pollEvents.close();
+        callback.close();
+        _counterAsyncDivideFfiBufferRustFutureFree(futureHandle);
+      }
+    } finally {
+      for (final ptr in foreignArgPtrs) {
+        if (ptr != ffi.nullptr) {
+          calloc.free(ptr);
+        }
+      }
+      for (final bufPtr in rustRetBufferPtrs) {
+        if (bufPtr.ref.data == ffi.nullptr && bufPtr.ref.len == 0 && bufPtr.ref.capacity == 0) {
+          continue;
+        }
+        final ffi.Pointer<_UniFfiRustCallStatus> freeStatusPtr = calloc<_UniFfiRustCallStatus>();
+        freeStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
+        freeStatusPtr.ref.errorBuf
+          ..capacity = 0
+          ..len = 0
+          ..data = ffi.nullptr;
+        _uniFfiRustBufferFree(bufPtr.ref, freeStatusPtr);
+        calloc.free(freeStatusPtr);
+        calloc.free(bufPtr);
+      }
+      calloc.free(argBuf);
+      calloc.free(returnBuf);
+    }
+  }
+
   late final void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr) _counterAsyncGetFfiBuffer = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr), void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)>('uniffi_ffibuffer_uniffi_library_mode_demo_fn_method_counter_async_get');
   late final void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData) _counterAsyncGetFfiBufferRustFuturePoll = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, ffi.Uint64 callbackData), void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData)>('ffi_uniffi_library_mode_demo_rust_future_poll_i32');
   late final void Function(int handle) _counterAsyncGetFfiBufferRustFutureCancel = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('ffi_uniffi_library_mode_demo_rust_future_cancel_i32');
@@ -1754,6 +2013,11 @@ final class Counter {
     return _bindings().counterCreateNew(initial);
   }
 
+  Future<int> asyncDivide(int divisor) {
+    _ensureOpen();
+    return _ffi.counterInvokeAsyncDivide(_handle, divisor);
+  }
+
   Future<int> asyncGet() {
     _ensureOpen();
     return _ffi.counterInvokeAsyncGet(_handle);
@@ -1797,6 +2061,10 @@ String describeShape(Shape shape) {
 
 int divide(int a, int b) {
   return _bindings().divide(a, b);
+}
+
+Future<int> divideAsync(int a, int b) {
+  return _bindings().divideAsync(a, b);
 }
 
 String echoLabel(String label) {

@@ -59,6 +59,14 @@ impl Counter {
     async fn async_get(&self) -> i32 {
         self.value.load(Ordering::SeqCst)
     }
+
+    #[uniffi::method(async_runtime = "tokio")]
+    async fn async_divide(&self, divisor: i32) -> Result<i32, ArithError> {
+        if divisor == 0 {
+            return Err(ArithError::DivisionByZero);
+        }
+        Ok(self.value.load(Ordering::SeqCst) / divisor)
+    }
 }
 
 // ── Top-level functions ────────────────────────────────────────────────────
@@ -107,6 +115,14 @@ fn describe_shape(shape: Shape) -> String {
         Shape::Circle { radius } => format!("circle(r={radius})"),
         Shape::Rect { w, h } => format!("rect({w}x{h})"),
     }
+}
+
+#[uniffi::export(async_runtime = "tokio")]
+async fn divide_async(a: u32, b: u32) -> Result<u32, ArithError> {
+    if b == 0 {
+        return Err(ArithError::DivisionByZero);
+    }
+    Ok(a / b)
 }
 
 #[uniffi::export]

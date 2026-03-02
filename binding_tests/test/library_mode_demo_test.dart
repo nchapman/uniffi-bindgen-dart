@@ -40,6 +40,17 @@ void main() {
       );
     });
 
+    test('divideAsync returns quotient', () async {
+      expect(await divideAsync(10, 3), 3);
+    });
+
+    test('divideAsync throws on zero', () async {
+      expect(
+        () => divideAsync(10, 0),
+        throwsA(isA<ArithErrorExceptionDivisionByZero>()),
+      );
+    });
+
     test('echoStrings round-trips list', () {
       expect(echoStrings(['a', 'b', 'c']), ['a', 'b', 'c']);
     });
@@ -103,6 +114,21 @@ void main() {
     test('Counter asyncGet', () async {
       final c = Counter.create(42);
       expect(await c.asyncGet(), 42);
+      c.close();
+    });
+
+    test('Counter asyncDivide returns quotient', () async {
+      final c = Counter.create(42);
+      expect(await c.asyncDivide(7), 6);
+      c.close();
+    });
+
+    test('Counter asyncDivide throws on zero', () async {
+      final c = Counter.create(42);
+      expect(
+        () => c.asyncDivide(0),
+        throwsA(isA<ArithErrorExceptionDivisionByZero>()),
+      );
       c.close();
     });
 
