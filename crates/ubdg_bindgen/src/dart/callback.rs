@@ -698,6 +698,8 @@ pub(super) fn is_runtime_callback_method_type_compatible(
     is_runtime_callback_function_return_compatible_type(type_)
         || is_runtime_string_type(type_)
         || is_runtime_optional_string_type(type_)
+        || is_runtime_object_type(type_)
+        || is_runtime_optional_object_type(type_)
         || records
             .iter()
             .any(|r| record_name_from_type(type_) == Some(r.name.as_str()))
@@ -784,6 +786,10 @@ pub(super) fn render_callback_async_result_return_field(
         Type::Enum { .. } if is_runtime_enum_type(type_, enums) => {
             Some("  external ffi.Pointer<Utf8> returnValue;\n\n".to_string())
         }
+        Type::Object { .. } => Some("  @ffi.Uint64()\n  external int returnValue;\n\n".to_string()),
+        Type::Optional { inner_type } if is_runtime_object_type(inner_type) => {
+            Some("  @ffi.Uint64()\n  external int returnValue;\n\n".to_string())
+        }
         Type::Sequence { .. } if is_runtime_sequence_json_type(type_) => {
             Some("  external ffi.Pointer<Utf8> returnValue;\n\n".to_string())
         }
@@ -810,6 +816,8 @@ pub(super) fn callback_async_default_return_expr(
             "ffi.nullptr"
         }
         Type::Enum { .. } if is_runtime_enum_type(type_, enums) => "ffi.nullptr",
+        Type::Object { .. } => "0",
+        Type::Optional { inner_type } if is_runtime_object_type(inner_type) => "0",
         Type::Sequence { .. } if is_runtime_sequence_json_type(type_) => "ffi.nullptr",
         Type::Bytes => "ffi.nullptr",
         _ => "0",
@@ -851,6 +859,20 @@ pub(super) fn render_callback_arg_decode_expr(
             let inner_decode = render_json_decode_expr("item", inner_type);
             format!(
                 "{arg_name} == ffi.nullptr ? (throw StateError('Rust passed null sequence callback arg')) : (jsonDecode({arg_name}.toDartString()) as List).map((item) => {inner_decode}).toList()"
+            )
+        }
+        Type::Object { name, .. } => {
+            format!(
+                "{}FfiCodec.lift({arg_name})",
+                to_upper_camel(name)
+            )
+        }
+        Type::Optional { inner_type } if is_runtime_object_type(inner_type) => {
+            let name = object_name_from_type(inner_type)
+                .expect("is_runtime_object_type guarantees Object inner");
+            format!(
+                "{arg_name} == 0 ? null : {}FfiCodec.lift({arg_name})",
+                to_upper_camel(name)
             )
         }
         Type::Bytes => {
@@ -896,6 +918,17 @@ pub(super) fn render_callback_return_encode_expr(
             let inner_encode = render_json_encode_expr("item", inner_type);
             format!(
                 "jsonEncode({value_expr}.map((item) => {inner_encode}).toList()).toNativeUtf8()"
+            )
+        }
+        Type::Object { name, .. } => {
+            format!("{}FfiCodec.lower({value_expr})", to_upper_camel(name))
+        }
+        Type::Optional { inner_type } if is_runtime_object_type(inner_type) => {
+            let name = object_name_from_type(inner_type)
+                .expect("is_runtime_object_type guarantees Object inner");
+            format!(
+                "{value_expr} == null ? 0 : {}FfiCodec.lower({value_expr})",
+                to_upper_camel(name)
             )
         }
         Type::Bytes => {

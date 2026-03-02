@@ -58,6 +58,20 @@ namespace coverall_demo {
 
   /// Return an optional boolean based on a flag.
   boolean? get_maybe_flag(boolean return_value);
+
+  /// Throw a CoverallFlatError.
+  [Throws=CoverallFlatError]
+  void throw_flat_error();
+
+  /// Validate HTML source; throws HTMLError on invalid input.
+  [Throws=HTMLError]
+  void validate_html(string source);
+
+  /// Return a ReturnOnlyDict (tests return-only record type).
+  ReturnOnlyDict output_return_only_dict();
+
+  /// Return a ReturnOnlyEnum (tests return-only enum type).
+  ReturnOnlyEnum output_return_only_enum();
 };
 
 /// Simple three-variant flat enum.
@@ -74,6 +88,13 @@ interface MaybeSimpleDict {
   Nah();
 };
 
+/// Enum wrapping an object — tests object in data enum variant.
+[Enum]
+interface MaybeObject {
+  Obj(Patch p);
+  Nah();
+};
+
 /// Primary test record with a rich set of field types.
 dictionary SimpleDict {
   string text;
@@ -84,6 +105,49 @@ dictionary SimpleDict {
   record<string, u64> counts;
   string? maybe_text;
   Patch? maybe_patch;
+  u8? maybe_u8;
+  u16? maybe_u16;
+  u64? maybe_u64;
+  i8? maybe_i8;
+  i64? maybe_i64;
+  f32? maybe_f32;
+  f64? maybe_f64;
+  boolean? maybe_bool;
+  bytes? maybe_bytes;
+  bytes some_bytes;
+  Coveralls? coveralls;
+};
+
+/// Empty record — tests zero-field record generation.
+dictionary EmptyStruct {};
+
+/// Record with default values — tests default field generation.
+dictionary DictWithDefaults {
+  string name = "default-value";
+  string? category = null;
+  i64 integer = 31;
+  sequence<string> item_list = [];
+  record<string, string> item_map = {};
+};
+
+/// Record with an object field — tests object-in-record via JSON codec.
+dictionary Repair {
+  timestamp when;
+  Patch patch;
+};
+
+/// Return-only record type with an error enum as a field.
+dictionary ReturnOnlyDict {
+  CoverallFlatError e;
+};
+
+/// Return-only enum with nested error and record types.
+[Enum]
+interface ReturnOnlyEnum {
+  One(CoverallFlatError e);
+  Two(ReturnOnlyDict d);
+  Three(sequence<CoverallFlatError> l);
+  Four(record<string, CoverallFlatError> m);
 };
 
 /// A simple object that wraps a Color.
@@ -92,9 +156,11 @@ interface Patch {
   Color get_color();
 };
 
-/// Object with fallible constructor only — no default constructor.
+/// Object with fallible constructors — tests error on construction.
 interface FalliblePatch {
   [Throws=CoverallError]
+  constructor(Color color, boolean should_fail);
+  [Throws=CoverallError, Name="secondary"]
   constructor(Color color, boolean should_fail);
   Color get_color();
 };
@@ -109,6 +175,27 @@ interface Coveralls {
   string get_name();
   void set_name(string name);
 
+  /// Simple pass-through returning the status string.
+  string get_status(string status);
+
+  /// Return a string-keyed map.
+  record<string, u64> get_dict2(string key, u64 value);
+
+  /// Return a non-string-keyed map.
+  record<u32, u64> get_dict3(u32 key, u64 value);
+
+  /// Add a patch to this coveralls.
+  void add_patch(Patch patch);
+
+  /// Add a repair record.
+  void add_repair(Repair repair);
+
+  /// Return all stored repairs.
+  sequence<Repair> get_repairs();
+
+  /// Empty record round-trip.
+  EmptyStruct set_and_get_empty_struct(EmptyStruct empty_struct);
+
   /// Take another Coveralls, creating a reference chain.
   void take_other(Coveralls? other);
   Coveralls? get_other();
@@ -122,6 +209,10 @@ interface Coveralls {
   /// Method that always throws a simple error.
   [Throws=CoverallError]
   boolean maybe_throw(boolean should_throw);
+
+  /// Another throws variant — returns boolean.
+  [Throws=CoverallError]
+  boolean maybe_throw_into(boolean should_throw);
 
   /// Method that throws a complex (rich) error.
   [Throws=ComplexError]
@@ -144,10 +235,33 @@ interface ThreadsafeCounter {
   u64 get_count();
 };
 
+/// Forward-reference test: IFirst refers to ISecond and vice versa.
+interface IFirst {
+  constructor();
+  boolean compare(optional ISecond? other = null);
+};
+
+interface ISecond {
+  constructor();
+  boolean compare(IFirst? other);
+};
+
 /// Simple flat error (single tag discriminator).
 [Error]
 enum CoverallError {
   "TooManyHoles",
+};
+
+/// Flat error with case-testing variant names.
+[Error]
+enum CoverallFlatError {
+  "TooManyVariants",
+};
+
+/// Flat error with non-standard casing.
+[Error]
+enum HTMLError {
+  "InvalidHTML",
 };
 
 /// Rich error with structured variant data.
@@ -167,6 +281,7 @@ callback interface Getters {
   string? get_option(string v, boolean arg2);
   sequence<i32> get_list(sequence<i32> v, boolean arg2);
   void get_nothing(string v);
+  Coveralls round_trip_object(Coveralls coveralls);
 };
 
 /// Callback interface for tree-like trait object graphs.

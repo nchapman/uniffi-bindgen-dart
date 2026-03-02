@@ -32,6 +32,9 @@ pub(super) fn render_json_encode_expr(value_expr: &str, type_: &Type) -> String 
         }
         Type::Custom { builtin, .. } => render_json_encode_expr(value_expr, builtin),
         Type::Record { .. } => format!("{value_expr}.toJson()"),
+        Type::Object { name, .. } => {
+            format!("{}FfiCodec.lower({value_expr})", to_upper_camel(name))
+        }
         Type::Enum { name, .. } => {
             format!("{}FfiCodec.encode({value_expr})", to_upper_camel(name))
         }

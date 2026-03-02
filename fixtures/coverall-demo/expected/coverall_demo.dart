@@ -25,6 +25,140 @@ const int _rustCallStatusSuccess = 0;
 const int _rustCallStatusError = 1;
 const int _rustCallStatusUnexpectedError = 2;
 const int _rustCallStatusCancelled = 3;
+/// Record with default values — tests default field generation.
+class DictWithDefaults {
+  const DictWithDefaults({
+    this.name = 'default-value',
+    this.category = null,
+    this.integer = 31,
+    this.itemList = const [],
+    this.itemMap = const {},
+  });
+
+  final String name;
+  final String? category;
+  final int integer;
+  final List<String> itemList;
+  final Map<String, String> itemMap;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'name': this.name,
+      'category': this.category == null ? null : (() { final __tmp = this.category; return __tmp; })(),
+      'integer': this.integer,
+      'itemList': this.itemList.map((item) => item).toList(),
+      'itemMap': this.itemMap.map((key, value) => MapEntry(key, value)),
+    };
+  }
+
+  static DictWithDefaults fromJson(Map<String, dynamic> json) {
+    return DictWithDefaults(
+      name: json.containsKey('name') ? json['name'] as String : 'default-value',
+      category: json.containsKey('category') ? json['category'] == null ? null : (() { final __tmp = json['category']; return __tmp as String; })() : null,
+      integer: json.containsKey('integer') ? (json['integer'] as num).toInt() : 31,
+      itemList: json.containsKey('itemList') ? (json['itemList'] as List).map((item) => item as String).toList() : const [],
+      itemMap: json.containsKey('itemMap') ? (json['itemMap'] as Map<String, dynamic>).map((key, value) => MapEntry(key, value as String)) : const {},
+    );
+  }
+
+  DictWithDefaults copyWith({
+    String? name,
+    String? category,
+    int? integer,
+    List<String>? itemList,
+    Map<String, String>? itemMap,
+  }) {
+    return DictWithDefaults(
+      name: name ?? this.name,
+      category: category ?? this.category,
+      integer: integer ?? this.integer,
+      itemList: itemList ?? this.itemList,
+      itemMap: itemMap ?? this.itemMap,
+    );
+  }
+}
+
+/// Empty record — tests zero-field record generation.
+class EmptyStruct {
+  const EmptyStruct({
+  });
+
+
+  Map<String, dynamic> toJson() {
+    return {
+    };
+  }
+
+  static EmptyStruct fromJson(Map<String, dynamic> json) {
+    return EmptyStruct(
+    );
+  }
+}
+
+/// Record with an object field — tests object-in-record via JSON codec.
+class Repair {
+  const Repair({
+    required this.when_,
+    required this.patch,
+  });
+
+  final DateTime when_;
+  final Patch patch;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'when_': this.when_.toUtc().microsecondsSinceEpoch,
+      'patch': PatchFfiCodec.lower(this.patch),
+    };
+  }
+
+  static Repair fromJson(Map<String, dynamic> json) {
+    return Repair(
+      when_: DateTime.fromMicrosecondsSinceEpoch((json['when_'] as num).toInt(), isUtc: true),
+      patch: PatchFfiCodec.lift((json['patch'] as num).toInt()),
+    );
+  }
+
+  Repair copyWith({
+    DateTime? when_,
+    Patch? patch,
+  }) {
+    return Repair(
+      when_: when_ ?? this.when_,
+      patch: patch ?? this.patch,
+    );
+  }
+}
+
+/// Return-only record type with an error enum as a field.
+class ReturnOnlyDict {
+  const ReturnOnlyDict({
+    required this.e,
+  });
+
+  final CoverallFlatError e;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'e': CoverallFlatErrorFfiCodec.encode(this.e),
+    };
+  }
+
+  static ReturnOnlyDict fromJson(Map<String, dynamic> json) {
+    return ReturnOnlyDict(
+      e: CoverallFlatErrorFfiCodec.decode(json['e'] as String),
+    );
+  }
+
+  ReturnOnlyDict copyWith({
+    CoverallFlatError? e,
+  }) {
+    return ReturnOnlyDict(
+      e: e ?? this.e,
+    );
+  }
+}
+
 /// Primary test record with a rich set of field types.
 class SimpleDict {
   const SimpleDict({
@@ -36,6 +170,17 @@ class SimpleDict {
     required this.counts,
     required this.maybeText,
     required this.maybePatch,
+    required this.maybeU8,
+    required this.maybeU16,
+    required this.maybeU64,
+    required this.maybeI8,
+    required this.maybeI64,
+    required this.maybeF32,
+    required this.maybeF64,
+    required this.maybeBool,
+    required this.maybeBytes,
+    required this.someBytes,
+    required this.coveralls,
   });
 
   final String text;
@@ -46,6 +191,17 @@ class SimpleDict {
   final Map<String, int> counts;
   final String? maybeText;
   final Patch? maybePatch;
+  final int? maybeU8;
+  final int? maybeU16;
+  final int? maybeU64;
+  final int? maybeI8;
+  final int? maybeI64;
+  final double? maybeF32;
+  final double? maybeF64;
+  final bool? maybeBool;
+  final Uint8List? maybeBytes;
+  final Uint8List someBytes;
+  final Coveralls? coveralls;
 
   Map<String, dynamic> toJson() {
     return {
@@ -56,7 +212,18 @@ class SimpleDict {
       'tags': this.tags.map((item) => item).toList(),
       'counts': this.counts.map((key, value) => MapEntry(key, value)),
       'maybeText': this.maybeText == null ? null : (() { final __tmp = this.maybeText; return __tmp; })(),
-      'maybePatch': this.maybePatch == null ? null : (() { final __tmp = this.maybePatch; return __tmp; })(),
+      'maybePatch': this.maybePatch == null ? null : (() { final __tmp = this.maybePatch; return PatchFfiCodec.lower(__tmp); })(),
+      'maybeU8': this.maybeU8 == null ? null : (() { final __tmp = this.maybeU8; return __tmp; })(),
+      'maybeU16': this.maybeU16 == null ? null : (() { final __tmp = this.maybeU16; return __tmp; })(),
+      'maybeU64': this.maybeU64 == null ? null : (() { final __tmp = this.maybeU64; return __tmp; })(),
+      'maybeI8': this.maybeI8 == null ? null : (() { final __tmp = this.maybeI8; return __tmp; })(),
+      'maybeI64': this.maybeI64 == null ? null : (() { final __tmp = this.maybeI64; return __tmp; })(),
+      'maybeF32': this.maybeF32 == null ? null : (() { final __tmp = this.maybeF32; return __tmp; })(),
+      'maybeF64': this.maybeF64 == null ? null : (() { final __tmp = this.maybeF64; return __tmp; })(),
+      'maybeBool': this.maybeBool == null ? null : (() { final __tmp = this.maybeBool; return __tmp; })(),
+      'maybeBytes': this.maybeBytes == null ? null : (() { final __tmp = this.maybeBytes; return base64Encode(__tmp); })(),
+      'someBytes': base64Encode(this.someBytes),
+      'coveralls': this.coveralls == null ? null : (() { final __tmp = this.coveralls; return CoverallsFfiCodec.lower(__tmp); })(),
     };
   }
 
@@ -70,6 +237,17 @@ class SimpleDict {
       counts: (json['counts'] as Map<String, dynamic>).map((key, value) => MapEntry(key, (value as num).toInt())),
       maybeText: json['maybeText'] == null ? null : (() { final __tmp = json['maybeText']; return __tmp as String; })(),
       maybePatch: json['maybePatch'] == null ? null : (() { final __tmp = json['maybePatch']; return PatchFfiCodec.lift((__tmp as num).toInt()); })(),
+      maybeU8: json['maybeU8'] == null ? null : (() { final __tmp = json['maybeU8']; return (__tmp as num).toInt(); })(),
+      maybeU16: json['maybeU16'] == null ? null : (() { final __tmp = json['maybeU16']; return (__tmp as num).toInt(); })(),
+      maybeU64: json['maybeU64'] == null ? null : (() { final __tmp = json['maybeU64']; return (__tmp as num).toInt(); })(),
+      maybeI8: json['maybeI8'] == null ? null : (() { final __tmp = json['maybeI8']; return (__tmp as num).toInt(); })(),
+      maybeI64: json['maybeI64'] == null ? null : (() { final __tmp = json['maybeI64']; return (__tmp as num).toInt(); })(),
+      maybeF32: json['maybeF32'] == null ? null : (() { final __tmp = json['maybeF32']; return (__tmp as num).toDouble(); })(),
+      maybeF64: json['maybeF64'] == null ? null : (() { final __tmp = json['maybeF64']; return (__tmp as num).toDouble(); })(),
+      maybeBool: json['maybeBool'] == null ? null : (() { final __tmp = json['maybeBool']; return __tmp as bool; })(),
+      maybeBytes: json['maybeBytes'] == null ? null : (() { final __tmp = json['maybeBytes']; return base64Decode(__tmp as String); })(),
+      someBytes: base64Decode(json['someBytes'] as String),
+      coveralls: json['coveralls'] == null ? null : (() { final __tmp = json['coveralls']; return CoverallsFfiCodec.lift((__tmp as num).toInt()); })(),
     );
   }
 
@@ -82,6 +260,17 @@ class SimpleDict {
     Map<String, int>? counts,
     String? maybeText,
     Patch? maybePatch,
+    int? maybeU8,
+    int? maybeU16,
+    int? maybeU64,
+    int? maybeI8,
+    int? maybeI64,
+    double? maybeF32,
+    double? maybeF64,
+    bool? maybeBool,
+    Uint8List? maybeBytes,
+    Uint8List? someBytes,
+    Coveralls? coveralls,
   }) {
     return SimpleDict(
       text: text ?? this.text,
@@ -92,6 +281,17 @@ class SimpleDict {
       counts: counts ?? this.counts,
       maybeText: maybeText ?? this.maybeText,
       maybePatch: maybePatch ?? this.maybePatch,
+      maybeU8: maybeU8 ?? this.maybeU8,
+      maybeU16: maybeU16 ?? this.maybeU16,
+      maybeU64: maybeU64 ?? this.maybeU64,
+      maybeI8: maybeI8 ?? this.maybeI8,
+      maybeI64: maybeI64 ?? this.maybeI64,
+      maybeF32: maybeF32 ?? this.maybeF32,
+      maybeF64: maybeF64 ?? this.maybeF64,
+      maybeBool: maybeBool ?? this.maybeBool,
+      maybeBytes: maybeBytes ?? this.maybeBytes,
+      someBytes: someBytes ?? this.someBytes,
+      coveralls: coveralls ?? this.coveralls,
     );
   }
 }
@@ -137,6 +337,40 @@ final class CoverallErrorTooManyHoles extends CoverallError {
   const CoverallErrorTooManyHoles();
 }
 
+/// Flat error with case-testing variant names.
+sealed class CoverallFlatError {
+  const CoverallFlatError();
+}
+
+final class CoverallFlatErrorTooManyVariants extends CoverallFlatError {
+  const CoverallFlatErrorTooManyVariants();
+}
+
+/// Flat error with non-standard casing.
+sealed class HTMLError {
+  const HTMLError();
+}
+
+final class HTMLErrorInvalidHTML extends HTMLError {
+  const HTMLErrorInvalidHTML();
+}
+
+/// Enum wrapping an object — tests object in data enum variant.
+sealed class MaybeObject {
+  const MaybeObject();
+}
+
+final class MaybeObjectObj extends MaybeObject {
+  const MaybeObjectObj({
+    required this.p,
+  });
+  final Patch p;
+}
+
+final class MaybeObjectNah extends MaybeObject {
+  const MaybeObjectNah();
+}
+
 /// Enum wrapping a record — tests enum-with-associated-data.
 sealed class MaybeSimpleDict {
   const MaybeSimpleDict();
@@ -151,6 +385,39 @@ final class MaybeSimpleDictYeah extends MaybeSimpleDict {
 
 final class MaybeSimpleDictNah extends MaybeSimpleDict {
   const MaybeSimpleDictNah();
+}
+
+/// Return-only enum with nested error and record types.
+sealed class ReturnOnlyEnum {
+  const ReturnOnlyEnum();
+}
+
+final class ReturnOnlyEnumOne extends ReturnOnlyEnum {
+  const ReturnOnlyEnumOne({
+    required this.e,
+  });
+  final CoverallFlatError e;
+}
+
+final class ReturnOnlyEnumTwo extends ReturnOnlyEnum {
+  const ReturnOnlyEnumTwo({
+    required this.d,
+  });
+  final ReturnOnlyDict d;
+}
+
+final class ReturnOnlyEnumThree extends ReturnOnlyEnum {
+  const ReturnOnlyEnumThree({
+    required this.l,
+  });
+  final List<CoverallFlatError> l;
+}
+
+final class ReturnOnlyEnumFour extends ReturnOnlyEnum {
+  const ReturnOnlyEnumFour({
+    required this.m,
+  });
+  final Map<String, CoverallFlatError> m;
 }
 
 /// Rich error with structured variant data.
@@ -185,6 +452,24 @@ sealed class CoverallErrorException implements Exception {
 
 final class CoverallErrorExceptionTooManyHoles extends CoverallErrorException {
   const CoverallErrorExceptionTooManyHoles();
+}
+
+/// Flat error with case-testing variant names.
+sealed class CoverallFlatErrorException implements Exception {
+  const CoverallFlatErrorException();
+}
+
+final class CoverallFlatErrorExceptionTooManyVariants extends CoverallFlatErrorException {
+  const CoverallFlatErrorExceptionTooManyVariants();
+}
+
+/// Flat error with non-standard casing.
+sealed class HTMLErrorException implements Exception {
+  const HTMLErrorException();
+}
+
+final class HTMLErrorExceptionInvalidHTML extends HTMLErrorException {
+  const HTMLErrorExceptionInvalidHTML();
 }
 
 String _encodeColor(Color value) {
@@ -272,6 +557,79 @@ CoverallError _decodeCoverallError(String raw) {
   }
 }
 
+String _encodeCoverallFlatError(CoverallFlatError value) {
+  if (value is CoverallFlatErrorTooManyVariants) {
+    return jsonEncode({
+      'tag': 'tooManyVariants',
+    });
+  }
+  throw StateError('Unknown CoverallFlatError variant instance: $value');
+}
+
+CoverallFlatError _decodeCoverallFlatError(String raw) {
+  final Map<String, dynamic> map = jsonDecode(raw) as Map<String, dynamic>;
+  final String? tag = map['tag'] as String?;
+  switch (tag) {
+    case 'tooManyVariants':
+      return CoverallFlatErrorTooManyVariants(
+      );
+    default:
+      throw StateError('Unknown CoverallFlatError variant tag: $tag');
+  }
+}
+
+String _encodeHTMLError(HTMLError value) {
+  if (value is HTMLErrorInvalidHTML) {
+    return jsonEncode({
+      'tag': 'invalidHTML',
+    });
+  }
+  throw StateError('Unknown HTMLError variant instance: $value');
+}
+
+HTMLError _decodeHTMLError(String raw) {
+  final Map<String, dynamic> map = jsonDecode(raw) as Map<String, dynamic>;
+  final String? tag = map['tag'] as String?;
+  switch (tag) {
+    case 'invalidHTML':
+      return HTMLErrorInvalidHTML(
+      );
+    default:
+      throw StateError('Unknown HTMLError variant tag: $tag');
+  }
+}
+
+String _encodeMaybeObject(MaybeObject value) {
+  if (value is MaybeObjectObj) {
+    return jsonEncode({
+      'tag': 'obj',
+      'p': PatchFfiCodec.lower(value.p),
+    });
+  }
+  if (value is MaybeObjectNah) {
+    return jsonEncode({
+      'tag': 'nah',
+    });
+  }
+  throw StateError('Unknown MaybeObject variant instance: $value');
+}
+
+MaybeObject _decodeMaybeObject(String raw) {
+  final Map<String, dynamic> map = jsonDecode(raw) as Map<String, dynamic>;
+  final String? tag = map['tag'] as String?;
+  switch (tag) {
+    case 'obj':
+      return MaybeObjectObj(
+        p: PatchFfiCodec.lift((map['p'] as num).toInt()),
+      );
+    case 'nah':
+      return MaybeObjectNah(
+      );
+    default:
+      throw StateError('Unknown MaybeObject variant tag: $tag');
+  }
+}
+
 String _encodeMaybeSimpleDict(MaybeSimpleDict value) {
   if (value is MaybeSimpleDictYeah) {
     return jsonEncode({
@@ -300,6 +658,59 @@ MaybeSimpleDict _decodeMaybeSimpleDict(String raw) {
       );
     default:
       throw StateError('Unknown MaybeSimpleDict variant tag: $tag');
+  }
+}
+
+String _encodeReturnOnlyEnum(ReturnOnlyEnum value) {
+  if (value is ReturnOnlyEnumOne) {
+    return jsonEncode({
+      'tag': 'one',
+      'e': CoverallFlatErrorFfiCodec.encode(value.e),
+    });
+  }
+  if (value is ReturnOnlyEnumTwo) {
+    return jsonEncode({
+      'tag': 'two',
+      'd': value.d.toJson(),
+    });
+  }
+  if (value is ReturnOnlyEnumThree) {
+    return jsonEncode({
+      'tag': 'three',
+      'l': value.l.map((item) => CoverallFlatErrorFfiCodec.encode(item)).toList(),
+    });
+  }
+  if (value is ReturnOnlyEnumFour) {
+    return jsonEncode({
+      'tag': 'four',
+      'm': value.m.map((key, value) => MapEntry(key, CoverallFlatErrorFfiCodec.encode(value))),
+    });
+  }
+  throw StateError('Unknown ReturnOnlyEnum variant instance: $value');
+}
+
+ReturnOnlyEnum _decodeReturnOnlyEnum(String raw) {
+  final Map<String, dynamic> map = jsonDecode(raw) as Map<String, dynamic>;
+  final String? tag = map['tag'] as String?;
+  switch (tag) {
+    case 'one':
+      return ReturnOnlyEnumOne(
+        e: CoverallFlatErrorFfiCodec.decode(map['e'] as String),
+      );
+    case 'two':
+      return ReturnOnlyEnumTwo(
+        d: ReturnOnlyDict.fromJson(map['d'] as Map<String, dynamic>),
+      );
+    case 'three':
+      return ReturnOnlyEnumThree(
+        l: (map['l'] as List).map((item) => CoverallFlatErrorFfiCodec.decode(item as String)).toList(),
+      );
+    case 'four':
+      return ReturnOnlyEnumFour(
+        m: (map['m'] as Map<String, dynamic>).map((key, value) => MapEntry(key, CoverallFlatErrorFfiCodec.decode(value as String))),
+      );
+    default:
+      throw StateError('Unknown ReturnOnlyEnum variant tag: $tag');
   }
 }
 
@@ -365,6 +776,46 @@ CoverallErrorException _decodeCoverallErrorException(Object? raw) {
   }
 }
 
+String _encodeCoverallFlatErrorException(CoverallFlatErrorException value) {
+  if (value is CoverallFlatErrorExceptionTooManyVariants) {
+    return jsonEncode({
+      'tag': 'tooManyVariants',
+    });
+  }
+  throw StateError('Unknown CoverallFlatErrorException exception instance: $value');
+}
+
+CoverallFlatErrorException _decodeCoverallFlatErrorException(Object? raw) {
+  final Map<String, dynamic> map = raw is String ? (jsonDecode(raw) as Map<String, dynamic>) : (raw as Map<String, dynamic>);
+  final String? tag = map['tag'] as String?;
+  switch (tag) {
+    case 'tooManyVariants':
+      return const CoverallFlatErrorExceptionTooManyVariants();
+    default:
+      throw StateError('Unknown CoverallFlatErrorException exception tag: $tag');
+  }
+}
+
+String _encodeHTMLErrorException(HTMLErrorException value) {
+  if (value is HTMLErrorExceptionInvalidHTML) {
+    return jsonEncode({
+      'tag': 'invalidHTML',
+    });
+  }
+  throw StateError('Unknown HTMLErrorException exception instance: $value');
+}
+
+HTMLErrorException _decodeHTMLErrorException(Object? raw) {
+  final Map<String, dynamic> map = raw is String ? (jsonDecode(raw) as Map<String, dynamic>) : (raw as Map<String, dynamic>);
+  final String? tag = map['tag'] as String?;
+  switch (tag) {
+    case 'invalidHTML':
+      return const HTMLErrorExceptionInvalidHTML();
+    default:
+      throw StateError('Unknown HTMLErrorException exception tag: $tag');
+  }
+}
+
 final class ColorFfiCodec {
   const ColorFfiCodec._();
 
@@ -389,12 +840,44 @@ final class CoverallErrorFfiCodec {
   static CoverallError decode(String raw) => _decodeCoverallError(raw);
 }
 
+final class CoverallFlatErrorFfiCodec {
+  const CoverallFlatErrorFfiCodec._();
+
+  static String encode(CoverallFlatError value) => _encodeCoverallFlatError(value);
+
+  static CoverallFlatError decode(String raw) => _decodeCoverallFlatError(raw);
+}
+
+final class HTMLErrorFfiCodec {
+  const HTMLErrorFfiCodec._();
+
+  static String encode(HTMLError value) => _encodeHTMLError(value);
+
+  static HTMLError decode(String raw) => _decodeHTMLError(raw);
+}
+
+final class MaybeObjectFfiCodec {
+  const MaybeObjectFfiCodec._();
+
+  static String encode(MaybeObject value) => _encodeMaybeObject(value);
+
+  static MaybeObject decode(String raw) => _decodeMaybeObject(raw);
+}
+
 final class MaybeSimpleDictFfiCodec {
   const MaybeSimpleDictFfiCodec._();
 
   static String encode(MaybeSimpleDict value) => _encodeMaybeSimpleDict(value);
 
   static MaybeSimpleDict decode(String raw) => _decodeMaybeSimpleDict(raw);
+}
+
+final class ReturnOnlyEnumFfiCodec {
+  const ReturnOnlyEnumFfiCodec._();
+
+  static String encode(ReturnOnlyEnum value) => _encodeReturnOnlyEnum(value);
+
+  static ReturnOnlyEnum decode(String raw) => _decodeReturnOnlyEnum(raw);
 }
 
 final class ComplexErrorExceptionFfiCodec {
@@ -413,6 +896,22 @@ final class CoverallErrorExceptionFfiCodec {
   static CoverallErrorException decode(Object? raw) => _decodeCoverallErrorException(raw);
 }
 
+final class CoverallFlatErrorExceptionFfiCodec {
+  const CoverallFlatErrorExceptionFfiCodec._();
+
+  static String encode(CoverallFlatErrorException value) => _encodeCoverallFlatErrorException(value);
+
+  static CoverallFlatErrorException decode(Object? raw) => _decodeCoverallFlatErrorException(raw);
+}
+
+final class HTMLErrorExceptionFfiCodec {
+  const HTMLErrorExceptionFfiCodec._();
+
+  static String encode(HTMLErrorException value) => _encodeHTMLErrorException(value);
+
+  static HTMLErrorException decode(Object? raw) => _decodeHTMLErrorException(raw);
+}
+
 /// Callback interface exercising multiple return types and error paths.
 abstract interface class Getters {
   bool getBool(bool v, bool arg2);
@@ -420,6 +919,7 @@ abstract interface class Getters {
   String? getOption(String v, bool arg2);
   List<int> getList(List<int> v, bool arg2);
   void getNothing(String v);
+  Coveralls roundTripObject(Coveralls coveralls);
 }
 
 /// Callback interface for tree-like trait object graphs.
@@ -443,6 +943,8 @@ final class _GettersVTable extends ffi.Struct {
   external ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<Utf8> v, ffi.Bool arg2, ffi.Pointer<ffi.Pointer<Utf8>> outReturn, ffi.Pointer<_RustCallStatus> outStatus)>> getList;
 
   external ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<Utf8> v, ffi.Pointer<ffi.Void> outReturn, ffi.Pointer<_RustCallStatus> outStatus)>> getNothing;
+
+  external ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Uint64 coveralls, ffi.Pointer<ffi.Uint64> outReturn, ffi.Pointer<_RustCallStatus> outStatus)>> roundTripObject;
 
 }
 
@@ -609,6 +1111,27 @@ final class _GettersCallbackBridge {
     }
   });
 
+  static final ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle, ffi.Uint64 coveralls, ffi.Pointer<ffi.Uint64> outReturn, ffi.Pointer<_RustCallStatus> outStatus)> _roundTripObjectNative = ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle, ffi.Uint64 coveralls, ffi.Pointer<ffi.Uint64> outReturn, ffi.Pointer<_RustCallStatus> outStatus)>.isolateLocal((int handle, int coveralls, ffi.Pointer<ffi.Uint64> outReturn, ffi.Pointer<_RustCallStatus> outStatus) {
+    final Getters? callback = instance.lookup(handle);
+    if (callback == null) {
+      outStatus.ref
+        ..code = _rustCallStatusUnexpectedError
+        ..errorBuf = 'Invalid callback handle'.toNativeUtf8();
+      return;
+    }
+    try {
+      final result = callback.roundTripObject(CoverallsFfiCodec.lift(coveralls));
+      outReturn.value = CoverallsFfiCodec.lower(result);
+      outStatus.ref
+        ..code = _rustCallStatusSuccess
+        ..errorBuf = ffi.nullptr;
+    } catch (err) {
+      outStatus.ref
+        ..code = _rustCallStatusUnexpectedError
+        ..errorBuf = err.toString().toNativeUtf8();
+    }
+  });
+
   static ffi.Pointer<_GettersVTable> createVTable() {
     final ffi.Pointer<_GettersVTable> vtablePtr = calloc<_GettersVTable>();
     vtablePtr.ref
@@ -619,6 +1142,7 @@ final class _GettersCallbackBridge {
       ..getOption = _getOptionNative.nativeFunction
       ..getList = _getListNative.nativeFunction
       ..getNothing = _getNothingNative.nativeFunction
+      ..roundTripObject = _roundTripObjectNative.nativeFunction
     ;
     return vtablePtr;
   }
@@ -804,6 +1328,26 @@ class CoverallDemoFfi {
     if (_checksum_uniffi_crate_name_checksum_func_make_rust_getters != 31082) {
       throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_make_rust_getters`: expected 31082, got $_checksum_uniffi_crate_name_checksum_func_make_rust_getters');
     }
+    final int _checksum_uniffi_crate_name_checksum_func_output_return_only_dict;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_func_output_return_only_dict');
+      _checksum_uniffi_crate_name_checksum_func_output_return_only_dict = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_func_output_return_only_dict`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_func_output_return_only_dict != 25732) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_output_return_only_dict`: expected 25732, got $_checksum_uniffi_crate_name_checksum_func_output_return_only_dict');
+    }
+    final int _checksum_uniffi_crate_name_checksum_func_output_return_only_enum;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_func_output_return_only_enum');
+      _checksum_uniffi_crate_name_checksum_func_output_return_only_enum = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_func_output_return_only_enum`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_func_output_return_only_enum != 17153) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_output_return_only_enum`: expected 17153, got $_checksum_uniffi_crate_name_checksum_func_output_return_only_enum');
+    }
     final int _checksum_uniffi_crate_name_checksum_func_println;
     try {
       final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_func_println');
@@ -834,6 +1378,46 @@ class CoverallDemoFfi {
     if (_checksum_uniffi_crate_name_checksum_func_test_getters != 40682) {
       throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_test_getters`: expected 40682, got $_checksum_uniffi_crate_name_checksum_func_test_getters');
     }
+    final int _checksum_uniffi_crate_name_checksum_func_throw_flat_error;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_func_throw_flat_error');
+      _checksum_uniffi_crate_name_checksum_func_throw_flat_error = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_func_throw_flat_error`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_func_throw_flat_error != 9433) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_throw_flat_error`: expected 9433, got $_checksum_uniffi_crate_name_checksum_func_throw_flat_error');
+    }
+    final int _checksum_uniffi_crate_name_checksum_func_validate_html;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_func_validate_html');
+      _checksum_uniffi_crate_name_checksum_func_validate_html = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_func_validate_html`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_func_validate_html != 3368) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_validate_html`: expected 3368, got $_checksum_uniffi_crate_name_checksum_func_validate_html');
+    }
+    final int _checksum_uniffi_crate_name_checksum_method_coveralls_add_patch;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_method_coveralls_add_patch');
+      _checksum_uniffi_crate_name_checksum_method_coveralls_add_patch = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_method_coveralls_add_patch`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_method_coveralls_add_patch != 39154) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_method_coveralls_add_patch`: expected 39154, got $_checksum_uniffi_crate_name_checksum_method_coveralls_add_patch');
+    }
+    final int _checksum_uniffi_crate_name_checksum_method_coveralls_add_repair;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_method_coveralls_add_repair');
+      _checksum_uniffi_crate_name_checksum_method_coveralls_add_repair = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_method_coveralls_add_repair`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_method_coveralls_add_repair != 25033) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_method_coveralls_add_repair`: expected 25033, got $_checksum_uniffi_crate_name_checksum_method_coveralls_add_repair');
+    }
     final int _checksum_uniffi_crate_name_checksum_method_coveralls_clone_me;
     try {
       final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_method_coveralls_clone_me');
@@ -843,6 +1427,26 @@ class CoverallDemoFfi {
     }
     if (_checksum_uniffi_crate_name_checksum_method_coveralls_clone_me != 58508) {
       throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_method_coveralls_clone_me`: expected 58508, got $_checksum_uniffi_crate_name_checksum_method_coveralls_clone_me');
+    }
+    final int _checksum_uniffi_crate_name_checksum_method_coveralls_get_dict2;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_method_coveralls_get_dict2');
+      _checksum_uniffi_crate_name_checksum_method_coveralls_get_dict2 = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_method_coveralls_get_dict2`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_method_coveralls_get_dict2 != 26919) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_method_coveralls_get_dict2`: expected 26919, got $_checksum_uniffi_crate_name_checksum_method_coveralls_get_dict2');
+    }
+    final int _checksum_uniffi_crate_name_checksum_method_coveralls_get_dict3;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_method_coveralls_get_dict3');
+      _checksum_uniffi_crate_name_checksum_method_coveralls_get_dict3 = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_method_coveralls_get_dict3`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_method_coveralls_get_dict3 != 4071) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_method_coveralls_get_dict3`: expected 4071, got $_checksum_uniffi_crate_name_checksum_method_coveralls_get_dict3');
     }
     final int _checksum_uniffi_crate_name_checksum_method_coveralls_get_metadata;
     try {
@@ -874,6 +1478,26 @@ class CoverallDemoFfi {
     if (_checksum_uniffi_crate_name_checksum_method_coveralls_get_other != 22943) {
       throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_method_coveralls_get_other`: expected 22943, got $_checksum_uniffi_crate_name_checksum_method_coveralls_get_other');
     }
+    final int _checksum_uniffi_crate_name_checksum_method_coveralls_get_repairs;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_method_coveralls_get_repairs');
+      _checksum_uniffi_crate_name_checksum_method_coveralls_get_repairs = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_method_coveralls_get_repairs`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_method_coveralls_get_repairs != 40486) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_method_coveralls_get_repairs`: expected 40486, got $_checksum_uniffi_crate_name_checksum_method_coveralls_get_repairs');
+    }
+    final int _checksum_uniffi_crate_name_checksum_method_coveralls_get_status;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_method_coveralls_get_status');
+      _checksum_uniffi_crate_name_checksum_method_coveralls_get_status = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_method_coveralls_get_status`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_method_coveralls_get_status != 19556) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_method_coveralls_get_status`: expected 19556, got $_checksum_uniffi_crate_name_checksum_method_coveralls_get_status');
+    }
     final int _checksum_uniffi_crate_name_checksum_method_coveralls_get_tags;
     try {
       final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_method_coveralls_get_tags');
@@ -904,6 +1528,16 @@ class CoverallDemoFfi {
     if (_checksum_uniffi_crate_name_checksum_method_coveralls_maybe_throw_complex != 24041) {
       throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_method_coveralls_maybe_throw_complex`: expected 24041, got $_checksum_uniffi_crate_name_checksum_method_coveralls_maybe_throw_complex');
     }
+    final int _checksum_uniffi_crate_name_checksum_method_coveralls_maybe_throw_into;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_method_coveralls_maybe_throw_into');
+      _checksum_uniffi_crate_name_checksum_method_coveralls_maybe_throw_into = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_method_coveralls_maybe_throw_into`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_method_coveralls_maybe_throw_into != 5009) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_method_coveralls_maybe_throw_into`: expected 5009, got $_checksum_uniffi_crate_name_checksum_method_coveralls_maybe_throw_into');
+    }
     final int _checksum_uniffi_crate_name_checksum_method_coveralls_reverse_bytes;
     try {
       final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_method_coveralls_reverse_bytes');
@@ -913,6 +1547,16 @@ class CoverallDemoFfi {
     }
     if (_checksum_uniffi_crate_name_checksum_method_coveralls_reverse_bytes != 28911) {
       throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_method_coveralls_reverse_bytes`: expected 28911, got $_checksum_uniffi_crate_name_checksum_method_coveralls_reverse_bytes');
+    }
+    final int _checksum_uniffi_crate_name_checksum_method_coveralls_set_and_get_empty_struct;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_method_coveralls_set_and_get_empty_struct');
+      _checksum_uniffi_crate_name_checksum_method_coveralls_set_and_get_empty_struct = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_method_coveralls_set_and_get_empty_struct`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_method_coveralls_set_and_get_empty_struct != 44611) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_method_coveralls_set_and_get_empty_struct`: expected 44611, got $_checksum_uniffi_crate_name_checksum_method_coveralls_set_and_get_empty_struct');
     }
     final int _checksum_uniffi_crate_name_checksum_method_coveralls_set_name;
     try {
@@ -953,6 +1597,26 @@ class CoverallDemoFfi {
     }
     if (_checksum_uniffi_crate_name_checksum_method_falliblepatch_get_color != 47454) {
       throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_method_falliblepatch_get_color`: expected 47454, got $_checksum_uniffi_crate_name_checksum_method_falliblepatch_get_color');
+    }
+    final int _checksum_uniffi_crate_name_checksum_method_ifirst_compare;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_method_ifirst_compare');
+      _checksum_uniffi_crate_name_checksum_method_ifirst_compare = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_method_ifirst_compare`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_method_ifirst_compare != 55948) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_method_ifirst_compare`: expected 55948, got $_checksum_uniffi_crate_name_checksum_method_ifirst_compare');
+    }
+    final int _checksum_uniffi_crate_name_checksum_method_isecond_compare;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_method_isecond_compare');
+      _checksum_uniffi_crate_name_checksum_method_isecond_compare = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_method_isecond_compare`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_method_isecond_compare != 51747) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_method_isecond_compare`: expected 51747, got $_checksum_uniffi_crate_name_checksum_method_isecond_compare');
     }
     final int _checksum_uniffi_crate_name_checksum_method_patch_get_color;
     try {
@@ -1013,6 +1677,36 @@ class CoverallDemoFfi {
     }
     if (_checksum_uniffi_crate_name_checksum_constructor_falliblepatch_new != 12136) {
       throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_constructor_falliblepatch_new`: expected 12136, got $_checksum_uniffi_crate_name_checksum_constructor_falliblepatch_new');
+    }
+    final int _checksum_uniffi_crate_name_checksum_constructor_falliblepatch_secondary;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_constructor_falliblepatch_secondary');
+      _checksum_uniffi_crate_name_checksum_constructor_falliblepatch_secondary = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_constructor_falliblepatch_secondary`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_constructor_falliblepatch_secondary != 256) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_constructor_falliblepatch_secondary`: expected 256, got $_checksum_uniffi_crate_name_checksum_constructor_falliblepatch_secondary');
+    }
+    final int _checksum_uniffi_crate_name_checksum_constructor_ifirst_new;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_constructor_ifirst_new');
+      _checksum_uniffi_crate_name_checksum_constructor_ifirst_new = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_constructor_ifirst_new`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_constructor_ifirst_new != 41251) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_constructor_ifirst_new`: expected 41251, got $_checksum_uniffi_crate_name_checksum_constructor_ifirst_new');
+    }
+    final int _checksum_uniffi_crate_name_checksum_constructor_isecond_new;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_constructor_isecond_new');
+      _checksum_uniffi_crate_name_checksum_constructor_isecond_new = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_constructor_isecond_new`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_constructor_isecond_new != 16463) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_constructor_isecond_new`: expected 16463, got $_checksum_uniffi_crate_name_checksum_constructor_isecond_new');
     }
     final int _checksum_uniffi_crate_name_checksum_constructor_patch_new;
     try {
@@ -1083,6 +1777,16 @@ class CoverallDemoFfi {
     }
     if (_checksum_uniffi_crate_name_checksum_method_getters_get_nothing != 22876) {
       throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_method_getters_get_nothing`: expected 22876, got $_checksum_uniffi_crate_name_checksum_method_getters_get_nothing');
+    }
+    final int _checksum_uniffi_crate_name_checksum_method_getters_round_trip_object;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_method_getters_round_trip_object');
+      _checksum_uniffi_crate_name_checksum_method_getters_round_trip_object = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_method_getters_round_trip_object`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_method_getters_round_trip_object != 42475) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_method_getters_round_trip_object`: expected 42475, got $_checksum_uniffi_crate_name_checksum_method_getters_round_trip_object');
     }
     final int _checksum_uniffi_crate_name_checksum_method_nodetrait_name;
     try {
@@ -1352,6 +2056,36 @@ class CoverallDemoFfi {
   // the function signature is not yet supported in this FFI binding mode.
 
 
+  late final ffi.Pointer<Utf8> Function() _outputReturnOnlyDict = _lib.lookupFunction<ffi.Pointer<Utf8> Function(), ffi.Pointer<Utf8> Function()>('output_return_only_dict');
+
+  ReturnOnlyDict outputReturnOnlyDict() {
+      final ffi.Pointer<Utf8> resultPtr = _outputReturnOnlyDict();
+      if (resultPtr == ffi.nullptr) {
+        throw StateError('Rust returned null for output_return_only_dict');
+      }
+      try {
+        final String payload = resultPtr.toDartString();
+        return ReturnOnlyDict.fromJson(jsonDecode(payload) as Map<String, dynamic>);
+      } finally {
+        _rustStringFree(resultPtr);
+      }
+  }
+
+  late final ffi.Pointer<Utf8> Function() _outputReturnOnlyEnum = _lib.lookupFunction<ffi.Pointer<Utf8> Function(), ffi.Pointer<Utf8> Function()>('output_return_only_enum');
+
+  ReturnOnlyEnum outputReturnOnlyEnum() {
+      final ffi.Pointer<Utf8> resultPtr = _outputReturnOnlyEnum();
+      if (resultPtr == ffi.nullptr) {
+        throw StateError('Rust returned null for output_return_only_enum');
+      }
+      try {
+        final String payload = resultPtr.toDartString();
+        return ReturnOnlyEnumFfiCodec.decode(payload);
+      } finally {
+        _rustStringFree(resultPtr);
+      }
+  }
+
   late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> value) _println = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> value), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> value)>('println');
 
   String println(String value) {
@@ -1442,6 +2176,53 @@ class CoverallDemoFfi {
     }
   }
 
+  late final ffi.Pointer<Utf8> Function() _throwFlatError = _lib.lookupFunction<ffi.Pointer<Utf8> Function(), ffi.Pointer<Utf8> Function()>('throw_flat_error');
+
+  void throwFlatError() {
+      final ffi.Pointer<Utf8> resultPtr = _throwFlatError();
+      if (resultPtr == ffi.nullptr) {
+        throw StateError('Rust returned null for throw_flat_error');
+      }
+      final String payload;
+      try {
+        payload = resultPtr.toDartString();
+      } finally {
+        _rustStringFree(resultPtr);
+      }
+      final Map<String, dynamic> envelope = jsonDecode(payload) as Map<String, dynamic>;
+      final Object? errRaw = envelope['err'];
+      if (errRaw != null) {
+        throw CoverallFlatErrorExceptionFfiCodec.decode(errRaw);
+      }
+      return;
+  }
+
+  late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> source) _validateHtml = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> source), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> source)>('validate_html');
+
+  void validateHtml(String source) {
+    final ffi.Pointer<Utf8> sourceNative = source.toNativeUtf8();
+    try {
+      final ffi.Pointer<Utf8> resultPtr = _validateHtml(sourceNative);
+      if (resultPtr == ffi.nullptr) {
+        throw StateError('Rust returned null for validate_html');
+      }
+      final String payload;
+      try {
+        payload = resultPtr.toDartString();
+      } finally {
+        _rustStringFree(resultPtr);
+      }
+      final Map<String, dynamic> envelope = jsonDecode(payload) as Map<String, dynamic>;
+      final Object? errRaw = envelope['err'];
+      if (errRaw != null) {
+        throw HTMLErrorExceptionFfiCodec.decode(errRaw);
+      }
+      return;
+    } finally {
+    calloc.free(sourceNative);
+    }
+  }
+
   late final void Function(int handle) _coverallsFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('coveralls_free');
 
   late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> name, bool shouldFail) _coverallsCtorFallibleNew = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> name, ffi.Bool shouldFail), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> name, bool shouldFail)>('coveralls_fallible_new');
@@ -1484,10 +2265,69 @@ class CoverallDemoFfi {
     }
   }
 
+  late final void Function(int handle, int patch) _coverallsAddPatch = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Uint64 patch), void Function(int handle, int patch)>('coveralls_add_patch');
+
+  void coverallsInvokeAddPatch(int handle, Patch patch) {
+    final int patchHandle = PatchFfiCodec.lower(patch);
+    _coverallsAddPatch(handle, patchHandle);
+  }
+
+  late final void Function(int handle, ffi.Pointer<Utf8> repair) _coverallsAddRepair = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<Utf8> repair), void Function(int handle, ffi.Pointer<Utf8> repair)>('coveralls_add_repair');
+
+  void coverallsInvokeAddRepair(int handle, Repair repair) {
+    final String repairNativeJson = jsonEncode(repair.toJson());
+    final ffi.Pointer<Utf8> repairNative = repairNativeJson.toNativeUtf8();
+    try {
+    _coverallsAddRepair(handle, repairNative);
+    } finally {
+    calloc.free(repairNative);
+    }
+  }
+
   late final int Function(int handle) _coverallsCloneMe = _lib.lookupFunction<ffi.Uint64 Function(ffi.Uint64 handle), int Function(int handle)>('coveralls_clone_me');
 
   Coveralls coverallsInvokeCloneMe(int handle) {
     return Coveralls._(_bindings(), _coverallsCloneMe(handle));
+  }
+
+  late final ffi.Pointer<Utf8> Function(int handle, ffi.Pointer<Utf8> key, int value) _coverallsGetDict2 = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle, ffi.Pointer<Utf8> key, ffi.Uint64 value), ffi.Pointer<Utf8> Function(int handle, ffi.Pointer<Utf8> key, int value)>('coveralls_get_dict2');
+
+  Map<String, int> coverallsInvokeGetDict2(int handle, String key, int value) {
+    final ffi.Pointer<Utf8> keyNative = key.toNativeUtf8();
+    try {
+    final ffi.Pointer<Utf8> resultPtr = _coverallsGetDict2(handle, keyNative, value);
+    if (resultPtr == ffi.nullptr) {
+      throw StateError('Rust returned null for coveralls_get_dict2');
+    }
+    try {
+      final String payload = resultPtr.toDartString();
+      return (jsonDecode(payload) as Map<String, dynamic>).map((key, value) => MapEntry(key, (value as num).toInt()));
+    } finally {
+      _rustStringFree(resultPtr);
+    }
+    } finally {
+    calloc.free(keyNative);
+    }
+  }
+
+  late final _RustBuffer Function(int handle, int key, int value) _coverallsGetDict3 = _lib.lookupFunction<_RustBuffer Function(ffi.Uint64 handle, ffi.Uint32 key, ffi.Uint64 value), _RustBuffer Function(int handle, int key, int value)>('coveralls_get_dict3');
+
+  Map<int, int> coverallsInvokeGetDict3(int handle, int key, int value) {
+    final _RustBuffer resultBuf = _coverallsGetDict3(handle, key, value);
+    final ffi.Pointer<ffi.Uint8> resultData = resultBuf.data;
+    final int resultLen = resultBuf.len;
+    if (resultData == ffi.nullptr) {
+      _rustBytesFree(resultBuf);
+      final mapReader = _UniFfiBinaryReader(Uint8List(0));
+      return (() { final int __len = mapReader.readI32(); final out = <int, int>{}; for (var i = 0; i < __len; i++) { final key = mapReader.readU32(); final value = mapReader.readU64(); out[key] = value; } return out; })();
+    }
+    try {
+      final Uint8List resultBytes = Uint8List.fromList(resultData.asTypedList(resultLen));
+      final mapReader = _UniFfiBinaryReader(resultBytes);
+      return (() { final int __len = mapReader.readI32(); final out = <int, int>{}; for (var i = 0; i < __len; i++) { final key = mapReader.readU32(); final value = mapReader.readU64(); out[key] = value; } return out; })();
+    } finally {
+      _rustBytesFree(resultBuf);
+    }
   }
 
   late final ffi.Pointer<Utf8> Function(int handle) _coverallsGetMetadata = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle), ffi.Pointer<Utf8> Function(int handle)>('coveralls_get_metadata');
@@ -1527,6 +2367,40 @@ class CoverallDemoFfi {
       return null;
     }
     return Coveralls._(_bindings(), resultHandle);
+  }
+
+  late final ffi.Pointer<Utf8> Function(int handle) _coverallsGetRepairs = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle), ffi.Pointer<Utf8> Function(int handle)>('coveralls_get_repairs');
+
+  List<Repair> coverallsInvokeGetRepairs(int handle) {
+    final ffi.Pointer<Utf8> resultPtr = _coverallsGetRepairs(handle);
+    if (resultPtr == ffi.nullptr) {
+      throw StateError('Rust returned null for coveralls_get_repairs');
+    }
+    try {
+      final String payload = resultPtr.toDartString();
+      return (jsonDecode(payload) as List).map((item) => Repair.fromJson(item as Map<String, dynamic>)).toList();
+    } finally {
+      _rustStringFree(resultPtr);
+    }
+  }
+
+  late final ffi.Pointer<Utf8> Function(int handle, ffi.Pointer<Utf8> status) _coverallsGetStatus = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle, ffi.Pointer<Utf8> status), ffi.Pointer<Utf8> Function(int handle, ffi.Pointer<Utf8> status)>('coveralls_get_status');
+
+  String coverallsInvokeGetStatus(int handle, String status) {
+    final ffi.Pointer<Utf8> statusNative = status.toNativeUtf8();
+    try {
+    final ffi.Pointer<Utf8> resultPtr = _coverallsGetStatus(handle, statusNative);
+    if (resultPtr == ffi.nullptr) {
+      throw StateError('Rust returned null for coveralls_get_status');
+    }
+    try {
+      return resultPtr.toDartString();
+    } finally {
+      _rustStringFree(resultPtr);
+    }
+    } finally {
+    calloc.free(statusNative);
+    }
   }
 
   late final ffi.Pointer<Utf8> Function(int handle) _coverallsGetTags = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle), ffi.Pointer<Utf8> Function(int handle)>('coveralls_get_tags');
@@ -1588,6 +2462,28 @@ class CoverallDemoFfi {
     return okRaw as bool;
   }
 
+  late final ffi.Pointer<Utf8> Function(int handle, bool shouldThrow) _coverallsMaybeThrowInto = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle, ffi.Bool shouldThrow), ffi.Pointer<Utf8> Function(int handle, bool shouldThrow)>('coveralls_maybe_throw_into');
+
+  bool coverallsInvokeMaybeThrowInto(int handle, bool shouldThrow) {
+    final ffi.Pointer<Utf8> resultPtr = _coverallsMaybeThrowInto(handle, shouldThrow);
+    if (resultPtr == ffi.nullptr) {
+      throw StateError('Rust returned null for coveralls_maybe_throw_into');
+    }
+    final String payload;
+    try {
+      payload = resultPtr.toDartString();
+    } finally {
+      _rustStringFree(resultPtr);
+    }
+    final Map<String, dynamic> envelope = jsonDecode(payload) as Map<String, dynamic>;
+    final Object? errRaw = envelope['err'];
+    if (errRaw != null) {
+      throw CoverallErrorExceptionFfiCodec.decode(errRaw);
+    }
+    final Object? okRaw = envelope['ok'];
+    return okRaw as bool;
+  }
+
   late final _RustBuffer Function(int handle, _RustBuffer input) _coverallsReverseBytes = _lib.lookupFunction<_RustBuffer Function(ffi.Uint64 handle, _RustBuffer input), _RustBuffer Function(int handle, _RustBuffer input)>('coveralls_reverse_bytes');
 
   Uint8List coverallsInvokeReverseBytes(int handle, Uint8List input) {
@@ -1618,6 +2514,27 @@ class CoverallDemoFfi {
     } finally {
     if (inputData != ffi.nullptr) calloc.free(inputData);
     calloc.free(inputBufferPtr);
+    }
+  }
+
+  late final ffi.Pointer<Utf8> Function(int handle, ffi.Pointer<Utf8> emptyStruct) _coverallsSetAndGetEmptyStruct = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle, ffi.Pointer<Utf8> emptyStruct), ffi.Pointer<Utf8> Function(int handle, ffi.Pointer<Utf8> emptyStruct)>('coveralls_set_and_get_empty_struct');
+
+  EmptyStruct coverallsInvokeSetAndGetEmptyStruct(int handle, EmptyStruct emptyStruct) {
+    final String emptyStructNativeJson = jsonEncode(emptyStruct.toJson());
+    final ffi.Pointer<Utf8> emptyStructNative = emptyStructNativeJson.toNativeUtf8();
+    try {
+    final ffi.Pointer<Utf8> resultPtr = _coverallsSetAndGetEmptyStruct(handle, emptyStructNative);
+    if (resultPtr == ffi.nullptr) {
+      throw StateError('Rust returned null for coveralls_set_and_get_empty_struct');
+    }
+    try {
+      final String payload = resultPtr.toDartString();
+      return EmptyStruct.fromJson(jsonDecode(payload) as Map<String, dynamic>);
+    } finally {
+      _rustStringFree(resultPtr);
+    }
+    } finally {
+    calloc.free(emptyStructNative);
     }
   }
 
@@ -1676,6 +2593,35 @@ class CoverallDemoFfi {
     }
   }
 
+  late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> color, bool shouldFail) _falliblePatchCtorSecondary = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> color, ffi.Bool shouldFail), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> color, bool shouldFail)>('falliblepatch_secondary');
+
+  FalliblePatch falliblePatchCreateSecondary(Color color, bool shouldFail) {
+    final String colorNativeJson = ColorFfiCodec.encode(color);
+    final ffi.Pointer<Utf8> colorNative = colorNativeJson.toNativeUtf8();
+    try {
+    final ffi.Pointer<Utf8> resultPtr = _falliblePatchCtorSecondary(colorNative, shouldFail);
+    if (resultPtr == ffi.nullptr) {
+      throw StateError('Rust returned null for falliblepatch_secondary');
+    }
+    final String payload;
+    try {
+      payload = resultPtr.toDartString();
+    } finally {
+      _rustStringFree(resultPtr);
+    }
+    final Map<String, dynamic> envelope = jsonDecode(payload) as Map<String, dynamic>;
+    final Object? errRaw = envelope['err'];
+    if (errRaw != null) {
+      throw CoverallErrorExceptionFfiCodec.decode(errRaw);
+    }
+    final Object? okRaw = envelope['ok'];
+    final int handle = (okRaw as num).toInt();
+    return FalliblePatch._(this, handle);
+    } finally {
+    calloc.free(colorNative);
+    }
+  }
+
   late final ffi.Pointer<Utf8> Function(int handle) _falliblePatchGetColor = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle), ffi.Pointer<Utf8> Function(int handle)>('falliblepatch_get_color');
 
   Color falliblePatchInvokeGetColor(int handle) {
@@ -1689,6 +2635,38 @@ class CoverallDemoFfi {
     } finally {
       _rustStringFree(resultPtr);
     }
+  }
+
+  late final void Function(int handle) _iFirstFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('ifirst_free');
+
+  late final int Function() _iFirstCtorNew = _lib.lookupFunction<ffi.Uint64 Function(), int Function()>('ifirst_new');
+
+  IFirst iFirstCreateNew() {
+    final int handle = _iFirstCtorNew();
+    return IFirst._(this, handle);
+  }
+
+  late final bool Function(int handle, int other) _iFirstCompare = _lib.lookupFunction<ffi.Bool Function(ffi.Uint64 handle, ffi.Uint64 other), bool Function(int handle, int other)>('ifirst_compare');
+
+  bool iFirstInvokeCompare(int handle, ISecond? other) {
+    final int otherHandle = other == null ? 0 : ISecondFfiCodec.lower(other);
+    return _iFirstCompare(handle, otherHandle);
+  }
+
+  late final void Function(int handle) _iSecondFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('isecond_free');
+
+  late final int Function() _iSecondCtorNew = _lib.lookupFunction<ffi.Uint64 Function(), int Function()>('isecond_new');
+
+  ISecond iSecondCreateNew() {
+    final int handle = _iSecondCtorNew();
+    return ISecond._(this, handle);
+  }
+
+  late final bool Function(int handle, int other) _iSecondCompare = _lib.lookupFunction<ffi.Bool Function(ffi.Uint64 handle, ffi.Uint64 other), bool Function(int handle, int other)>('isecond_compare');
+
+  bool iSecondInvokeCompare(int handle, IFirst? other) {
+    final int otherHandle = other == null ? 0 : IFirstFfiCodec.lower(other);
+    return _iSecondCompare(handle, otherHandle);
   }
 
   late final void Function(int handle) _patchFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('patch_free');
@@ -1788,10 +2766,34 @@ final class Coveralls {
     return _bindings().coverallsCreateNew(name);
   }
 
+  /// Add a patch to this coveralls.
+  void addPatch(Patch patch) {
+    _ensureOpen();
+    _ffi.coverallsInvokeAddPatch(_handle, patch);
+  }
+
+  /// Add a repair record.
+  void addRepair(Repair repair) {
+    _ensureOpen();
+    _ffi.coverallsInvokeAddRepair(_handle, repair);
+  }
+
   /// Clone into a new instance (tests object return from method).
   Coveralls cloneMe() {
     _ensureOpen();
     return _ffi.coverallsInvokeCloneMe(_handle);
+  }
+
+  /// Return a string-keyed map.
+  Map<String, int> getDict2(String key, int value) {
+    _ensureOpen();
+    return _ffi.coverallsInvokeGetDict2(_handle, key, value);
+  }
+
+  /// Return a non-string-keyed map.
+  Map<int, int> getDict3(int key, int value) {
+    _ensureOpen();
+    return _ffi.coverallsInvokeGetDict3(_handle, key, value);
   }
 
   /// Return a map with string keys and optional string values.
@@ -1808,6 +2810,18 @@ final class Coveralls {
   Coveralls? getOther() {
     _ensureOpen();
     return _ffi.coverallsInvokeGetOther(_handle);
+  }
+
+  /// Return all stored repairs.
+  List<Repair> getRepairs() {
+    _ensureOpen();
+    return _ffi.coverallsInvokeGetRepairs(_handle);
+  }
+
+  /// Simple pass-through returning the status string.
+  String getStatus(String status) {
+    _ensureOpen();
+    return _ffi.coverallsInvokeGetStatus(_handle, status);
   }
 
   /// Return a sequence of optional strings.
@@ -1828,10 +2842,22 @@ final class Coveralls {
     return _ffi.coverallsInvokeMaybeThrowComplex(_handle, selector);
   }
 
+  /// Another throws variant — returns boolean.
+  bool maybeThrowInto(bool shouldThrow) {
+    _ensureOpen();
+    return _ffi.coverallsInvokeMaybeThrowInto(_handle, shouldThrow);
+  }
+
   /// Reverse some bytes via a method (tests binary on object).
   Uint8List reverseBytes(Uint8List input) {
     _ensureOpen();
     return _ffi.coverallsInvokeReverseBytes(_handle, input);
+  }
+
+  /// Empty record round-trip.
+  EmptyStruct setAndGetEmptyStruct(EmptyStruct emptyStruct) {
+    _ensureOpen();
+    return _ffi.coverallsInvokeSetAndGetEmptyStruct(_handle, emptyStruct);
   }
 
   void setName(String name) {
@@ -1867,7 +2893,7 @@ final class _FalliblePatchFinalizerToken {
   final int handle;
 }
 
-/// Object with fallible constructor only — no default constructor.
+/// Object with fallible constructors — tests error on construction.
 final class FalliblePatch {
   FalliblePatch._(this._ffi, this._handle) {
     _finalizer.attach(this, _FalliblePatchFinalizerToken(_ffi._falliblePatchFree, _handle), detach: this);
@@ -1902,6 +2928,10 @@ final class FalliblePatch {
     return _bindings().falliblePatchCreateNew(color, shouldFail);
   }
 
+  static FalliblePatch secondary(Color color, bool shouldFail) {
+    return _bindings().falliblePatchCreateSecondary(color, shouldFail);
+  }
+
   Color getColor() {
     _ensureOpen();
     return _ffi.falliblePatchInvokeGetColor(_handle);
@@ -1915,6 +2945,117 @@ final class FalliblePatchFfiCodec {
   static int lower(FalliblePatch value) => value._handle;
 
   static FalliblePatch lift(int handle) => FalliblePatch._(_bindings(), handle);
+}
+
+final class _IFirstFinalizerToken {
+  const _IFirstFinalizerToken(this.free, this.handle);
+  final void Function(int) free;
+  final int handle;
+}
+
+/// Forward-reference test: IFirst refers to ISecond and vice versa.
+final class IFirst {
+  IFirst._(this._ffi, this._handle) {
+    _finalizer.attach(this, _IFirstFinalizerToken(_ffi._iFirstFree, _handle), detach: this);
+  }
+
+  final CoverallDemoFfi _ffi;
+  int _handle;
+  bool _closed = false;
+
+  static final Finalizer<_IFirstFinalizerToken> _finalizer = Finalizer((token) {
+    token.free(token.handle);
+  });
+
+  bool get isClosed => _closed;
+
+  void close() {
+    if (_closed) {
+      return;
+    }
+    _closed = true;
+    _finalizer.detach(this);
+    _ffi._iFirstFree(_handle);
+  }
+
+  void _ensureOpen() {
+    if (_closed) {
+      throw StateError('IFirst is closed');
+    }
+  }
+
+  static IFirst create() {
+    return _bindings().iFirstCreateNew();
+  }
+
+  bool compare({ISecond? other = null}) {
+    _ensureOpen();
+    return _ffi.iFirstInvokeCompare(_handle, other);
+  }
+
+}
+
+final class IFirstFfiCodec {
+  const IFirstFfiCodec._();
+
+  static int lower(IFirst value) => value._handle;
+
+  static IFirst lift(int handle) => IFirst._(_bindings(), handle);
+}
+
+final class _ISecondFinalizerToken {
+  const _ISecondFinalizerToken(this.free, this.handle);
+  final void Function(int) free;
+  final int handle;
+}
+
+final class ISecond {
+  ISecond._(this._ffi, this._handle) {
+    _finalizer.attach(this, _ISecondFinalizerToken(_ffi._iSecondFree, _handle), detach: this);
+  }
+
+  final CoverallDemoFfi _ffi;
+  int _handle;
+  bool _closed = false;
+
+  static final Finalizer<_ISecondFinalizerToken> _finalizer = Finalizer((token) {
+    token.free(token.handle);
+  });
+
+  bool get isClosed => _closed;
+
+  void close() {
+    if (_closed) {
+      return;
+    }
+    _closed = true;
+    _finalizer.detach(this);
+    _ffi._iSecondFree(_handle);
+  }
+
+  void _ensureOpen() {
+    if (_closed) {
+      throw StateError('ISecond is closed');
+    }
+  }
+
+  static ISecond create() {
+    return _bindings().iSecondCreateNew();
+  }
+
+  bool compare(IFirst? other) {
+    _ensureOpen();
+    return _ffi.iSecondInvokeCompare(_handle, other);
+  }
+
+}
+
+final class ISecondFfiCodec {
+  const ISecondFfiCodec._();
+
+  static int lower(ISecond value) => value._handle;
+
+  static ISecond lift(int handle) => ISecond._(_bindings(), handle);
 }
 
 final class _PatchFinalizerToken {
@@ -2121,6 +3262,16 @@ Getters makeRustGetters() {
   throw UnimplementedError('TODO: bind to Rust FFI');
 }
 
+/// Return a ReturnOnlyDict (tests return-only record type).
+ReturnOnlyDict outputReturnOnlyDict() {
+  return _bindings().outputReturnOnlyDict();
+}
+
+/// Return a ReturnOnlyEnum (tests return-only enum type).
+ReturnOnlyEnum outputReturnOnlyEnum() {
+  return _bindings().outputReturnOnlyEnum();
+}
+
 /// Round-trip a string; throws ComplexError on certain inputs.
 String println(String value) {
   return _bindings().println(value);
@@ -2134,5 +3285,15 @@ Uint8List reverseBytes(Uint8List input) {
 /// Exercise a foreign-implemented Getters.
 void testGetters(Getters getters) {
   _bindings().testGetters(getters);
+}
+
+/// Throw a CoverallFlatError.
+void throwFlatError() {
+  _bindings().throwFlatError();
+}
+
+/// Validate HTML source; throws HTMLError on invalid input.
+void validateHtml(String source) {
+  _bindings().validateHtml(source);
 }
 

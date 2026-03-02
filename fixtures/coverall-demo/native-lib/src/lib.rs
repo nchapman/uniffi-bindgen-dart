@@ -9,10 +9,76 @@ use serde_json::Value;
 static NEXT_HANDLE: AtomicU64 = AtomicU64::new(1);
 static NUM_ALIVE: AtomicU64 = AtomicU64::new(0);
 
+// --- Callback VTable infrastructure ---
+
+/// Matches _RustCallStatus in generated Dart.
+#[repr(C)]
+pub struct RustCallStatus {
+    pub code: i8,
+    pub error_buf: *mut c_char,
+}
+
+/// Getters callback vtable — mirrors _GettersVTable in generated Dart.
+#[repr(C)]
+pub struct GettersVTable {
+    pub uniffi_free: unsafe extern "C" fn(handle: u64),
+    pub uniffi_clone: unsafe extern "C" fn(handle: u64) -> u64,
+    pub get_bool: unsafe extern "C" fn(
+        handle: u64,
+        v: bool,
+        arg2: bool,
+        out_return: *mut bool,
+        out_status: *mut RustCallStatus,
+    ),
+    pub get_string: unsafe extern "C" fn(
+        handle: u64,
+        v: *const c_char,
+        arg2: bool,
+        out_return: *mut *mut c_char,
+        out_status: *mut RustCallStatus,
+    ),
+    pub get_option: unsafe extern "C" fn(
+        handle: u64,
+        v: *const c_char,
+        arg2: bool,
+        out_return: *mut *mut c_char,
+        out_status: *mut RustCallStatus,
+    ),
+    pub get_list: unsafe extern "C" fn(
+        handle: u64,
+        v: *const c_char,
+        arg2: bool,
+        out_return: *mut *mut c_char,
+        out_status: *mut RustCallStatus,
+    ),
+    pub get_nothing: unsafe extern "C" fn(
+        handle: u64,
+        v: *const c_char,
+        out_return: *mut std::ffi::c_void,
+        out_status: *mut RustCallStatus,
+    ),
+    pub round_trip_object: unsafe extern "C" fn(
+        handle: u64,
+        coveralls: u64,
+        out_return: *mut u64,
+        out_status: *mut RustCallStatus,
+    ),
+}
+
+/// Newtype wrapper for Send safety. The pointer originates from Dart
+/// NativeCallable.isolateLocal and must only be invoked from the main isolate
+/// thread. The Mutex guards pointer reads/writes.
+struct VTablePtr(*const GettersVTable);
+unsafe impl Send for VTablePtr {}
+
+static GETTERS_VTABLE: LazyLock<Mutex<Option<VTablePtr>>> =
+    LazyLock::new(|| Mutex::new(None));
+
 /// Per-Coveralls instance state.
 struct CoverallsState {
     name: String,
     strong_count: u64,
+    repairs: Vec<(i64, u64)>, // (timestamp_micros, patch_handle)
 }
 
 static COVERALLS: LazyLock<Mutex<HashMap<u64, CoverallsState>>> =
@@ -29,6 +95,12 @@ static FALLIBLE_PATCHES: LazyLock<Mutex<HashMap<u64, String>>> =
 /// Per-ThreadsafeCounter state.
 static COUNTERS: LazyLock<Mutex<HashMap<u64, u64>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// Per-IFirst instance state.
+static IFIRSTS: LazyLock<Mutex<HashMap<u64, ()>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// Per-ISecond instance state.
+static ISECONDS: LazyLock<Mutex<HashMap<u64, ()>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// Bytes buffer matching the Dart _RustBuffer layout.
 #[repr(C)]
@@ -105,7 +177,18 @@ pub extern "C" fn create_some_dict() -> *mut c_char {
         "tags": ["a", "b"],
         "counts": {"x": 1, "y": 2},
         "maybeText": "present",
-        "maybePatch": null
+        "maybePatch": null,
+        "maybeU8": 1,
+        "maybeU16": 2,
+        "maybeU64": 3,
+        "maybeI8": -1,
+        "maybeI64": -2,
+        "maybeF32": 1.5,
+        "maybeF64": 2.5,
+        "maybeBool": true,
+        "maybeBytes": null,
+        "someBytes": "",
+        "coveralls": null
     });
     json_out(&dict)
 }
@@ -121,7 +204,18 @@ pub extern "C" fn create_none_dict() -> *mut c_char {
         "tags": [],
         "counts": {},
         "maybeText": null,
-        "maybePatch": null
+        "maybePatch": null,
+        "maybeU8": null,
+        "maybeU16": null,
+        "maybeU64": null,
+        "maybeI8": null,
+        "maybeI64": null,
+        "maybeF32": null,
+        "maybeF64": null,
+        "maybeBool": null,
+        "maybeBytes": null,
+        "someBytes": "",
+        "coveralls": null
     });
     json_out(&dict)
 }
@@ -143,7 +237,18 @@ pub extern "C" fn get_maybe_simple_dict(index: i8) -> *mut c_char {
             "tags": ["tag"],
             "counts": {"n": index as u64},
             "maybeText": null,
-            "maybePatch": null
+            "maybePatch": null,
+            "maybeU8": null,
+            "maybeU16": null,
+            "maybeU64": null,
+            "maybeI8": null,
+            "maybeI64": null,
+            "maybeF32": null,
+            "maybeF64": null,
+            "maybeBool": null,
+            "maybeBytes": null,
+            "someBytes": "",
+            "coveralls": null
         });
         let val = serde_json::json!({
             "tag": "yeah",
@@ -201,6 +306,44 @@ pub extern "C" fn reverse_bytes(input: RustBuffer) -> RustBuffer {
     RustBuffer { data: ptr, len }
 }
 
+/// Throw a CoverallFlatError.
+#[no_mangle]
+pub extern "C" fn throw_flat_error() -> *mut c_char {
+    err_envelope(&serde_json::json!({"tag": "tooManyVariants"}))
+}
+
+/// Validate HTML source — always throws for non-empty invalid input.
+#[no_mangle]
+pub extern "C" fn validate_html(source: *const c_char) -> *mut c_char {
+    let s = c_str(source);
+    if s.is_empty() {
+        // ok — no error
+        let env = serde_json::json!({"ok": null});
+        json_out(&env)
+    } else {
+        err_envelope(&serde_json::json!({"tag": "invalidHTML"}))
+    }
+}
+
+/// Return a ReturnOnlyDict.
+#[no_mangle]
+pub extern "C" fn output_return_only_dict() -> *mut c_char {
+    let dict = serde_json::json!({
+        "e": "tooManyVariants"
+    });
+    json_out(&dict)
+}
+
+/// Return a ReturnOnlyEnum.
+#[no_mangle]
+pub extern "C" fn output_return_only_enum() -> *mut c_char {
+    let val = serde_json::json!({
+        "tag": "one",
+        "e": "tooManyVariants"
+    });
+    json_out(&val)
+}
+
 /// Create a Patch with a given color.
 #[no_mangle]
 pub extern "C" fn create_patch(color: *const c_char) -> u64 {
@@ -246,6 +389,12 @@ pub extern "C" fn falliblepatch_new(color: *const c_char, should_fail: bool) -> 
 }
 
 #[no_mangle]
+pub extern "C" fn falliblepatch_secondary(color: *const c_char, should_fail: bool) -> *mut c_char {
+    // Same behavior as primary constructor
+    falliblepatch_new(color, should_fail)
+}
+
+#[no_mangle]
 pub extern "C" fn falliblepatch_free(handle: u64) {
     FALLIBLE_PATCHES.lock().unwrap().remove(&handle);
 }
@@ -268,6 +417,7 @@ pub extern "C" fn coveralls_new(name: *const c_char) -> u64 {
         CoverallsState {
             name: n,
             strong_count: 1,
+            repairs: Vec::new(),
         },
     );
     NUM_ALIVE.fetch_add(1, Ordering::Relaxed);
@@ -286,6 +436,7 @@ pub extern "C" fn coveralls_fallible_new(name: *const c_char, should_fail: bool)
         CoverallsState {
             name: n,
             strong_count: 1,
+            repairs: Vec::new(),
         },
     );
     NUM_ALIVE.fetch_add(1, Ordering::Relaxed);
@@ -318,6 +469,85 @@ pub extern "C" fn coveralls_set_name(handle: u64, name: *const c_char) {
 }
 
 #[no_mangle]
+pub extern "C" fn coveralls_get_status(_handle: u64, status: *const c_char) -> *mut c_char {
+    c_string_out(&c_str(status))
+}
+
+#[no_mangle]
+pub extern "C" fn coveralls_get_dict2(
+    _handle: u64,
+    key: *const c_char,
+    value: u64,
+) -> *mut c_char {
+    let k = c_str(key);
+    let map = serde_json::json!({ k: value });
+    json_out(&map)
+}
+
+#[no_mangle]
+pub extern "C" fn coveralls_get_dict3(_handle: u64, key: u32, value: u64) -> RustBuffer {
+    // Binary format: i32 length, then for each entry: u32 key, u64 value
+    let mut buf = Vec::new();
+    buf.extend_from_slice(&1i32.to_be_bytes());
+    buf.extend_from_slice(&key.to_be_bytes());
+    buf.extend_from_slice(&value.to_be_bytes());
+    let len = buf.len() as u64;
+    let ptr = buf.as_mut_ptr();
+    std::mem::forget(buf);
+    RustBuffer { data: ptr, len }
+}
+
+#[no_mangle]
+pub extern "C" fn coveralls_add_patch(handle: u64, patch_handle: u64) {
+    // We store the patch handle in the repairs list with timestamp 0
+    // In a real impl we'd track patches separately, but for testing
+    // we just need to verify the object handle round-trips.
+    let _ = (handle, patch_handle);
+}
+
+#[no_mangle]
+pub extern "C" fn coveralls_add_repair(handle: u64, repair_json: *const c_char) {
+    let json_str = c_str(repair_json);
+    if let Ok(val) = serde_json::from_str::<Value>(&json_str) {
+        let when = val["when"].as_i64().unwrap_or(0);
+        let patch_handle = val["patch"].as_u64().unwrap_or(0);
+        if let Some(s) = COVERALLS.lock().unwrap().get_mut(&handle) {
+            s.repairs.push((when, patch_handle));
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn coveralls_get_repairs(handle: u64) -> *mut c_char {
+    let state = COVERALLS.lock().unwrap();
+    let repairs = state
+        .get(&handle)
+        .map(|s| &s.repairs)
+        .cloned()
+        .unwrap_or_default();
+    let arr: Vec<Value> = repairs
+        .iter()
+        .map(|(when, patch)| {
+            serde_json::json!({
+                "when": when,
+                "patch": patch
+            })
+        })
+        .collect();
+    json_out(&Value::Array(arr))
+}
+
+#[no_mangle]
+pub extern "C" fn coveralls_set_and_get_empty_struct(
+    handle: u64,
+    empty_json: *const c_char,
+) -> *mut c_char {
+    let _ = (handle, c_str(empty_json));
+    // Return an empty JSON object for the empty record
+    json_out(&serde_json::json!({}))
+}
+
+#[no_mangle]
 pub extern "C" fn coveralls_strong_count(handle: u64) -> u64 {
     let state = COVERALLS.lock().unwrap();
     state.get(&handle).map(|s| s.strong_count).unwrap_or(0)
@@ -338,6 +568,7 @@ pub extern "C" fn coveralls_clone_me(handle: u64) -> u64 {
         CoverallsState {
             name,
             strong_count: 1,
+            repairs: Vec::new(),
         },
     );
     NUM_ALIVE.fetch_add(1, Ordering::Relaxed);
@@ -354,6 +585,11 @@ pub extern "C" fn coveralls_maybe_throw(handle: u64, should_throw: bool) -> *mut
         return err_envelope(&serde_json::json!({"tag": "tooManyHoles"}));
     }
     ok_envelope(Value::Bool(true))
+}
+
+#[no_mangle]
+pub extern "C" fn coveralls_maybe_throw_into(handle: u64, should_throw: bool) -> *mut c_char {
+    coveralls_maybe_throw(handle, should_throw)
 }
 
 #[no_mangle]
@@ -448,7 +684,18 @@ pub extern "C" fn get_maybe_dict(return_value: bool) -> *mut c_char {
             "tags": ["a"],
             "counts": {"x": 1},
             "maybeText": null,
-            "maybePatch": null
+            "maybePatch": null,
+            "maybeU8": null,
+            "maybeU16": null,
+            "maybeU64": null,
+            "maybeI8": null,
+            "maybeI64": null,
+            "maybeF32": null,
+            "maybeF64": null,
+            "maybeBool": null,
+            "maybeBytes": null,
+            "someBytes": "",
+            "coveralls": null
         });
         json_out(&dict)
     } else {
@@ -545,4 +792,186 @@ pub extern "C" fn threadsafecounter_increment(handle: u64) {
 #[no_mangle]
 pub extern "C" fn threadsafecounter_get_count(handle: u64) -> u64 {
     COUNTERS.lock().unwrap().get(&handle).copied().unwrap_or(0)
+}
+
+// --- Getters callback init ---
+
+#[no_mangle]
+pub extern "C" fn getters_callback_init(vtable: *const GettersVTable) {
+    *GETTERS_VTABLE.lock().unwrap() = Some(VTablePtr(vtable));
+}
+
+/// Exercise a foreign-implemented Getters callback.
+/// Calls get_bool, get_string, get_nothing, and round_trip_object.
+/// Note: get_list and get_option are not exercised here.
+#[no_mangle]
+pub extern "C" fn test_getters(getters_handle: u64) -> *mut c_char {
+    let vtable_guard = GETTERS_VTABLE.lock().unwrap();
+    let vtable_ptr = match vtable_guard.as_ref() {
+        Some(wrapper) => wrapper.0,
+        None => return err_envelope(&serde_json::json!({"tag": "tooManyHoles"})),
+    };
+    let vtable = unsafe { &*vtable_ptr };
+    drop(vtable_guard);
+
+    // Call get_bool(true, true) — should return true
+    {
+        let mut out_return: bool = false;
+        let mut out_status = RustCallStatus {
+            code: 0,
+            error_buf: std::ptr::null_mut(),
+        };
+        unsafe {
+            (vtable.get_bool)(
+                getters_handle,
+                true,
+                true,
+                &mut out_return,
+                &mut out_status,
+            );
+        }
+        if out_status.code != 0 {
+            return err_envelope(&serde_json::json!({"tag": "tooManyHoles"}));
+        }
+        if !out_return {
+            return err_envelope(&serde_json::json!({"tag": "tooManyHoles"}));
+        }
+    }
+
+    // Call get_string("hello", false) — should succeed
+    {
+        let v = CString::new("hello").unwrap();
+        let mut out_return: *mut c_char = std::ptr::null_mut();
+        let mut out_status = RustCallStatus {
+            code: 0,
+            error_buf: std::ptr::null_mut(),
+        };
+        unsafe {
+            (vtable.get_string)(
+                getters_handle,
+                v.as_ptr(),
+                false,
+                &mut out_return,
+                &mut out_status,
+            );
+        }
+        if out_status.code != 0 {
+            return err_envelope(&serde_json::json!({"tag": "tooManyHoles"}));
+        }
+        if !out_return.is_null() {
+            let result_str = c_str(out_return);
+            // Free the string returned by the callback
+            rust_string_free(out_return);
+            if result_str != "hello" {
+                return err_envelope(&serde_json::json!({"tag": "tooManyHoles"}));
+            }
+        }
+    }
+
+    // Call get_nothing("test") — should succeed (void return)
+    {
+        let v = CString::new("test").unwrap();
+        let mut out_status = RustCallStatus {
+            code: 0,
+            error_buf: std::ptr::null_mut(),
+        };
+        unsafe {
+            (vtable.get_nothing)(
+                getters_handle,
+                v.as_ptr(),
+                std::ptr::null_mut(),
+                &mut out_status,
+            );
+        }
+        if out_status.code != 0 {
+            return err_envelope(&serde_json::json!({"tag": "tooManyHoles"}));
+        }
+    }
+
+    // Call round_trip_object with a Coveralls handle
+    {
+        let name = CString::new("round-trip-test").unwrap();
+        let test_handle = coveralls_new(name.as_ptr());
+        let mut out_return: u64 = 0;
+        let mut out_status = RustCallStatus {
+            code: 0,
+            error_buf: std::ptr::null_mut(),
+        };
+        unsafe {
+            (vtable.round_trip_object)(
+                getters_handle,
+                test_handle,
+                &mut out_return,
+                &mut out_status,
+            );
+        }
+        if out_status.code != 0 {
+            coveralls_free(test_handle);
+            return err_envelope(&serde_json::json!({"tag": "tooManyHoles"}));
+        }
+        if out_return == 0 {
+            coveralls_free(test_handle);
+            return err_envelope(&serde_json::json!({"tag": "tooManyHoles"}));
+        }
+        // Verify the returned handle preserves the object's name.
+        let returned_name_ptr = coveralls_get_name(out_return);
+        let returned_name = c_str(returned_name_ptr);
+        rust_string_free(returned_name_ptr);
+        // The test Dart implementation returns the same handle it received
+        // (FfiCodec.lower reads the handle without cloning), so
+        // test_handle == out_return. Free once to avoid double-free.
+        coveralls_free(test_handle);
+        if out_return != test_handle {
+            coveralls_free(out_return);
+        }
+        if returned_name != "round-trip-test" {
+            return err_envelope(&serde_json::json!({"tag": "tooManyHoles"}));
+        }
+    }
+
+    // Success — return ok envelope
+    let env = serde_json::json!({"ok": null});
+    json_out(&env)
+}
+
+// --- IFirst object ---
+
+#[no_mangle]
+pub extern "C" fn ifirst_new() -> u64 {
+    let handle = alloc_handle();
+    IFIRSTS.lock().unwrap().insert(handle, ());
+    handle
+}
+
+#[no_mangle]
+pub extern "C" fn ifirst_free(handle: u64) {
+    IFIRSTS.lock().unwrap().remove(&handle);
+}
+
+#[no_mangle]
+pub extern "C" fn ifirst_compare(handle: u64, other: u64) -> bool {
+    let _ = handle;
+    // Returns true if other is non-null (non-zero handle)
+    other != 0
+}
+
+// --- ISecond object ---
+
+#[no_mangle]
+pub extern "C" fn isecond_new() -> u64 {
+    let handle = alloc_handle();
+    ISECONDS.lock().unwrap().insert(handle, ());
+    handle
+}
+
+#[no_mangle]
+pub extern "C" fn isecond_free(handle: u64) {
+    ISECONDS.lock().unwrap().remove(&handle);
+}
+
+#[no_mangle]
+pub extern "C" fn isecond_compare(handle: u64, other: u64) -> bool {
+    let _ = handle;
+    // Returns true if other is non-null (non-zero handle)
+    other != 0
 }

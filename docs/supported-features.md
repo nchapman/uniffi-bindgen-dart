@@ -21,7 +21,7 @@ Legend:
 | Sequences/maps | Implemented | sequences covered in top-level + object paths (including async bytes families); string-keyed maps use JSON codec; non-string-keyed maps (`record<u32, u64>`) use binary RustBuffer codec with `_UniFfiBinaryWriter`/`_UniFfiBinaryReader` |
 | Builtins | Implemented | int/float/bool/string/bytes/timestamp/duration |
 | Async futures | Implemented | `[Async]` maps to idiomatic `Future<...>` APIs with rust-future poll/cancel/complete/free runtime flow for all return families; `[Async, Throws=X]` functions/methods/constructors fully supported with typed error decoding; dedicated async golden coverage (`fixtures/futures-stress`) and runtime smoke with failure + timeout checks |
-| Callback interfaces | Implemented | sync/async/throws callback argument paths for top-level functions and object methods; callback-interface method-level async/throws generation for all supported return families; vtable/handle-based dispatch with `NativeCallable.isolateLocal`; throwing functions with callback params supported |
+| Callback interfaces | Implemented | sync/async/throws callback argument paths for top-level functions and object methods; callback-interface method-level async/throws generation for all supported return families; vtable/handle-based dispatch with `NativeCallable.isolateLocal`; throwing functions with callback params supported; Object types supported as callback args and returns (handle-based lift/lower) |
 | Custom types | Implemented | builtin-backed typedef unwrapping implemented across all runtime paths (same approach as Swift/Kotlin — validation happens in Rust scaffolding); validated for string, integer, bytes/optional-bytes, and string-keyed custom-map aliases across sync/async top-level + object calls; nested container custom aliases covered in runtime smoke |
 | External/remote types | Implemented | external record/enum/interface typedef references bind through runtime wrappers with mapped `external_packages` imports; import collection scans all surfaces including record fields and enum payloads; generator emits stable public `*FfiCodec` helpers for cross-package conversion contracts; `Optional<ExternalRecord>`, `Sequence<ExternalRecord>`, and external-field-in-record paths covered by golden fixture |
 | Rename/exclude/docstrings | Implemented | `rename`/`exclude` config keys implemented for generated Dart public API wrappers with dedicated `rename-demo` golden coverage; docstring emission across all generated surfaces with `docstrings-demo` golden coverage |
@@ -35,6 +35,20 @@ Legend:
 - **Recursive callback interfaces**: Callback interfaces whose methods take or return the same callback type (e.g., `NodeTrait` with `set_parent(NodeTrait?)`) cannot be used as function parameters.
 - **Callback interface as return type**: Functions returning a callback interface type (e.g., `Getters make_rust_getters()`) are not yet supported.
 - **Error interface methods**: Error types generated from `[Error]` enums do not support methods.
+- **Panic handling**: `RustCallStatus`-based panic propagation (e.g., `panicking_new`, `panic()`, `fallible_panic()`) is not implemented; panics in Rust will abort rather than throwing a Dart exception.
+- **Stored callbacks**: Callback interfaces stored in Rust constructors (e.g., `StoredForeignStringifier`) are not supported; callbacks are passed per-call.
+- **`[ByRef]` arguments**: Not applicable to Dart FFI — all arguments are passed by value.
+
+### Upstream coverall gaps
+
+These features exist in the upstream `uniffi-rs` coverall fixture but require deeper generator work:
+
+| Feature | Why | Upstream Coverage |
+|---|---|---|
+| `sequence<Object?>` in records | Object lift/lower in JSON sequence codec | `SimpleDict.coveralls_list` |
+| `record<string, Object?>` in records | Object lift/lower in JSON map codec | `SimpleDict.coveralls_map` |
+| `NodeTrait?` in records | CallbackInterface type not standalone-FFI-compatible | `SimpleDict.test_trait` |
+| `sequence<Object>` return type | Objects in sequences not FFI-compatible | `get_traits()`, `get_string_util_traits()` |
 
 ## Notes
 - Current fixture coverage includes 19 golden tests across all major feature domains, anchored by `coverall-demo` (comprehensive feature combinations) and `simple-fns` (rich runtime interactions).

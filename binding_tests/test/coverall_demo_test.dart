@@ -23,9 +23,9 @@ void main() {
     resetDefaultBindings();
   });
 
-  // Not tested: makeRustGetters, testGetters, ancestorNames
-  // The native-lib stub does not implement callback interfaces.
-  // These are covered by the golden test fixture.
+  // Not tested: makeRustGetters, ancestorNames
+  // makeRustGetters returns a callback interface type (unsupported).
+  // ancestorNames takes a NodeTrait (recursive callback, unsupported).
 
   test('generated bindings file exists', () {
     final generated = File('generated/coverall_demo.dart');
@@ -44,6 +44,17 @@ void main() {
       expect(dict.counts['y'], 2);
       expect(dict.maybeText, 'present');
       expect(dict.maybePatch, isNull);
+      expect(dict.maybeU8, 1);
+      expect(dict.maybeU16, 2);
+      expect(dict.maybeU64, 3);
+      expect(dict.maybeI8, -1);
+      expect(dict.maybeI64, -2);
+      expect(dict.maybeF32, closeTo(1.5, 0.01));
+      expect(dict.maybeF64, closeTo(2.5, 0.01));
+      expect(dict.maybeBool, isTrue);
+      expect(dict.maybeBytes, isNull);
+      expect(dict.someBytes, isEmpty);
+      expect(dict.coveralls, isNull);
     });
 
     test('createNoneDict returns dict with nulls', () {
@@ -56,6 +67,17 @@ void main() {
       expect(dict.counts, isEmpty);
       expect(dict.maybeText, isNull);
       expect(dict.maybePatch, isNull);
+      expect(dict.maybeU8, isNull);
+      expect(dict.maybeU16, isNull);
+      expect(dict.maybeU64, isNull);
+      expect(dict.maybeI8, isNull);
+      expect(dict.maybeI64, isNull);
+      expect(dict.maybeF32, isNull);
+      expect(dict.maybeF64, isNull);
+      expect(dict.maybeBool, isNull);
+      expect(dict.maybeBytes, isNull);
+      expect(dict.someBytes, isEmpty);
+      expect(dict.coveralls, isNull);
     });
 
     test('getMaybeSimpleDict Nah variant', () {
@@ -205,6 +227,36 @@ void main() {
       final result = getIntMap(31, 42);
       expect(result[31], 42);
     });
+
+    test('throwFlatError throws CoverallFlatError', () {
+      expect(
+        () => throwFlatError(),
+        throwsA(isA<CoverallFlatErrorExceptionTooManyVariants>()),
+      );
+    });
+
+    test('validateHtml empty source succeeds', () {
+      validateHtml('');
+    });
+
+    test('validateHtml non-empty throws HTMLError', () {
+      expect(
+        () => validateHtml('<invalid>'),
+        throwsA(isA<HTMLErrorExceptionInvalidHTML>()),
+      );
+    });
+
+    test('outputReturnOnlyDict returns dict with error enum', () {
+      final result = outputReturnOnlyDict();
+      expect(result.e, isA<CoverallFlatError>());
+    });
+
+    test('outputReturnOnlyEnum returns One variant', () {
+      final result = outputReturnOnlyEnum();
+      expect(result, isA<ReturnOnlyEnumOne>());
+      final one = result as ReturnOnlyEnumOne;
+      expect(one.e, isA<CoverallFlatError>());
+    });
   });
 
   group('Patch object', () {
@@ -231,6 +283,19 @@ void main() {
     test('fallible creation throws', () {
       expect(
         () => FalliblePatch.create(Color.red, true),
+        throwsA(isA<CoverallErrorExceptionTooManyHoles>()),
+      );
+    });
+
+    test('secondary constructor success', () {
+      final patch = FalliblePatch.secondary(Color.blue, false);
+      expect(patch.getColor(), Color.blue);
+      patch.close();
+    });
+
+    test('secondary constructor throws', () {
+      expect(
+        () => FalliblePatch.secondary(Color.blue, true),
         throwsA(isA<CoverallErrorExceptionTooManyHoles>()),
       );
     });
@@ -264,6 +329,54 @@ void main() {
       c.close();
     });
 
+    test('getStatus pass-through', () {
+      final c = Coveralls.create('test');
+      expect(c.getStatus('active'), 'active');
+      expect(c.getStatus('idle'), 'idle');
+      c.close();
+    });
+
+    test('getDict2 string-keyed map', () {
+      final c = Coveralls.create('test');
+      final result = c.getDict2('hello', 42);
+      expect(result['hello'], 42);
+      c.close();
+    });
+
+    test('getDict3 non-string-keyed map', () {
+      final c = Coveralls.create('test');
+      final result = c.getDict3(7, 99);
+      expect(result[7], 99);
+      c.close();
+    });
+
+    test('addPatch does not throw', () {
+      final c = Coveralls.create('test');
+      final p = Patch.create(Color.red);
+      c.addPatch(p);
+      p.close();
+      c.close();
+    });
+
+    test('addRepair and getRepairs', () {
+      final c = Coveralls.create('test');
+      final p = Patch.create(Color.green);
+      final now = DateTime.now().toUtc();
+      c.addRepair(Repair(when: now, patch: p));
+      final repairs = c.getRepairs();
+      expect(repairs, hasLength(1));
+      p.close();
+      c.close();
+    });
+
+    test('setAndGetEmptyStruct', () {
+      final c = Coveralls.create('test');
+      final empty = EmptyStruct();
+      final result = c.setAndGetEmptyStruct(empty);
+      expect(result, isA<EmptyStruct>());
+      c.close();
+    });
+
     test('strongCount', () {
       final c = Coveralls.create('strong');
       expect(c.strongCount(), 1);
@@ -288,6 +401,21 @@ void main() {
       final c = Coveralls.create('thrower');
       expect(
         () => c.maybeThrow(true),
+        throwsA(isA<CoverallErrorExceptionTooManyHoles>()),
+      );
+      c.close();
+    });
+
+    test('maybeThrowInto does not throw', () {
+      final c = Coveralls.create('thrower');
+      expect(c.maybeThrowInto(false), isTrue);
+      c.close();
+    });
+
+    test('maybeThrowInto throws CoverallError', () {
+      final c = Coveralls.create('thrower');
+      expect(
+        () => c.maybeThrowInto(true),
         throwsA(isA<CoverallErrorExceptionTooManyHoles>()),
       );
       c.close();
@@ -390,6 +518,82 @@ void main() {
     });
   });
 
+  group('IFirst / ISecond forward references', () {
+    test('IFirst compare with null', () {
+      final first = IFirst.create();
+      expect(first.compare(), isFalse);
+      first.close();
+    });
+
+    test('IFirst compare with ISecond', () {
+      final first = IFirst.create();
+      final second = ISecond.create();
+      expect(first.compare(other: second), isTrue);
+      first.close();
+      second.close();
+    });
+
+    test('ISecond compare with null', () {
+      final second = ISecond.create();
+      expect(second.compare(null), isFalse);
+      second.close();
+    });
+
+    test('ISecond compare with IFirst', () {
+      final first = IFirst.create();
+      final second = ISecond.create();
+      expect(second.compare(first), isTrue);
+      first.close();
+      second.close();
+    });
+  });
+
+  group('EmptyStruct', () {
+    test('construction', () {
+      final empty = EmptyStruct();
+      expect(empty, isA<EmptyStruct>());
+    });
+
+    test('toJson/fromJson round-trip', () {
+      final empty = EmptyStruct();
+      final json = empty.toJson();
+      final restored = EmptyStruct.fromJson(json);
+      expect(restored, isA<EmptyStruct>());
+    });
+  });
+
+  group('DictWithDefaults', () {
+    test('default values', () {
+      final dict = DictWithDefaults();
+      expect(dict.name, 'default-value');
+      expect(dict.category, isNull);
+      expect(dict.integer, 31);
+      expect(dict.itemList, isEmpty);
+      expect(dict.itemMap, isEmpty);
+    });
+
+    test('custom values override defaults', () {
+      final dict = DictWithDefaults(name: 'custom', integer: 99);
+      expect(dict.name, 'custom');
+      expect(dict.integer, 99);
+    });
+  });
+
+  group('MaybeObject enum', () {
+    test('Obj variant with Patch', () {
+      final patch = Patch.create(Color.red);
+      final obj = MaybeObjectObj(p: patch);
+      expect(obj, isA<MaybeObjectObj>());
+      expect((obj as MaybeObjectObj).p.getColor(), Color.red);
+      patch.close();
+    });
+
+    test('Nah variant', () {
+      final nah = MaybeObjectNah();
+      expect(nah, isA<MaybeObjectNah>());
+    });
+  });
+
   group('type codecs', () {
     test('Color encode/decode round-trip', () {
       for (final color in Color.values) {
@@ -431,6 +635,20 @@ void main() {
           CoverallErrorFfiCodec.decode(CoverallErrorFfiCodec.encode(err));
       expect(decoded, isA<CoverallErrorTooManyHoles>());
     });
+
+    test('CoverallFlatError encode/decode round-trip', () {
+      final err = CoverallFlatErrorTooManyVariants();
+      final decoded =
+          CoverallFlatErrorFfiCodec.decode(CoverallFlatErrorFfiCodec.encode(err));
+      expect(decoded, isA<CoverallFlatErrorTooManyVariants>());
+    });
+
+    test('HTMLError encode/decode round-trip', () {
+      final err = HTMLErrorInvalidHTML();
+      final decoded =
+          HTMLErrorFfiCodec.decode(HTMLErrorFfiCodec.encode(err));
+      expect(decoded, isA<HTMLErrorInvalidHTML>());
+    });
   });
 
   group('SimpleDict model', () {
@@ -444,6 +662,17 @@ void main() {
         counts: {'k': 3},
         maybeText: 'opt',
         maybePatch: null,
+        maybeU8: 10,
+        maybeU16: 20,
+        maybeU64: 30,
+        maybeI8: -5,
+        maybeI64: -10,
+        maybeF32: 1.1,
+        maybeF64: 2.2,
+        maybeBool: false,
+        maybeBytes: null,
+        someBytes: Uint8List(0),
+        coveralls: null,
       );
       final json = dict.toJson();
       final restored = SimpleDict.fromJson(json);
@@ -455,6 +684,11 @@ void main() {
       expect(restored.counts['k'], 3);
       expect(restored.maybeText, 'opt');
       expect(restored.maybePatch, isNull);
+      expect(restored.maybeU8, 10);
+      expect(restored.maybeU16, 20);
+      expect(restored.maybeU64, 30);
+      expect(restored.maybeI8, -5);
+      expect(restored.maybeI64, -10);
     });
 
     test('copyWith', () {
@@ -467,6 +701,17 @@ void main() {
         counts: {},
         maybeText: null,
         maybePatch: null,
+        maybeU8: null,
+        maybeU16: null,
+        maybeU64: null,
+        maybeI8: null,
+        maybeI64: null,
+        maybeF32: null,
+        maybeF64: null,
+        maybeBool: null,
+        maybeBytes: null,
+        someBytes: Uint8List(0),
+        coveralls: null,
       );
       final updated = dict.copyWith(text: 'new', flag: true);
       expect(updated.text, 'new');
@@ -474,4 +719,73 @@ void main() {
       expect(updated.maybeCount, 1);
     });
   });
+
+  group('ReturnOnlyDict', () {
+    test('construction with error enum field', () {
+      final dict = ReturnOnlyDict(e: CoverallFlatErrorTooManyVariants());
+      expect(dict.e, isA<CoverallFlatErrorTooManyVariants>());
+    });
+  });
+
+  group('Getters callback', () {
+    test('testGetters exercises callback interface', () {
+      final before = getNumAlive();
+      final getters = _TestGetters();
+      testGetters(getters);
+      expect(getters.getBoolCalled, isTrue);
+      expect(getters.getStringCalled, isTrue);
+      expect(getters.getNothingCalled, isTrue);
+      expect(getters.roundTripObjectCalled, isTrue);
+      // The native side creates and frees its Coveralls handles, so
+      // the live count should return to baseline.
+      expect(getNumAlive(), before);
+    });
+  });
+}
+
+/// Test implementation of the Getters callback interface.
+class _TestGetters implements Getters {
+  bool getBoolCalled = false;
+  bool getStringCalled = false;
+  bool getNothingCalled = false;
+  bool roundTripObjectCalled = false;
+
+  @override
+  bool getBool(bool v, bool arg2) {
+    getBoolCalled = true;
+    return v && arg2;
+  }
+
+  @override
+  String getString(String v, bool arg2) {
+    getStringCalled = true;
+    if (arg2) {
+      throw CoverallErrorExceptionTooManyHoles();
+    }
+    return v;
+  }
+
+  @override
+  String? getOption(String v, bool arg2) {
+    if (arg2) {
+      throw ComplexErrorExceptionOsError(code: 1, extendedCode: 2);
+    }
+    return v.isEmpty ? null : v;
+  }
+
+  @override
+  List<int> getList(List<int> v, bool arg2) {
+    return v;
+  }
+
+  @override
+  void getNothing(String v) {
+    getNothingCalled = true;
+  }
+
+  @override
+  Coveralls roundTripObject(Coveralls coveralls) {
+    roundTripObjectCalled = true;
+    return coveralls;
+  }
 }
