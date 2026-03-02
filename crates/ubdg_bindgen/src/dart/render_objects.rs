@@ -98,7 +98,16 @@ pub(super) fn render_object_classes(
                 "  static {signature_return} {static_name}({args}) {{\n"
             ));
             if ctor.is_async {
-                out.push_str(&format!("    return Future(() => {invoke_expr});\n"));
+                if is_runtime_async_rust_future_compatible_constructor(
+                    ctor,
+                    callback_interfaces,
+                    records,
+                    enums,
+                ) {
+                    out.push_str(&format!("    return {invoke_expr};\n"));
+                } else {
+                    out.push_str(&format!("    return Future(() => {invoke_expr});\n"));
+                }
             } else {
                 out.push_str(&format!("    return {invoke_expr};\n"));
             }

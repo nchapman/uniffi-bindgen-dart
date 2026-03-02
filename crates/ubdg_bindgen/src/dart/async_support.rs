@@ -18,7 +18,14 @@ pub(super) fn has_runtime_async_rust_future_support(
                 enums,
             )
     }) || objects.iter().any(|o| {
-        o.methods.iter().any(|m| {
+        o.constructors.iter().any(|c| {
+            is_runtime_async_rust_future_compatible_constructor(
+                c,
+                callback_interfaces,
+                records,
+                enums,
+            )
+        }) || o.methods.iter().any(|m| {
             m.runtime_unsupported.is_none()
                 && is_runtime_async_rust_future_compatible_method(
                     m,
@@ -229,6 +236,30 @@ pub(super) fn is_runtime_async_rust_future_compatible_method(
         && async_rust_future_spec(method.return_type.as_ref(), records, enums).is_some()
         && runtime_args_compatible_with_optional_callbacks(
             &method.args,
+            callback_interfaces,
+            records,
+            enums,
+        )
+        .is_some()
+}
+
+/// Check whether an async constructor can use the real Rust-future
+/// poll/complete/free lifecycle. Constructors always return a u64 handle,
+/// which maps to the `u64` async spec.
+pub(super) fn is_runtime_async_rust_future_compatible_constructor(
+    ctor: &UdlObjectConstructor,
+    callback_interfaces: &[UdlCallbackInterface],
+    records: &[UdlRecord],
+    enums: &[UdlEnum],
+) -> bool {
+    ctor.is_async
+        && ctor
+            .throws_type
+            .as_ref()
+            .map(|t| is_runtime_throws_enum_type(t, enums))
+            .unwrap_or(true)
+        && runtime_args_compatible_with_optional_callbacks(
+            &ctor.args,
             callback_interfaces,
             records,
             enums,

@@ -1122,6 +1122,160 @@ class FuturesStressFfi {
     }
   }
 
+  late final void Function(int handle) _asyncWidgetFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('asyncwidget_free');
+
+  late final int Function(ffi.Pointer<Utf8> name) _asyncWidgetCtorNew = _lib.lookupFunction<ffi.Uint64 Function(ffi.Pointer<Utf8> name), int Function(ffi.Pointer<Utf8> name)>('asyncwidget_new');
+  late final void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData) _asyncWidgetCtorNewRustFuturePoll = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, ffi.Uint64 callbackData), void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData)>('rust_future_poll_u64');
+  late final void Function(int handle) _asyncWidgetCtorNewRustFutureCancel = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_cancel_u64');
+  late final int Function(int handle, ffi.Pointer<_RustCallStatus> outStatus) _asyncWidgetCtorNewRustFutureComplete = _lib.lookupFunction<ffi.Uint64 Function(ffi.Uint64 handle, ffi.Pointer<_RustCallStatus> outStatus), int Function(int handle, ffi.Pointer<_RustCallStatus> outStatus)>('rust_future_complete_u64');
+  late final void Function(int handle) _asyncWidgetCtorNewRustFutureFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_free_u64');
+
+  Future<AsyncWidget> asyncWidgetCreateNew(String name) async {
+    final ffi.Pointer<Utf8> nameNative = name.toNativeUtf8();
+    final int futureHandle;
+    try {
+      futureHandle = _asyncWidgetCtorNew(nameNative);
+    } finally {
+    calloc.free(nameNative);
+    }
+    final StreamController<int> pollEvents = StreamController<int>.broadcast();
+    final callback = ffi.NativeCallable<ffi.Void Function(ffi.Uint64, ffi.Int8)>.listener((int _, int pollResult) {
+      pollEvents.add(pollResult);
+    });
+    try {
+      _asyncWidgetCtorNewRustFuturePoll(futureHandle, callback.nativeFunction, 0);
+      while (true) {
+        final int pollResult = await pollEvents.stream.first;
+        if (pollResult == _rustFuturePollReady) {
+          break;
+        }
+        if (pollResult == _rustFuturePollWake) {
+          _asyncWidgetCtorNewRustFuturePoll(futureHandle, callback.nativeFunction, 0);
+          continue;
+        }
+        throw StateError('Rust future poll returned invalid status for asyncwidget_new: $pollResult');
+      }
+      final ffi.Pointer<_RustCallStatus> outStatusPtr = calloc<_RustCallStatus>();
+      try {
+        final int resultValue = _asyncWidgetCtorNewRustFutureComplete(futureHandle, outStatusPtr);
+        final int statusCode = outStatusPtr.ref.code;
+        if (statusCode == _rustCallStatusSuccess) {
+          return AsyncWidget._(this, resultValue);
+        }
+        if (statusCode == _rustCallStatusCancelled) {
+          throw StateError('Rust future was cancelled for asyncwidget_new');
+        }
+        final ffi.Pointer<Utf8> errorPtr = outStatusPtr.ref.errorBuf;
+        if (errorPtr != ffi.nullptr) {
+          try {
+            throw StateError(errorPtr.toDartString());
+          } finally {
+            _rustStringFree(errorPtr);
+          }
+        }
+        throw StateError('Rust future failed for asyncwidget_new with status code: $statusCode');
+      } finally {
+        calloc.free(outStatusPtr);
+      }
+    } catch (_) {
+      _asyncWidgetCtorNewRustFutureCancel(futureHandle);
+      rethrow;
+    } finally {
+      await pollEvents.close();
+      callback.close();
+      _asyncWidgetCtorNewRustFutureFree(futureHandle);
+    }
+  }
+
+  late final int Function(ffi.Pointer<Utf8> name, bool shouldFail) _asyncWidgetCtorValidatedNew = _lib.lookupFunction<ffi.Uint64 Function(ffi.Pointer<Utf8> name, ffi.Bool shouldFail), int Function(ffi.Pointer<Utf8> name, bool shouldFail)>('asyncwidget_validated_new');
+  late final void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData) _asyncWidgetCtorValidatedNewRustFuturePoll = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, ffi.Uint64 callbackData), void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData)>('rust_future_poll_u64');
+  late final void Function(int handle) _asyncWidgetCtorValidatedNewRustFutureCancel = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_cancel_u64');
+  late final int Function(int handle, ffi.Pointer<_RustCallStatus> outStatus) _asyncWidgetCtorValidatedNewRustFutureComplete = _lib.lookupFunction<ffi.Uint64 Function(ffi.Uint64 handle, ffi.Pointer<_RustCallStatus> outStatus), int Function(int handle, ffi.Pointer<_RustCallStatus> outStatus)>('rust_future_complete_u64');
+  late final void Function(int handle) _asyncWidgetCtorValidatedNewRustFutureFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_free_u64');
+
+  Future<AsyncWidget> asyncWidgetCreateValidatedNew(String name, bool shouldFail) async {
+    final ffi.Pointer<Utf8> nameNative = name.toNativeUtf8();
+    final int futureHandle;
+    try {
+      futureHandle = _asyncWidgetCtorValidatedNew(nameNative, shouldFail);
+    } finally {
+    calloc.free(nameNative);
+    }
+    final StreamController<int> pollEvents = StreamController<int>.broadcast();
+    final callback = ffi.NativeCallable<ffi.Void Function(ffi.Uint64, ffi.Int8)>.listener((int _, int pollResult) {
+      pollEvents.add(pollResult);
+    });
+    try {
+      _asyncWidgetCtorValidatedNewRustFuturePoll(futureHandle, callback.nativeFunction, 0);
+      while (true) {
+        final int pollResult = await pollEvents.stream.first;
+        if (pollResult == _rustFuturePollReady) {
+          break;
+        }
+        if (pollResult == _rustFuturePollWake) {
+          _asyncWidgetCtorValidatedNewRustFuturePoll(futureHandle, callback.nativeFunction, 0);
+          continue;
+        }
+        throw StateError('Rust future poll returned invalid status for asyncwidget_validated_new: $pollResult');
+      }
+      final ffi.Pointer<_RustCallStatus> outStatusPtr = calloc<_RustCallStatus>();
+      try {
+        final int resultValue = _asyncWidgetCtorValidatedNewRustFutureComplete(futureHandle, outStatusPtr);
+        final int statusCode = outStatusPtr.ref.code;
+        if (statusCode == _rustCallStatusSuccess) {
+          return AsyncWidget._(this, resultValue);
+        }
+        if (statusCode == _rustCallStatusError) {
+          final ffi.Pointer<Utf8> errorPtr = outStatusPtr.ref.errorBuf;
+          if (errorPtr != ffi.nullptr) {
+            try {
+              final String errorPayload = errorPtr.toDartString();
+              throw AsyncErrorExceptionFfiCodec.decode(jsonDecode(errorPayload));
+            } finally {
+              _rustStringFree(errorPtr);
+            }
+          }
+          throw StateError('Rust async error without payload for asyncwidget_validated_new');
+        }
+        if (statusCode == _rustCallStatusCancelled) {
+          throw StateError('Rust future was cancelled for asyncwidget_validated_new');
+        }
+        final ffi.Pointer<Utf8> errorPtr = outStatusPtr.ref.errorBuf;
+        if (errorPtr != ffi.nullptr) {
+          try {
+            throw StateError(errorPtr.toDartString());
+          } finally {
+            _rustStringFree(errorPtr);
+          }
+        }
+        throw StateError('Rust future failed for asyncwidget_validated_new with status code: $statusCode');
+      } finally {
+        calloc.free(outStatusPtr);
+      }
+    } catch (_) {
+      _asyncWidgetCtorValidatedNewRustFutureCancel(futureHandle);
+      rethrow;
+    } finally {
+      await pollEvents.close();
+      callback.close();
+      _asyncWidgetCtorValidatedNewRustFutureFree(futureHandle);
+    }
+  }
+
+  late final ffi.Pointer<Utf8> Function(int handle) _asyncWidgetGetName = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle), ffi.Pointer<Utf8> Function(int handle)>('asyncwidget_get_name');
+
+  String asyncWidgetInvokeGetName(int handle) {
+    final ffi.Pointer<Utf8> resultPtr = _asyncWidgetGetName(handle);
+    if (resultPtr == ffi.nullptr) {
+      throw StateError('Rust returned null for asyncwidget_get_name');
+    }
+    try {
+      return resultPtr.toDartString();
+    } finally {
+      _rustStringFree(resultPtr);
+    }
+  }
+
   late final void Function(int handle) _workerFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('worker_free');
 
   late final int Function() _workerCtorNew = _lib.lookupFunction<ffi.Uint64 Function(), int Function()>('worker_new');
@@ -1472,6 +1626,65 @@ class FuturesStressFfi {
       _workerAsyncValueRustFutureFree(futureHandle);
     }
   }
+}
+
+final class _AsyncWidgetFinalizerToken {
+  const _AsyncWidgetFinalizerToken(this.free, this.handle);
+  final void Function(int) free;
+  final int handle;
+}
+
+final class AsyncWidget {
+  AsyncWidget._(this._ffi, this._handle) {
+    _finalizer.attach(this, _AsyncWidgetFinalizerToken(_ffi._asyncWidgetFree, _handle), detach: this);
+  }
+
+  final FuturesStressFfi _ffi;
+  int _handle;
+  bool _closed = false;
+
+  static final Finalizer<_AsyncWidgetFinalizerToken> _finalizer = Finalizer((token) {
+    token.free(token.handle);
+  });
+
+  bool get isClosed => _closed;
+
+  void close() {
+    if (_closed) {
+      return;
+    }
+    _closed = true;
+    _finalizer.detach(this);
+    _ffi._asyncWidgetFree(_handle);
+  }
+
+  void _ensureOpen() {
+    if (_closed) {
+      throw StateError('AsyncWidget is closed');
+    }
+  }
+
+  static Future<AsyncWidget> create(String name) {
+    return _bindings().asyncWidgetCreateNew(name);
+  }
+
+  static Future<AsyncWidget> validatedNew(String name, bool shouldFail) {
+    return _bindings().asyncWidgetCreateValidatedNew(name, shouldFail);
+  }
+
+  String getName() {
+    _ensureOpen();
+    return _ffi.asyncWidgetInvokeGetName(_handle);
+  }
+
+}
+
+final class AsyncWidgetFfiCodec {
+  const AsyncWidgetFfiCodec._();
+
+  static int lower(AsyncWidget value) => value._handle;
+
+  static AsyncWidget lift(int handle) => AsyncWidget._(_bindings(), handle);
 }
 
 final class _WorkerFinalizerToken {

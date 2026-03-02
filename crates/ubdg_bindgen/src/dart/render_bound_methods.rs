@@ -2570,16 +2570,6 @@ pub(super) fn render_bound_methods(
                 .clone()
                 .unwrap_or_else(|| format!("{}_{}", object_symbol, dart_identifier(&ctor.name)));
             let is_throwing = ctor.throws_type.is_some();
-            let native_return = if is_throwing {
-                "ffi.Pointer<Utf8>"
-            } else {
-                "ffi.Uint64"
-            };
-            let dart_return = if is_throwing {
-                "ffi.Pointer<Utf8>"
-            } else {
-                "int"
-            };
             let mut native_args = Vec::new();
             let mut dart_args = Vec::new();
             let mut dart_ffi_args = Vec::new();
@@ -2617,6 +2607,187 @@ pub(super) fn render_bound_methods(
             if !signature_compatible {
                 continue;
             }
+
+            // Async constructor with real Rust-future poll/complete/free lifecycle
+            if is_runtime_async_rust_future_compatible_constructor(
+                ctor,
+                callback_interfaces,
+                records,
+                enums,
+            ) {
+                let start_native_sig = format!("ffi.Uint64 Function({})", native_args.join(", "));
+                let start_dart_sig = format!("int Function({})", dart_ffi_args.join(", "));
+                let poll_field = format!("{ctor_field}RustFuturePoll");
+                let cancel_field = format!("{ctor_field}RustFutureCancel");
+                let complete_field = format!("{ctor_field}RustFutureComplete");
+                let free_field = format!("{ctor_field}RustFutureFree");
+                // Constructors always return a u64 handle
+                let complete_symbol = "rust_future_complete_u64";
+                let poll_symbol = "rust_future_poll_u64";
+                let cancel_symbol = "rust_future_cancel_u64";
+                let free_symbol = "rust_future_free_u64";
+                let complete_native_sig =
+                    "ffi.Uint64 Function(ffi.Uint64 handle, ffi.Pointer<_RustCallStatus> outStatus)";
+                let complete_dart_sig =
+                    "int Function(int handle, ffi.Pointer<_RustCallStatus> outStatus)";
+
+                out.push('\n');
+                out.push_str(&format!(
+                    "  late final {start_dart_sig} {ctor_field} = _lib.lookupFunction<{start_native_sig}, {start_dart_sig}>('{ctor_symbol}');\n",
+                ));
+                out.push_str(&format!(
+                    "  late final void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData) {poll_field} = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, ffi.Uint64 callbackData), void Function(int handle, ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 callbackData, ffi.Int8 pollResult)>> callback, int callbackData)>('{poll_symbol}');\n"
+                ));
+                out.push_str(&format!(
+                    "  late final void Function(int handle) {cancel_field} = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('{cancel_symbol}');\n"
+                ));
+                out.push_str(&format!(
+                    "  late final {complete_dart_sig} {complete_field} = _lib.lookupFunction<{complete_native_sig}, {complete_dart_sig}>('{complete_symbol}');\n"
+                ));
+                out.push_str(&format!(
+                    "  late final void Function(int handle) {free_field} = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('{free_symbol}');\n"
+                ));
+                out.push('\n');
+                out.push_str(&format!(
+                    "  Future<{object_name}> {ctor_method}({}) async {{\n",
+                    dart_args.join(", ")
+                ));
+                for line in &pre_call {
+                    out.push_str(line);
+                }
+                out.push_str("    final int futureHandle;\n");
+                if !post_call.is_empty() {
+                    out.push_str("    try {\n");
+                    out.push_str(&format!(
+                        "      futureHandle = {ctor_field}({});\n",
+                        call_args.join(", ")
+                    ));
+                    out.push_str("    } finally {\n");
+                    for line in &post_call {
+                        out.push_str(line);
+                    }
+                    out.push_str("    }\n");
+                } else {
+                    out.push_str(&format!(
+                        "    futureHandle = {ctor_field}({});\n",
+                        call_args.join(", ")
+                    ));
+                }
+                out.push_str(
+                    "    final StreamController<int> pollEvents = StreamController<int>.broadcast();\n",
+                );
+                out.push_str(
+                    "    final callback = ffi.NativeCallable<ffi.Void Function(ffi.Uint64, ffi.Int8)>.listener((int _, int pollResult) {\n",
+                );
+                out.push_str("      pollEvents.add(pollResult);\n");
+                out.push_str("    });\n");
+                out.push_str("    try {\n");
+                out.push_str(&format!(
+                    "      {poll_field}(futureHandle, callback.nativeFunction, 0);\n"
+                ));
+                out.push_str("      while (true) {\n");
+                out.push_str("        final int pollResult = await pollEvents.stream.first;\n");
+                out.push_str("        if (pollResult == _rustFuturePollReady) {\n");
+                out.push_str("          break;\n");
+                out.push_str("        }\n");
+                out.push_str("        if (pollResult == _rustFuturePollWake) {\n");
+                out.push_str(&format!(
+                    "          {poll_field}(futureHandle, callback.nativeFunction, 0);\n"
+                ));
+                out.push_str("          continue;\n");
+                out.push_str("        }\n");
+                out.push_str(&format!(
+                    "        throw StateError('Rust future poll returned invalid status for {}: $pollResult');\n",
+                    ctor_symbol
+                ));
+                out.push_str("      }\n");
+                out.push_str(
+                    "      final ffi.Pointer<_RustCallStatus> outStatusPtr = calloc<_RustCallStatus>();\n",
+                );
+                out.push_str("      try {\n");
+                out.push_str(&format!(
+                    "        final int resultValue = {complete_field}(futureHandle, outStatusPtr);\n"
+                ));
+                out.push_str("        final int statusCode = outStatusPtr.ref.code;\n");
+                out.push_str("        if (statusCode == _rustCallStatusSuccess) {\n");
+                out.push_str(&format!(
+                    "          return {object_name}._(this, resultValue);\n"
+                ));
+                out.push_str("        }\n");
+                if let Some(throws_name) = ctor
+                    .throws_type
+                    .as_ref()
+                    .and_then(enum_name_from_type)
+                    .map(to_upper_camel)
+                {
+                    out.push_str("        if (statusCode == _rustCallStatusError) {\n");
+                    out.push_str(
+                        "          final ffi.Pointer<Utf8> errorPtr = outStatusPtr.ref.errorBuf;\n",
+                    );
+                    out.push_str("          if (errorPtr != ffi.nullptr) {\n");
+                    out.push_str("            try {\n");
+                    out.push_str(
+                        "              final String errorPayload = errorPtr.toDartString();\n",
+                    );
+                    out.push_str(&format!(
+                        "              throw {}ExceptionFfiCodec.decode(jsonDecode(errorPayload));\n",
+                        throws_name
+                    ));
+                    out.push_str("            } finally {\n");
+                    out.push_str("              _rustStringFree(errorPtr);\n");
+                    out.push_str("            }\n");
+                    out.push_str("          }\n");
+                    out.push_str(&format!(
+                        "          throw StateError('Rust async error without payload for {}');\n",
+                        ctor_symbol
+                    ));
+                    out.push_str("        }\n");
+                }
+                out.push_str("        if (statusCode == _rustCallStatusCancelled) {\n");
+                out.push_str(&format!(
+                    "          throw StateError('Rust future was cancelled for {}');\n",
+                    ctor_symbol
+                ));
+                out.push_str("        }\n");
+                out.push_str(
+                    "        final ffi.Pointer<Utf8> errorPtr = outStatusPtr.ref.errorBuf;\n",
+                );
+                out.push_str("        if (errorPtr != ffi.nullptr) {\n");
+                out.push_str("          try {\n");
+                out.push_str("            throw StateError(errorPtr.toDartString());\n");
+                out.push_str("          } finally {\n");
+                out.push_str("            _rustStringFree(errorPtr);\n");
+                out.push_str("          }\n");
+                out.push_str("        }\n");
+                out.push_str(&format!(
+                    "        throw StateError('Rust future failed for {} with status code: $statusCode');\n",
+                    ctor_symbol
+                ));
+                out.push_str("      } finally {\n");
+                out.push_str("        calloc.free(outStatusPtr);\n");
+                out.push_str("      }\n");
+                out.push_str("    } catch (_) {\n");
+                out.push_str(&format!("      {cancel_field}(futureHandle);\n"));
+                out.push_str("      rethrow;\n");
+                out.push_str("    } finally {\n");
+                out.push_str("      await pollEvents.close();\n");
+                out.push_str("      callback.close();\n");
+                out.push_str(&format!("      {free_field}(futureHandle);\n"));
+                out.push_str("    }\n");
+                out.push_str("  }\n");
+                continue;
+            }
+
+            let native_return = if is_throwing {
+                "ffi.Pointer<Utf8>"
+            } else {
+                "ffi.Uint64"
+            };
+            let dart_return = if is_throwing {
+                "ffi.Pointer<Utf8>"
+            } else {
+                "int"
+            };
             out.push('\n');
             out.push_str(&format!(
                 "  late final {dart_return} Function({}) {ctor_field} = _lib.lookupFunction<{native_return} Function({}), {dart_return} Function({})>('{ctor_symbol}');\n",

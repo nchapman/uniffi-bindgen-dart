@@ -47,3 +47,11 @@ interface Worker {
   [Async, Throws=AsyncError]
   string async_checked_describe(boolean fail);
 };
+
+interface AsyncWidget {
+  [Async]
+  constructor(string name);
+  [Async, Throws=AsyncError, Name="validated_new"]
+  constructor(string name, boolean should_fail);
+  string get_name();
+};
