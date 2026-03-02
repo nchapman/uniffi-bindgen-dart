@@ -694,6 +694,26 @@ class CoverallDemoFfi {
     if (_checksum_uniffi_crate_name_checksum_func_create_some_dict != 59765) {
       throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_create_some_dict`: expected 59765, got $_checksum_uniffi_crate_name_checksum_func_create_some_dict');
     }
+    final int _checksum_uniffi_crate_name_checksum_func_describe_maybe_color;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_func_describe_maybe_color');
+      _checksum_uniffi_crate_name_checksum_func_describe_maybe_color = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_func_describe_maybe_color`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_func_describe_maybe_color != 34211) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_describe_maybe_color`: expected 34211, got $_checksum_uniffi_crate_name_checksum_func_describe_maybe_color');
+    }
+    final int _checksum_uniffi_crate_name_checksum_func_describe_maybe_dict;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_func_describe_maybe_dict');
+      _checksum_uniffi_crate_name_checksum_func_describe_maybe_dict = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_func_describe_maybe_dict`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_func_describe_maybe_dict != 56361) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_describe_maybe_dict`: expected 56361, got $_checksum_uniffi_crate_name_checksum_func_describe_maybe_dict');
+    }
     final int _checksum_uniffi_crate_name_checksum_func_divide_by_text;
     try {
       final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_func_divide_by_text');
@@ -713,6 +733,26 @@ class CoverallDemoFfi {
     }
     if (_checksum_uniffi_crate_name_checksum_func_get_int_map != 13540) {
       throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_get_int_map`: expected 13540, got $_checksum_uniffi_crate_name_checksum_func_get_int_map');
+    }
+    final int _checksum_uniffi_crate_name_checksum_func_get_maybe_color;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_func_get_maybe_color');
+      _checksum_uniffi_crate_name_checksum_func_get_maybe_color = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_func_get_maybe_color`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_func_get_maybe_color != 27958) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_get_maybe_color`: expected 27958, got $_checksum_uniffi_crate_name_checksum_func_get_maybe_color');
+    }
+    final int _checksum_uniffi_crate_name_checksum_func_get_maybe_dict;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_func_get_maybe_dict');
+      _checksum_uniffi_crate_name_checksum_func_get_maybe_dict = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_func_get_maybe_dict`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_func_get_maybe_dict != 50623) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_get_maybe_dict`: expected 50623, got $_checksum_uniffi_crate_name_checksum_func_get_maybe_dict');
     }
     final int _checksum_uniffi_crate_name_checksum_func_get_maybe_simple_dict;
     try {
@@ -1118,6 +1158,44 @@ class CoverallDemoFfi {
       }
   }
 
+  late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> input) _describeMaybeColor = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> input), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> input)>('describe_maybe_color');
+
+  String describeMaybeColor(Color? input) {
+    final ffi.Pointer<Utf8> inputNative = input == null ? ffi.nullptr : ColorFfiCodec.encode(input).toNativeUtf8();
+    try {
+      final ffi.Pointer<Utf8> resultPtr = _describeMaybeColor(inputNative);
+      if (resultPtr == ffi.nullptr) {
+        throw StateError('Rust returned null for describe_maybe_color');
+      }
+      try {
+        return resultPtr.toDartString();
+      } finally {
+        _rustStringFree(resultPtr);
+      }
+    } finally {
+    if (inputNative != ffi.nullptr) calloc.free(inputNative);
+    }
+  }
+
+  late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> input) _describeMaybeDict = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> input), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> input)>('describe_maybe_dict');
+
+  String describeMaybeDict(SimpleDict? input) {
+    final ffi.Pointer<Utf8> inputNative = input == null ? ffi.nullptr : jsonEncode(input.toJson()).toNativeUtf8();
+    try {
+      final ffi.Pointer<Utf8> resultPtr = _describeMaybeDict(inputNative);
+      if (resultPtr == ffi.nullptr) {
+        throw StateError('Rust returned null for describe_maybe_dict');
+      }
+      try {
+        return resultPtr.toDartString();
+      } finally {
+        _rustStringFree(resultPtr);
+      }
+    } finally {
+    if (inputNative != ffi.nullptr) calloc.free(inputNative);
+    }
+  }
+
   late final ffi.Pointer<Utf8> Function(double value, ffi.Pointer<Utf8> divisor) _divideByText = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Double value, ffi.Pointer<Utf8> divisor), ffi.Pointer<Utf8> Function(double value, ffi.Pointer<Utf8> divisor)>('divide_by_text');
 
   double divideByText(double value, String divisor) {
@@ -1165,6 +1243,36 @@ class CoverallDemoFfi {
         return (() { final int __len = mapReader.readI32(); final out = <int, int>{}; for (var i = 0; i < __len; i++) { final key = mapReader.readU32(); final value = mapReader.readU64(); out[key] = value; } return out; })();
       } finally {
         _rustBytesFree(resultBuf);
+      }
+  }
+
+  late final ffi.Pointer<Utf8> Function(bool returnValue) _getMaybeColor = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Bool returnValue), ffi.Pointer<Utf8> Function(bool returnValue)>('get_maybe_color');
+
+  Color? getMaybeColor(bool returnValue) {
+      final ffi.Pointer<Utf8> resultPtr = _getMaybeColor(returnValue);
+      if (resultPtr == ffi.nullptr) {
+        return null;
+      }
+      try {
+        final String payload = resultPtr.toDartString();
+        return ColorFfiCodec.decode(payload);
+      } finally {
+        _rustStringFree(resultPtr);
+      }
+  }
+
+  late final ffi.Pointer<Utf8> Function(bool returnValue) _getMaybeDict = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Bool returnValue), ffi.Pointer<Utf8> Function(bool returnValue)>('get_maybe_dict');
+
+  SimpleDict? getMaybeDict(bool returnValue) {
+      final ffi.Pointer<Utf8> resultPtr = _getMaybeDict(returnValue);
+      if (resultPtr == ffi.nullptr) {
+        return null;
+      }
+      try {
+        final String payload = resultPtr.toDartString();
+        return SimpleDict.fromJson(jsonDecode(payload) as Map<String, dynamic>);
+      } finally {
+        _rustStringFree(resultPtr);
       }
   }
 
@@ -1906,6 +2014,16 @@ SimpleDict createSomeDict() {
   return _bindings().createSomeDict();
 }
 
+/// Accept an optional Color enum parameter.
+String describeMaybeColor(Color? input) {
+  return _bindings().describeMaybeColor(input);
+}
+
+/// Accept an optional SimpleDict parameter.
+String describeMaybeDict(SimpleDict? input) {
+  return _bindings().describeMaybeDict(input);
+}
+
 /// Divide a float by a text-parsed divisor; exercises error paths.
 double divideByText(double value, String divisor) {
   return _bindings().divideByText(value, divisor);
@@ -1914,6 +2032,16 @@ double divideByText(double value, String divisor) {
 /// Round-trip a map with non-string keys (record<u32, u64>).
 Map<int, int> getIntMap(int key, int value) {
   return _bindings().getIntMap(key, value);
+}
+
+/// Return an optional Color enum based on a flag.
+Color? getMaybeColor(bool returnValue) {
+  return _bindings().getMaybeColor(returnValue);
+}
+
+/// Return an optional SimpleDict based on a flag.
+SimpleDict? getMaybeDict(bool returnValue) {
+  return _bindings().getMaybeDict(returnValue);
 }
 
 /// Return an enum variant based on a numeric selector.

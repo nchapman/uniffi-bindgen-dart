@@ -378,6 +378,30 @@ pub(super) fn append_runtime_arg_marshalling(
         ));
         post_call.push(format!("    calloc.free({native_name});\n"));
         call_args.push(native_name);
+    } else if is_runtime_optional_record_type(type_) {
+        let native_name = format!("{arg_name}Native");
+        pre_call.push(format!(
+            "    final ffi.Pointer<Utf8> {native_name} = {arg_name} == null ? ffi.nullptr : jsonEncode({arg_name}.toJson()).toNativeUtf8();\n"
+        ));
+        post_call.push(format!(
+            "    if ({native_name} != ffi.nullptr) calloc.free({native_name});\n"
+        ));
+        call_args.push(native_name);
+    } else if is_runtime_optional_enum_type(type_) {
+        let native_name = format!("{arg_name}Native");
+        let inner = match runtime_unwrapped_type(type_) {
+            Type::Optional { inner_type } => inner_type,
+            _ => unreachable!(),
+        };
+        let enum_name = enum_name_from_type(inner).unwrap_or("Enum");
+        pre_call.push(format!(
+            "    final ffi.Pointer<Utf8> {native_name} = {arg_name} == null ? ffi.nullptr : {}FfiCodec.encode({arg_name}).toNativeUtf8();\n",
+            to_upper_camel(enum_name)
+        ));
+        post_call.push(format!(
+            "    if ({native_name} != ffi.nullptr) calloc.free({native_name});\n"
+        ));
+        call_args.push(native_name);
     } else if is_runtime_object_type(type_) {
         let handle_name = format!("{arg_name}Handle");
         let object_name = object_name_from_type(type_).unwrap_or("Object");

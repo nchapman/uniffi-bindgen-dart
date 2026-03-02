@@ -40,6 +40,18 @@ namespace coverall_demo {
 
   /// Round-trip a map with non-string keys (record<u32, u64>).
   record<u32, u64> get_int_map(u32 key, u64 value);
+
+  /// Return an optional SimpleDict based on a flag.
+  SimpleDict? get_maybe_dict(boolean return_value);
+
+  /// Accept an optional SimpleDict parameter.
+  string describe_maybe_dict(SimpleDict? input);
+
+  /// Return an optional Color enum based on a flag.
+  Color? get_maybe_color(boolean return_value);
+
+  /// Accept an optional Color enum parameter.
+  string describe_maybe_color(Color? input);
 };
 
 /// Simple three-variant flat enum.

@@ -124,6 +124,14 @@ pub(super) fn is_runtime_optional_object_type(type_: &Type) -> bool {
     matches!(runtime_unwrapped_type(type_), Type::Optional { inner_type } if is_runtime_object_type(inner_type))
 }
 
+pub(super) fn is_runtime_optional_record_type(type_: &Type) -> bool {
+    matches!(runtime_unwrapped_type(type_), Type::Optional { inner_type } if is_runtime_record_type(inner_type))
+}
+
+pub(super) fn is_runtime_optional_enum_type(type_: &Type) -> bool {
+    matches!(runtime_unwrapped_type(type_), Type::Optional { inner_type } if matches!(**inner_type, Type::Enum { .. }))
+}
+
 pub(super) fn is_runtime_optional_primitive_type(type_: &Type) -> bool {
     match runtime_unwrapped_type(type_) {
         Type::Optional { inner_type } => matches!(
@@ -383,6 +391,10 @@ pub(super) fn map_runtime_native_ffi_type(
         Type::Optional { .. } if is_runtime_optional_primitive_type(type_) => {
             Some("ffi.Pointer<Utf8>")
         }
+        Type::Optional { .. } if is_runtime_optional_record_type(type_) => {
+            Some("ffi.Pointer<Utf8>")
+        }
+        Type::Optional { .. } if is_runtime_optional_enum_type(type_) => Some("ffi.Pointer<Utf8>"),
         Type::Record { .. } => Some("ffi.Pointer<Utf8>"),
         Type::Enum { .. } => Some("ffi.Pointer<Utf8>"),
         Type::Object { .. } => Some("ffi.Uint64"),
@@ -442,6 +454,10 @@ pub(super) fn map_runtime_dart_ffi_type(
         Type::Optional { .. } if is_runtime_optional_primitive_type(type_) => {
             Some("ffi.Pointer<Utf8>")
         }
+        Type::Optional { .. } if is_runtime_optional_record_type(type_) => {
+            Some("ffi.Pointer<Utf8>")
+        }
+        Type::Optional { .. } if is_runtime_optional_enum_type(type_) => Some("ffi.Pointer<Utf8>"),
         Type::Record { .. } => Some("ffi.Pointer<Utf8>"),
         Type::Enum { .. } => Some("ffi.Pointer<Utf8>"),
         Type::Object { .. } => Some("int"),

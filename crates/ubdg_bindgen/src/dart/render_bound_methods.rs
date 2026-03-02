@@ -1683,6 +1683,42 @@ pub(super) fn render_bound_methods(
                     out.push_str("            return null;\n");
                     out.push_str("          }\n");
                     out.push_str(&format!("          return {lift};\n"));
+                } else if is_runtime_optional_record_type(ret_type) {
+                    let inner = match runtime_unwrapped_type(ret_type) {
+                        Type::Optional { inner_type } => inner_type,
+                        _ => unreachable!(),
+                    };
+                    let record_name = record_name_from_type(inner).unwrap_or("Record");
+                    out.push_str("          if (resultPtr == ffi.nullptr) {\n");
+                    out.push_str("            return null;\n");
+                    out.push_str("          }\n");
+                    out.push_str("          try {\n");
+                    out.push_str("            final String payload = resultPtr.toDartString();\n");
+                    out.push_str(&format!(
+                        "            return {}.fromJson(jsonDecode(payload) as Map<String, dynamic>);\n",
+                        to_upper_camel(record_name)
+                    ));
+                    out.push_str("          } finally {\n");
+                    out.push_str("            _rustStringFree(resultPtr);\n");
+                    out.push_str("          }\n");
+                } else if is_runtime_optional_enum_type(ret_type) {
+                    let inner = match runtime_unwrapped_type(ret_type) {
+                        Type::Optional { inner_type } => inner_type,
+                        _ => unreachable!(),
+                    };
+                    let enum_name = enum_name_from_type(inner).unwrap_or("Enum");
+                    out.push_str("          if (resultPtr == ffi.nullptr) {\n");
+                    out.push_str("            return null;\n");
+                    out.push_str("          }\n");
+                    out.push_str("          try {\n");
+                    out.push_str("            final String payload = resultPtr.toDartString();\n");
+                    out.push_str(&format!(
+                        "            return {}FfiCodec.decode(payload);\n",
+                        to_upper_camel(enum_name)
+                    ));
+                    out.push_str("          } finally {\n");
+                    out.push_str("            _rustStringFree(resultPtr);\n");
+                    out.push_str("          }\n");
                 } else if is_runtime_optional_primitive_type(ret_type) {
                     let decode = render_json_decode_expr("jsonDecode(payload)", ret_type);
                     out.push_str("          if (resultPtr == ffi.nullptr) {\n");
@@ -2277,6 +2313,50 @@ pub(super) fn render_bound_methods(
                         objects,
                     );
                     out.push_str(&format!("      return {lift};\n"));
+                }
+                Some(type_) if is_runtime_optional_record_type(type_) => {
+                    let inner = match runtime_unwrapped_type(type_) {
+                        Type::Optional { inner_type } => inner_type,
+                        _ => unreachable!(),
+                    };
+                    let record_name = record_name_from_type(inner).unwrap_or("Record");
+                    out.push_str(&format!(
+                        "      final ffi.Pointer<Utf8> resultPtr = {call_expr};\n"
+                    ));
+                    out.push_str("      if (resultPtr == ffi.nullptr) {\n");
+                    out.push_str("        return null;\n");
+                    out.push_str("      }\n");
+                    out.push_str("      try {\n");
+                    out.push_str("        final String payload = resultPtr.toDartString();\n");
+                    out.push_str(&format!(
+                        "        return {}.fromJson(jsonDecode(payload) as Map<String, dynamic>);\n",
+                        to_upper_camel(record_name)
+                    ));
+                    out.push_str("      } finally {\n");
+                    out.push_str("        _rustStringFree(resultPtr);\n");
+                    out.push_str("      }\n");
+                }
+                Some(type_) if is_runtime_optional_enum_type(type_) => {
+                    let inner = match runtime_unwrapped_type(type_) {
+                        Type::Optional { inner_type } => inner_type,
+                        _ => unreachable!(),
+                    };
+                    let enum_name = enum_name_from_type(inner).unwrap_or("Enum");
+                    out.push_str(&format!(
+                        "      final ffi.Pointer<Utf8> resultPtr = {call_expr};\n"
+                    ));
+                    out.push_str("      if (resultPtr == ffi.nullptr) {\n");
+                    out.push_str("        return null;\n");
+                    out.push_str("      }\n");
+                    out.push_str("      try {\n");
+                    out.push_str("        final String payload = resultPtr.toDartString();\n");
+                    out.push_str(&format!(
+                        "        return {}FfiCodec.decode(payload);\n",
+                        to_upper_camel(enum_name)
+                    ));
+                    out.push_str("      } finally {\n");
+                    out.push_str("        _rustStringFree(resultPtr);\n");
+                    out.push_str("      }\n");
                 }
                 Some(type_) if is_runtime_optional_primitive_type(type_) => {
                     let decode = render_json_decode_expr("jsonDecode(payload)", type_);
@@ -4068,6 +4148,58 @@ pub(super) fn render_bound_methods(
                 } else if method
                     .return_type
                     .as_ref()
+                    .is_some_and(is_runtime_optional_record_type)
+                {
+                    let inner = method
+                        .return_type
+                        .as_ref()
+                        .and_then(|t| match runtime_unwrapped_type(t) {
+                            Type::Optional { inner_type } => Some(inner_type.as_ref()),
+                            _ => None,
+                        })
+                        .expect("validated optional record type");
+                    let record_name = record_name_from_type(inner).unwrap_or("Record");
+                    out.push_str("          if (resultPtr == ffi.nullptr) {\n");
+                    out.push_str("            return null;\n");
+                    out.push_str("          }\n");
+                    out.push_str("          try {\n");
+                    out.push_str("            final String payload = resultPtr.toDartString();\n");
+                    out.push_str(&format!(
+                        "            return {}.fromJson(jsonDecode(payload) as Map<String, dynamic>);\n",
+                        to_upper_camel(record_name)
+                    ));
+                    out.push_str("          } finally {\n");
+                    out.push_str("            _rustStringFree(resultPtr);\n");
+                    out.push_str("          }\n");
+                } else if method
+                    .return_type
+                    .as_ref()
+                    .is_some_and(is_runtime_optional_enum_type)
+                {
+                    let inner = method
+                        .return_type
+                        .as_ref()
+                        .and_then(|t| match runtime_unwrapped_type(t) {
+                            Type::Optional { inner_type } => Some(inner_type.as_ref()),
+                            _ => None,
+                        })
+                        .expect("validated optional enum type");
+                    let enum_name = enum_name_from_type(inner).unwrap_or("Enum");
+                    out.push_str("          if (resultPtr == ffi.nullptr) {\n");
+                    out.push_str("            return null;\n");
+                    out.push_str("          }\n");
+                    out.push_str("          try {\n");
+                    out.push_str("            final String payload = resultPtr.toDartString();\n");
+                    out.push_str(&format!(
+                        "            return {}FfiCodec.decode(payload);\n",
+                        to_upper_camel(enum_name)
+                    ));
+                    out.push_str("          } finally {\n");
+                    out.push_str("            _rustStringFree(resultPtr);\n");
+                    out.push_str("          }\n");
+                } else if method
+                    .return_type
+                    .as_ref()
                     .is_some_and(is_runtime_optional_primitive_type)
                 {
                     let decode = method
@@ -4377,6 +4509,48 @@ pub(super) fn render_bound_methods(
                     out.push_str("      return null;\n");
                     out.push_str("    }\n");
                     out.push_str(&format!("    return {lift};\n"));
+                } else if is_runtime_optional_record_type(ret) {
+                    let inner = match runtime_unwrapped_type(ret) {
+                        Type::Optional { inner_type } => inner_type,
+                        _ => unreachable!(),
+                    };
+                    let record_name = record_name_from_type(inner).unwrap_or("Record");
+                    out.push_str(&format!(
+                        "    final ffi.Pointer<Utf8> resultPtr = {call_expr};\n"
+                    ));
+                    out.push_str("    if (resultPtr == ffi.nullptr) {\n");
+                    out.push_str("      return null;\n");
+                    out.push_str("    }\n");
+                    out.push_str("    try {\n");
+                    out.push_str("      final String payload = resultPtr.toDartString();\n");
+                    out.push_str(&format!(
+                        "      return {}.fromJson(jsonDecode(payload) as Map<String, dynamic>);\n",
+                        to_upper_camel(record_name)
+                    ));
+                    out.push_str("    } finally {\n");
+                    out.push_str("      _rustStringFree(resultPtr);\n");
+                    out.push_str("    }\n");
+                } else if is_runtime_optional_enum_type(ret) {
+                    let inner = match runtime_unwrapped_type(ret) {
+                        Type::Optional { inner_type } => inner_type,
+                        _ => unreachable!(),
+                    };
+                    let enum_name = enum_name_from_type(inner).unwrap_or("Enum");
+                    out.push_str(&format!(
+                        "    final ffi.Pointer<Utf8> resultPtr = {call_expr};\n"
+                    ));
+                    out.push_str("    if (resultPtr == ffi.nullptr) {\n");
+                    out.push_str("      return null;\n");
+                    out.push_str("    }\n");
+                    out.push_str("    try {\n");
+                    out.push_str("      final String payload = resultPtr.toDartString();\n");
+                    out.push_str(&format!(
+                        "      return {}FfiCodec.decode(payload);\n",
+                        to_upper_camel(enum_name)
+                    ));
+                    out.push_str("    } finally {\n");
+                    out.push_str("      _rustStringFree(resultPtr);\n");
+                    out.push_str("    }\n");
                 } else if is_runtime_optional_primitive_type(ret) {
                     let decode = render_json_decode_expr("jsonDecode(payload)", ret);
                     out.push_str(&format!(
