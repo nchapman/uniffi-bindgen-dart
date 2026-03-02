@@ -170,6 +170,10 @@ pub(super) fn component_interface_to_metadata(
                     default: field.default_value().cloned(),
                 })
                 .collect(),
+            traits: udl_interface_traits
+                .get(record.name())
+                .cloned()
+                .unwrap_or_default(),
             methods: record
                 .methods()
                 .iter()
@@ -221,6 +225,10 @@ pub(super) fn component_interface_to_metadata(
                 is_error: ci.is_name_used_as_error(enum_.name()),
                 is_non_exhaustive: enum_.is_non_exhaustive(),
                 has_discr_type: has_discr,
+                traits: udl_interface_traits
+                    .get(enum_.name())
+                    .cloned()
+                    .unwrap_or_default(),
                 variants: enum_
                     .variants()
                     .iter()
@@ -590,11 +598,21 @@ pub(super) fn parse_udl_interface_traits(
             continue;
         }
 
-        if line.starts_with("dictionary ")
-            || line.starts_with("enum ")
-            || line.starts_with("namespace ")
-            || line.starts_with("callback interface ")
-        {
+        if let Some(dict_name) = parse_dictionary_name_from_line(line) {
+            if let Some(traits) = pending_traits.take() {
+                out.insert(dict_name, traits);
+            }
+            continue;
+        }
+
+        if let Some(enum_name) = parse_enum_name_from_line(line) {
+            if let Some(traits) = pending_traits.take() {
+                out.insert(enum_name, traits);
+            }
+            continue;
+        }
+
+        if line.starts_with("namespace ") || line.starts_with("callback interface ") {
             pending_traits = None;
         }
     }
@@ -698,6 +716,40 @@ pub(super) fn parse_interface_name_from_line(line: &str) -> Option<String> {
     let marker = "interface ";
     let start = line.find(marker)?;
     let rest = &line[start + marker.len()..];
+    let name = rest
+        .chars()
+        .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+        .collect::<String>();
+    if name.is_empty() {
+        None
+    } else {
+        Some(name)
+    }
+}
+
+pub(super) fn parse_dictionary_name_from_line(line: &str) -> Option<String> {
+    let marker = "dictionary ";
+    if !line.starts_with(marker) {
+        return None;
+    }
+    let rest = &line[marker.len()..];
+    let name = rest
+        .chars()
+        .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+        .collect::<String>();
+    if name.is_empty() {
+        None
+    } else {
+        Some(name)
+    }
+}
+
+pub(super) fn parse_enum_name_from_line(line: &str) -> Option<String> {
+    let marker = "enum ";
+    if !line.starts_with(marker) {
+        return None;
+    }
+    let rest = &line[marker.len()..];
     let name = rest
         .chars()
         .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')

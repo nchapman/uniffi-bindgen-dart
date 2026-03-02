@@ -139,6 +139,11 @@ pub(super) fn render_data_models(
             }
             out.push_str("  }\n");
         }
+        out.push_str(&render_record_trait_methods(
+            &class_name,
+            &record.fields,
+            &record.traits,
+        ));
 
         out.push_str("}\n\n");
     }
@@ -318,6 +323,11 @@ pub(super) fn render_data_models(
                     map_uniffi_type_to_dart(&field.type_)
                 ));
             }
+            out.push_str(&render_sealed_variant_trait_methods(
+                &class_name,
+                &variant.fields,
+                &enum_.traits,
+            ));
             out.push_str("}\n\n");
         }
         if enum_.is_non_exhaustive {
@@ -614,6 +624,90 @@ pub(super) fn render_data_models(
     }
 
     out
+}
+
+/// Render `toString`, `operator ==`, and `hashCode` for a record class
+/// when the corresponding traits are declared via `[Traits=(Display, Eq, Hash)]`.
+fn render_record_trait_methods(class_name: &str, fields: &[UdlArg], traits: &[String]) -> String {
+    let mut out = String::new();
+    let has_display = traits.iter().any(|t| t == "Display");
+    let has_eq = traits.iter().any(|t| t == "Eq");
+    let has_hash = traits.iter().any(|t| t == "Hash");
+
+    if has_display {
+        out.push('\n');
+        out.push_str("  @override\n");
+        out.push_str("  String toString() {\n");
+        let field_parts: Vec<String> = fields
+            .iter()
+            .map(|f| {
+                let name = safe_dart_identifier(&to_lower_camel(&f.name));
+                format!("{name}: ${name}")
+            })
+            .collect();
+        out.push_str(&format!(
+            "    return '{class_name}({})';\n",
+            field_parts.join(", ")
+        ));
+        out.push_str("  }\n");
+    }
+
+    if has_eq {
+        out.push('\n');
+        out.push_str("  @override\n");
+        out.push_str("  bool operator ==(Object other) =>\n");
+        out.push_str("      identical(this, other) ||\n");
+        let field_comparisons: Vec<String> = fields
+            .iter()
+            .map(|f| {
+                let name = safe_dart_identifier(&to_lower_camel(&f.name));
+                format!("{name} == other.{name}")
+            })
+            .collect();
+        if field_comparisons.is_empty() {
+            out.push_str(&format!("      other is {class_name};\n"));
+        } else {
+            out.push_str(&format!(
+                "      other is {class_name} && {};\n",
+                field_comparisons.join(" && ")
+            ));
+        }
+    }
+
+    if has_hash {
+        out.push('\n');
+        out.push_str("  @override\n");
+        let field_names: Vec<String> = fields
+            .iter()
+            .map(|f| safe_dart_identifier(&to_lower_camel(&f.name)))
+            .collect();
+        if field_names.is_empty() {
+            out.push_str("  int get hashCode => runtimeType.hashCode;\n");
+        } else if field_names.len() <= 20 {
+            out.push_str(&format!(
+                "  int get hashCode => Object.hash({});\n",
+                field_names.join(", ")
+            ));
+        } else {
+            out.push_str(&format!(
+                "  int get hashCode => Object.hashAll([{}]);\n",
+                field_names.join(", ")
+            ));
+        }
+    }
+
+    out
+}
+
+/// Render `toString`, `operator ==`, and `hashCode` for a sealed enum variant class
+/// when the corresponding traits are declared via `[Traits=(Display, Eq, Hash)]`.
+fn render_sealed_variant_trait_methods(
+    class_name: &str,
+    fields: &[UdlArg],
+    traits: &[String],
+) -> String {
+    // Reuse the same logic as records -- the generated methods are structurally identical.
+    render_record_trait_methods(class_name, fields, traits)
 }
 
 /// Render a discriminant literal as a Dart integer literal.

@@ -101,6 +101,8 @@ pub(super) struct UdlRecord {
     pub(super) docstring: Option<String>,
     pub(super) fields: Vec<UdlArg>,
     pub(super) methods: Vec<UdlObjectMethod>,
+    /// Traits declared via `[Traits=(Display, Eq, Hash)]` on this dictionary.
+    pub(super) traits: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -114,6 +116,8 @@ pub(super) struct UdlEnum {
     pub(super) has_discr_type: bool,
     pub(super) variants: Vec<UdlEnumVariant>,
     pub(super) methods: Vec<UdlObjectMethod>,
+    /// Traits declared via `[Traits=(Display, Eq, Hash)]` on this enum.
+    pub(super) traits: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

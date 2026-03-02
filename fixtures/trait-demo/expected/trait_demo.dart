@@ -49,12 +49,71 @@ class TraitRecord {
       value: value ?? this.value,
     );
   }
+
+  @override
+  String toString() {
+    return 'TraitRecord(name: $name, value: $value)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TraitRecord && name == other.name && value == other.value;
+
+  @override
+  int get hashCode => Object.hash(name, value);
 }
 
 enum TraitColor {
   red,
   green,
   blue,
+}
+
+sealed class TraitShape {
+  const TraitShape();
+}
+
+final class TraitShapeCircle extends TraitShape {
+  const TraitShapeCircle({
+    required this.radius,
+  });
+  final double radius;
+
+  @override
+  String toString() {
+    return 'TraitShapeCircle(radius: $radius)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TraitShapeCircle && radius == other.radius;
+
+  @override
+  int get hashCode => Object.hash(radius);
+}
+
+final class TraitShapeRectangle extends TraitShape {
+  const TraitShapeRectangle({
+    required this.width,
+    required this.height,
+  });
+  final double width;
+  final double height;
+
+  @override
+  String toString() {
+    return 'TraitShapeRectangle(width: $width, height: $height)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TraitShapeRectangle && width == other.width && height == other.height;
+
+  @override
+  int get hashCode => Object.hash(width, height);
 }
 
 String _encodeTraitColor(TraitColor value) {
@@ -78,12 +137,55 @@ TraitColor _decodeTraitColor(String raw) {
   }
 }
 
+String _encodeTraitShape(TraitShape value) {
+  if (value is TraitShapeCircle) {
+    return jsonEncode({
+      'tag': 'circle',
+      'radius': value.radius,
+    });
+  }
+  if (value is TraitShapeRectangle) {
+    return jsonEncode({
+      'tag': 'rectangle',
+      'width': value.width,
+      'height': value.height,
+    });
+  }
+  throw StateError('Unknown TraitShape variant instance: $value');
+}
+
+TraitShape _decodeTraitShape(String raw) {
+  final Map<String, dynamic> map = jsonDecode(raw) as Map<String, dynamic>;
+  final String? tag = map['tag'] as String?;
+  switch (tag) {
+    case 'circle':
+      return TraitShapeCircle(
+        radius: (map['radius'] as num).toDouble(),
+      );
+    case 'rectangle':
+      return TraitShapeRectangle(
+        width: (map['width'] as num).toDouble(),
+        height: (map['height'] as num).toDouble(),
+      );
+    default:
+      throw StateError('Unknown TraitShape variant tag: $tag');
+  }
+}
+
 final class TraitColorFfiCodec {
   const TraitColorFfiCodec._();
 
   static String encode(TraitColor value) => _encodeTraitColor(value);
 
   static TraitColor decode(String raw) => _decodeTraitColor(raw);
+}
+
+final class TraitShapeFfiCodec {
+  const TraitShapeFfiCodec._();
+
+  static String encode(TraitShape value) => _encodeTraitShape(value);
+
+  static TraitShape decode(String raw) => _decodeTraitShape(raw);
 }
 
 class TraitDemoFfi {

@@ -1629,6 +1629,7 @@ interface Outcome {
                 },
             ],
             methods: vec![],
+            traits: vec![],
         }];
 
         let content = render_uniffi_binary_helpers(&[], &enums);
@@ -1661,6 +1662,7 @@ interface Outcome {
                 throws_type: None,
                 args: vec![],
             }],
+            traits: vec![],
         }];
         let enums = vec![UdlEnum {
             name: "State".to_string(),
@@ -1695,6 +1697,7 @@ interface Outcome {
                 throws_type: None,
                 args: vec![],
             }],
+            traits: vec![],
         }];
 
         let content = render_dart_scaffold(&RenderContext {
@@ -1757,6 +1760,7 @@ interface Outcome {
                 },
             ],
             methods: vec![],
+            traits: vec![],
         }];
 
         let content = render_data_models(&[], &enums, &[], false);
@@ -1805,6 +1809,7 @@ interface Outcome {
                 },
             ],
             methods: vec![],
+            traits: vec![],
         }];
 
         let content = render_data_models(&[], &enums, &[], false);

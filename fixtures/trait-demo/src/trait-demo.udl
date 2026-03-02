@@ -13,11 +13,9 @@ interface Greeter {
   string greet(string name);
 };
 
-// [Traits=(Display, Eq, Hash)] on records and enums is parsed by the UDL
-// parser but our Dart generator currently only wires trait methods for
-// `interface` types.  The declarations below verify that the generator
-// does NOT crash and still emits correct record/enum code, even though
-// toString/operator==/hashCode are not yet synthesised.
+// [Traits=(Display, Eq, Hash)] on records and enums generates Dart-idiomatic
+// toString, operator ==, and hashCode methods.  Flat enums skip generation
+// since Dart enum types provide these natively.
 
 [Traits=(Display, Eq, Hash)]
 dictionary TraitRecord {
@@ -30,4 +28,10 @@ enum TraitColor {
   "Red",
   "Green",
   "Blue",
+};
+
+[Enum, Traits=(Display, Eq, Hash)]
+interface TraitShape {
+  Circle(double radius);
+  Rectangle(double width, double height);
 };
