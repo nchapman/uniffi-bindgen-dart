@@ -21,6 +21,14 @@ if [[ -n "${UBDG_RECORD_ENUM_METHODS_LIB:-}" ]]; then
     --out-dir "$OUT_DIR"
 fi
 
+if [[ -n "${UBDG_LIBRARY_MODE_DEMO_LIB:-}" ]]; then
+  cargo run -p ubdg_bindgen --bin uniffi-bindgen-dart -- \
+    generate "${UBDG_LIBRARY_MODE_DEMO_LIB}" \
+    --library \
+    --crate "uniffi_library_mode_demo" \
+    --out-dir "$OUT_DIR"
+fi
+
 # Generate bindings for additional fixtures (UDL-based)
 for fixture in compound-demo coverall-demo keywords-demo; do
   FIXTURE_UDL="$ROOT_DIR/fixtures/$fixture/src/$fixture.udl"

@@ -34,6 +34,10 @@ pub(super) struct UdlObject {
     /// True when this object is a `[Trait, WithForeign]` interface that can be
     /// implemented by both Rust and Dart code.
     pub(super) has_callback_interface: bool,
+    /// FFI symbol name for the free/destructor function (library mode only).
+    pub(super) ffi_free_symbol: Option<String>,
+    /// FFI symbol name for the clone/ref-increment function (library mode only).
+    pub(super) ffi_clone_symbol: Option<String>,
     pub(super) constructors: Vec<UdlObjectConstructor>,
     pub(super) methods: Vec<UdlObjectMethod>,
     pub(super) trait_methods: UdlObjectTraitMethods,

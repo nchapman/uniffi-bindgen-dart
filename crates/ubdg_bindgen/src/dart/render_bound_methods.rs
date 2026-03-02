@@ -857,11 +857,17 @@ pub(super) fn render_bound_methods(
                         .as_ref()
                         .and_then(ffibuffer_ffi_type_from_uniffi_type)
                 });
-                let Some(ffi_return_type) = ffi_return_type else {
-                    continue;
-                };
-                let Some(return_ffi_elements) = ffibuffer_element_count(&ffi_return_type) else {
-                    continue;
+                // For void-returning functions, return_ffi_elements is 0 (no return
+                // value slots); the return buffer only holds the RustCallStatus
+                // fields (4 elements).
+                let return_ffi_elements = match &ffi_return_type {
+                    Some(fft) => {
+                        let Some(count) = ffibuffer_element_count(fft) else {
+                            continue;
+                        };
+                        count
+                    }
+                    None => 0,
                 };
                 let ffi_arg_types = if function.ffi_arg_types.len() == function.args.len() {
                     function.ffi_arg_types.clone()
@@ -1109,8 +1115,8 @@ pub(super) fn render_bound_methods(
 
                 match function.return_type.as_ref() {
                     None => out.push_str("      return;\n"),
-                    Some(ret_type) => match &ffi_return_type {
-                        FfiType::RustBuffer(_) => {
+                    Some(ret_type) => match ffi_return_type.as_ref() {
+                        Some(FfiType::RustBuffer(_)) => {
                             let decode_expr = match runtime_unwrapped_type(ret_type) {
                                 Type::String => "utf8.decode(retBytes)".to_string(),
                                 Type::Bytes => "retBytes".to_string(),
@@ -1159,8 +1165,9 @@ pub(super) fn render_bound_methods(
                             out.push_str("      return decodedValue;\n");
                         }
                         _ => {
-                            let Some(union_field) =
-                                ffibuffer_primitive_union_field(&ffi_return_type)
+                            let Some(union_field) = ffi_return_type
+                                .as_ref()
+                                .and_then(ffibuffer_primitive_union_field)
                             else {
                                 let escaped_reason = reason.replace('\'', "\\'");
                                 out.push_str(&format!(
@@ -2474,11 +2481,58 @@ pub(super) fn render_bound_methods(
         };
         let object_lower = safe_dart_identifier(&to_lower_camel(&object.name));
         let object_symbol = dart_identifier(&object.name);
+        // In library mode, ffi_free_symbol is always populated by the parser
+        // (from `obj.ffi_object_free().name()`). The fallback to `{name}_free`
+        // is only used in UDL mode where ffi_free_symbol is None.
+        let free_symbol = object
+            .ffi_free_symbol
+            .clone()
+            .unwrap_or_else(|| format!("{object_symbol}_free"));
         let free_field = format!("_{}Free", object_lower);
         out.push('\n');
-        out.push_str(&format!(
-            "  late final void Function(int handle) {free_field} = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('{object_symbol}_free');\n"
-        ));
+        if object.ffi_free_symbol.is_some() {
+            // Library mode: the Rust free function expects (handle, &mut RustCallStatus).
+            // We look up the raw 2-param function and wrap it in a closure that
+            // allocates/frees the RustCallStatus, keeping the `void Function(int)`
+            // signature expected by FinalizerToken and close().
+            let raw_free_field = format!("_{}FreeRaw", object_lower);
+            out.push_str(&format!(
+                "  late final void Function(int handle, ffi.Pointer<_UniFfiRustCallStatus> outStatus) {raw_free_field} = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<_UniFfiRustCallStatus> outStatus), void Function(int handle, ffi.Pointer<_UniFfiRustCallStatus> outStatus)>('{free_symbol}');\n\
+                 \x20 late final void Function(int handle) {free_field} = (int handle) {{\n\
+                 \x20   final statusPtr = calloc<_UniFfiRustCallStatus>();\n\
+                 \x20   statusPtr.ref.code = _uniFfiRustCallStatusSuccess;\n\
+                 \x20   statusPtr.ref.errorBuf\n\
+                 \x20     ..capacity = 0\n\
+                 \x20     ..len = 0\n\
+                 \x20     ..data = ffi.nullptr;\n\
+                 \x20   {raw_free_field}(handle, statusPtr);\n\
+                 \x20   calloc.free(statusPtr);\n\
+                 \x20 }};\n"
+            ));
+        } else {
+            // UDL mode: the scaffolding free function takes only (handle).
+            out.push_str(&format!(
+                "  late final void Function(int handle) {free_field} = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('{free_symbol}');\n"
+            ));
+        }
+
+        // Library mode: generate a clone function that increments the handle's
+        // Arc refcount.  Every method call must clone the handle before passing
+        // it to the Rust scaffolding, because `try_lift` consumes the handle
+        // via `Arc::from_raw()`.  Without cloning, the first method call would
+        // free the underlying object, and subsequent calls would be
+        // use-after-free.  This matches what Swift and Kotlin do (they call
+        // `uniffiCloneHandle()` before every method invocation).
+        let clone_field = if let Some(clone_symbol) = &object.ffi_clone_symbol {
+            let field = format!("_{}Clone", object_lower);
+            out.push('\n');
+            out.push_str(&format!(
+                "  late final int Function(int handle, ffi.Pointer<_UniFfiRustCallStatus> outStatus) {field} = _lib.lookupFunction<ffi.Uint64 Function(ffi.Uint64 handle, ffi.Pointer<_UniFfiRustCallStatus> outStatus), int Function(int handle, ffi.Pointer<_UniFfiRustCallStatus> outStatus)>('{clone_symbol}');\n"
+            ));
+            Some(field)
+        } else {
+            None
+        };
 
         for ctor in &object.constructors {
             if let Some(reason) = ctor.runtime_unsupported.as_ref() {
@@ -3147,29 +3201,33 @@ pub(super) fn render_bound_methods(
                         .unwrap_or(&method.name)
                         .to_string();
                     let ffibuffer_symbol = ffibuffer_symbol_name(&method_symbol);
-                    let ffi_return_type = method
-                        .ffi_return_type
-                        .clone()
-                        .or_else(|| {
-                            method
-                                .return_type
-                                .as_ref()
-                                .and_then(ffibuffer_ffi_type_from_uniffi_type)
-                        })
-                        .unwrap_or(FfiType::VoidPointer);
-                    let Some(return_ffi_elements) = ffibuffer_element_count(&ffi_return_type)
-                    else {
-                        out.push('\n');
-                        out.push_str(&format!(
-                            "  {signature_return_type} {method_invoke}({}) {{\n",
-                            dart_args.join(", ")
-                        ));
-                        out.push_str(&format!(
-                            "    throw UnsupportedError('{escaped_reason} ({})');\n",
-                            method.name
-                        ));
-                        out.push_str("  }\n");
-                        continue;
+                    let ffi_return_type = method.ffi_return_type.clone().or_else(|| {
+                        method
+                            .return_type
+                            .as_ref()
+                            .and_then(ffibuffer_ffi_type_from_uniffi_type)
+                    });
+                    // For void-returning methods, return_ffi_elements is 0 (no return
+                    // value slots); the return buffer only holds the RustCallStatus
+                    // fields (4 elements).
+                    let return_ffi_elements = match &ffi_return_type {
+                        Some(fft) => {
+                            let Some(count) = ffibuffer_element_count(fft) else {
+                                out.push('\n');
+                                out.push_str(&format!(
+                                    "  {signature_return_type} {method_invoke}({}) {{\n",
+                                    dart_args.join(", ")
+                                ));
+                                out.push_str(&format!(
+                                    "    throw UnsupportedError('{escaped_reason} ({})');\n",
+                                    method.name
+                                ));
+                                out.push_str("  }\n");
+                                continue;
+                            };
+                            count
+                        }
+                        None => 0,
                     };
                     let ffi_arg_types = if method.ffi_arg_types.len() == method.args.len() + 1 {
                         method.ffi_arg_types.clone()
@@ -3232,17 +3290,52 @@ pub(super) fn render_bound_methods(
                     );
                     out.push_str("    try {\n");
 
+                    // Clone the handle before passing it to the method.
+                    // UniFFI's `try_lift` consumes the handle via
+                    // `Arc::from_raw()`, so without cloning the object
+                    // would be freed after the first method call.
+                    if let Some(clone_fn) = &clone_field {
+                        out.push_str("      final int clonedHandle;\n");
+                        out.push_str("      {\n");
+                        out.push_str(
+                            "        final cloneStatusPtr = calloc<_UniFfiRustCallStatus>();\n",
+                        );
+                        out.push_str("        try {\n");
+                        out.push_str(
+                            "          cloneStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;\n",
+                        );
+                        out.push_str("          cloneStatusPtr.ref.errorBuf\n");
+                        out.push_str("            ..capacity = 0\n");
+                        out.push_str("            ..len = 0\n");
+                        out.push_str("            ..data = ffi.nullptr;\n");
+                        out.push_str(&format!(
+                            "          clonedHandle = {clone_fn}(handle, cloneStatusPtr);\n"
+                        ));
+                        out.push_str("          if (cloneStatusPtr.ref.code != _uniFfiRustCallStatusSuccess) {\n");
+                        out.push_str("            throw StateError('UniFFI clone failed with status ${cloneStatusPtr.ref.code}');\n");
+                        out.push_str("          }\n");
+                        out.push_str("        } finally {\n");
+                        out.push_str("          calloc.free(cloneStatusPtr);\n");
+                        out.push_str("        }\n");
+                        out.push_str("      }\n");
+                    }
+
                     if let Some(handle_ffi_type) = ffi_arg_types.first() {
                         if let Some(handle_field) = ffibuffer_primitive_union_field(handle_ffi_type)
                         {
+                            let handle_expr = if clone_field.is_some() {
+                                "clonedHandle"
+                            } else {
+                                "handle"
+                            };
                             if handle_field == "ptr" {
                                 out.push_str(&format!(
-                                    "      (argBuf + {}).ref.ptr = handle.cast<ffi.Void>();\n",
+                                    "      (argBuf + {}).ref.ptr = {handle_expr}.cast<ffi.Void>();\n",
                                     arg_ffi_offsets[0]
                                 ));
                             } else {
                                 out.push_str(&format!(
-                                    "      (argBuf + {}).ref.{handle_field} = handle;\n",
+                                    "      (argBuf + {}).ref.{handle_field} = {handle_expr};\n",
                                     arg_ffi_offsets[0]
                                 ));
                             }
@@ -3493,8 +3586,8 @@ pub(super) fn render_bound_methods(
                             out.push_str("        _rustStringFree(resultPtr);\n");
                             out.push_str("      }\n");
                         }
-                        Some(ret_type) => match &ffi_return_type {
-                            FfiType::RustBuffer(_) => {
+                        Some(ret_type) => match ffi_return_type.as_ref() {
+                            Some(FfiType::RustBuffer(_)) => {
                                 let is_map_type =
                                     matches!(runtime_unwrapped_type(ret_type), Type::Map { .. });
                                 let decode_expr = match runtime_unwrapped_type(ret_type) {
@@ -3532,8 +3625,9 @@ pub(super) fn render_bound_methods(
                                 }
                             }
                             _ => {
-                                let Some(union_field) =
-                                    ffibuffer_primitive_union_field(&ffi_return_type)
+                                let Some(union_field) = ffi_return_type
+                                    .as_ref()
+                                    .and_then(ffibuffer_primitive_union_field)
                                 else {
                                     out.push_str(&format!(
                                         "      throw UnsupportedError('{escaped_reason} ({})');\n",
@@ -3635,6 +3729,10 @@ pub(super) fn render_bound_methods(
                 .unwrap_or_else(|| format!("{}_{}", object_symbol, dart_identifier(&method.name)));
             let is_throwing = method.throws_type.is_some();
 
+            // Note: this direct-call path only runs when runtime_unsupported is
+            // None, which currently only occurs in UDL mode (where
+            // ffi_clone_symbol is None).  If library-mode methods ever reach
+            // this path, clone_field must be injected into call_args here.
             let mut native_args = vec!["ffi.Uint64 handle".to_string()];
             let mut dart_ffi_args = vec!["int handle".to_string()];
             let mut dart_args = vec!["int handle".to_string()];

@@ -471,6 +471,10 @@ pub(super) fn component_interface_to_metadata(
                 docstring: obj.docstring().map(ToString::to_string),
                 is_error: ci.is_name_used_as_error(obj.name()),
                 has_callback_interface: obj.has_callback_interface(),
+                ffi_free_symbol: include_ffi_symbols
+                    .then(|| obj.ffi_object_free().name().to_string()),
+                ffi_clone_symbol: include_ffi_symbols
+                    .then(|| obj.ffi_object_clone().name().to_string()),
                 constructors: obj
                     .constructors()
                     .into_iter()

@@ -23,6 +23,20 @@ fn generate(source: &Path, out_dir: &Path, config: Option<&Path>) {
     ubdg_bindgen::run(args).expect("generate bindings");
 }
 
+fn generate_library(source: &Path, crate_name: &str, out_dir: &Path) {
+    let args = vec![
+        "uniffi-bindgen-dart".to_string(),
+        "generate".to_string(),
+        source.display().to_string(),
+        "--library".to_string(),
+        "--crate".to_string(),
+        crate_name.to_string(),
+        "--out-dir".to_string(),
+        out_dir.display().to_string(),
+    ];
+    ubdg_bindgen::run(args).expect("generate bindings (library mode)");
+}
+
 fn assert_matches_expected(actual: &Path, expected: &Path) {
     let actual_src = std::fs::read_to_string(actual).expect("read actual");
     let expected_src = std::fs::read_to_string(expected).expect("read expected");
@@ -291,4 +305,64 @@ fn golden_regression_forward_refs_demo() {
 
     generate(&source, &out_dir, None);
     assert_matches_expected(&out_dir.join("forward_refs_demo.dart"), &expected);
+}
+
+// ── Library-mode golden tests ──────────────────────────────────────────────
+// These require a compiled cdylib. They are gated on env vars that point to
+// the built library path. Regular `cargo test` skips them; CI and
+// test_bindings.sh set the vars after building the fixtures.
+
+#[test]
+fn golden_record_enum_methods_library() {
+    let lib_path = match std::env::var("UBDG_RECORD_ENUM_METHODS_LIB") {
+        Ok(p) => {
+            let path = PathBuf::from(&p);
+            if path.is_absolute() {
+                path
+            } else {
+                repo_root().join(path)
+            }
+        }
+        Err(_) => {
+            eprintln!("UBDG_RECORD_ENUM_METHODS_LIB not set; skipping library-mode golden test");
+            return;
+        }
+    };
+
+    let root = repo_root();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let out_dir = temp.path().join("out");
+
+    let expected =
+        root.join("fixtures/record-enum-methods/expected/record_enum_methods_library.dart");
+
+    generate_library(&lib_path, "uniffi_record_enum_methods", &out_dir);
+    assert_matches_expected(&out_dir.join("record_enum_methods.dart"), &expected);
+}
+
+#[test]
+fn golden_library_mode_demo() {
+    let lib_path = match std::env::var("UBDG_LIBRARY_MODE_DEMO_LIB") {
+        Ok(p) => {
+            let path = PathBuf::from(&p);
+            if path.is_absolute() {
+                path
+            } else {
+                repo_root().join(path)
+            }
+        }
+        Err(_) => {
+            eprintln!("UBDG_LIBRARY_MODE_DEMO_LIB not set; skipping library-mode golden test");
+            return;
+        }
+    };
+
+    let root = repo_root();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let out_dir = temp.path().join("out");
+
+    let expected = root.join("fixtures/library-mode-demo/expected/library_mode_demo.dart");
+
+    generate_library(&lib_path, "uniffi_library_mode_demo", &out_dir);
+    assert_matches_expected(&out_dir.join("library_mode_demo.dart"), &expected);
 }

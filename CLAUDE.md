@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-uniffi-bindgen-dart is a Dart backend for UniFFI — it generates idiomatic Dart bindings from UDL definitions. Built in Rust, it generates Dart code that uses `dart:ffi` and `DynamicLibrary` to call into compiled Rust shared libraries (.dylib/.so/.dll).
+uniffi-bindgen-dart is a Dart backend for UniFFI — it generates idiomatic Dart bindings from UDL or compiled UniFFI libraries. Built in Rust, it generates Dart code that uses `dart:ffi` and `DynamicLibrary` to call into compiled Rust shared libraries (.dylib/.so/.dll).
 
 ## Build & Test Commands
 
@@ -23,6 +23,9 @@ cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test --w
 
 # Generate bindings from a UDL file
 cargo run -- generate fixtures/simple-fns/src/simple-fns.udl --out-dir /tmp/out
+
+# Generate bindings from a compiled library (library mode)
+cargo run -- generate path/to/libcrate.dylib --library --crate crate_name --out-dir /tmp/out
 
 # Run a single Rust test
 cargo test -p ubdg_bindgen golden_simple_fns
@@ -63,11 +66,18 @@ class SimpleFnsFfi {
 
 **Convention**: The Dart library name matches the UDL namespace in snake_case. Generated files include FFI class (`{Name}Ffi`), public wrapper functions, type codecs (`*FfiCodec`), and a configurable `DynamicLibrary` binding system.
 
+### Generation Modes
+
+The generator supports two modes:
+
+1. **UDL mode** (default) — Reads a `.udl` file, generates Dart with bare symbol names (`add`, `greet`), no integrity checks. Used with hand-written native libs that manually export C functions.
+2. **Library mode** (`--library`) — Reads metadata from a compiled UniFFI cdylib, generates Dart with proper `uniffi_*` symbol names, API integrity checks (contract version + checksums), and the ffi_buffer ABI. **This is the standard upstream approach** used by all first-party UniFFI backends (Swift, Kotlin, Python, Ruby) and is the recommended production path.
+
 ### Native FFI Architecture
 
 For each fixture:
 1. Rust cdylib is compiled (`.dylib`/`.so`) exporting C functions
-2. `uniffi-bindgen-dart generate` reads UDL and emits `{namespace}.dart`
+2. `uniffi-bindgen-dart generate` reads UDL (or `--library` reads the cdylib directly) and emits `{namespace}.dart`
 3. Consumer opens the library: `configureDefaultBindings(libraryPath: 'libmy_crate.dylib')`
 
 ### Golden Test Pattern
@@ -75,9 +85,16 @@ For each fixture:
 Fixtures live in `fixtures/{name}/` with UDL input at `src/{name}.udl` and expected output at `expected/{name}.dart`. The test harness (`crates/ubdg_bindgen/tests/golden_generated.rs`) generates bindings to a temp dir and compares byte-for-byte against expected files. When changing generator output, regenerate expected files:
 
 ```bash
+# UDL mode
 cargo run -- generate fixtures/{name}/src/{name}.udl --out-dir /tmp/regen
 cp /tmp/regen/{namespace}.dart fixtures/{name}/expected/{namespace}.dart
+
+# Library mode (requires compiled cdylib)
+cargo run -- generate path/to/libcrate.dylib --library --crate crate_name --out-dir /tmp/regen
+cp /tmp/regen/{namespace}.dart fixtures/{name}/expected/{namespace}_library.dart
 ```
+
+Library-mode golden tests are gated on environment variables (e.g., `UBDG_RECORD_ENUM_METHODS_LIB`, `UBDG_LIBRARY_MODE_DEMO_LIB`) pointing to the compiled cdylib. They skip gracefully when the vars are not set. `test_bindings.sh` builds all fixtures and re-runs `cargo test` with the vars set.
 
 ### Naming Conventions
 
@@ -86,9 +103,9 @@ cp /tmp/regen/{namespace}.dart fixtures/{name}/expected/{namespace}.dart
 - Crate names prefixed with `ubdg_`
 - UDL filenames use kebab-case (`simple-fns.udl`)
 
-### UDL Feature Coverage
+### Feature Coverage
 
-All planned UDL features are implemented and golden-tested (16 fixtures):
+**UDL-mode fixtures** (15 fixtures + 5 regression fixtures):
 
 | Feature | Fixture |
 |---------|---------|
@@ -104,9 +121,17 @@ All planned UDL features are implemented and golden-tested (16 fixtures):
 | Large enum/error code-gen scale + all primitives | `type-limits-demo` |
 | Record/enum methods | `record-enum-methods` |
 | Trait attributes on interfaces, records, and enums | `trait-demo` |
+| Flat and rich error enums, non-exhaustive variants | `error-types-demo`, `non-exhaustive-demo` |
 | Regression: custom shadow types, async object lift, callback custom async | `regressions/*` |
 | Regression: optional param defaults, record field defaults | `regressions/defaults-demo` |
 | Regression: forward/mutual interface references | `regressions/forward-refs-demo` |
+
+**Library-mode fixtures** (2 fixtures):
+
+| Feature | Fixture |
+|---------|---------|
+| Record/enum methods, custom types, errors (library mode) | `record-enum-methods` (library golden) |
+| Top-level sync/async/throws fns, objects, records, enums, custom types, collections | `library-mode-demo` |
 
 ### External Type Support
 

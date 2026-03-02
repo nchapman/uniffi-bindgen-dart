@@ -7,7 +7,15 @@ RECORD_ENUM_METHODS_LIB="$(./scripts/build_record_enum_methods_fixture.sh)"
 COMPOUND_DEMO_LIB="$(./scripts/build_compound_demo_fixture.sh)"
 COVERALL_DEMO_LIB="$(./scripts/build_coverall_demo_fixture.sh)"
 KEYWORDS_DEMO_LIB="$(./scripts/build_keywords_demo_fixture.sh)"
-UBDG_RECORD_ENUM_METHODS_LIB="$RECORD_ENUM_METHODS_LIB" ./scripts/build_bindings.sh
+LIBRARY_MODE_DEMO_LIB="$(./scripts/build_library_mode_demo_fixture.sh)"
+UBDG_RECORD_ENUM_METHODS_LIB="$RECORD_ENUM_METHODS_LIB" \
+  UBDG_LIBRARY_MODE_DEMO_LIB="$LIBRARY_MODE_DEMO_LIB" \
+  ./scripts/build_bindings.sh
+
+# Re-run workspace tests with library paths set for library-mode golden tests
+UBDG_RECORD_ENUM_METHODS_LIB="$RECORD_ENUM_METHODS_LIB" \
+  UBDG_LIBRARY_MODE_DEMO_LIB="$LIBRARY_MODE_DEMO_LIB" \
+  cargo test --workspace
 
 resolve_dart_bin() {
   if [[ -n "${DART_BIN:-}" ]] && [[ -x "${DART_BIN}" ]]; then
@@ -42,6 +50,7 @@ if DART_CMD="$(resolve_dart_bin)"; then
       UBDG_COMPOUND_DEMO_LIB="$COMPOUND_DEMO_LIB" \
       UBDG_COVERALL_DEMO_LIB="$COVERALL_DEMO_LIB" \
       UBDG_KEYWORDS_DEMO_LIB="$KEYWORDS_DEMO_LIB" \
+      UBDG_LIBRARY_MODE_DEMO_LIB="$LIBRARY_MODE_DEMO_LIB" \
       "$DART_CMD" test
   )
 else

@@ -33,10 +33,23 @@ jobs:
         run: |
           SIMPLE_FNS_LIB="$(./scripts/build_fixture.sh)"
           RECORD_ENUM_METHODS_LIB="$(./scripts/build_record_enum_methods_fixture.sh)"
+          LIBRARY_MODE_DEMO_LIB="$(./scripts/build_library_mode_demo_fixture.sh)"
           ./scripts/build_compound_demo_fixture.sh
           ./scripts/build_coverall_demo_fixture.sh
           ./scripts/build_keywords_demo_fixture.sh
-          UBDG_RECORD_ENUM_METHODS_LIB="$RECORD_ENUM_METHODS_LIB" ./scripts/build_bindings.sh
+          UBDG_RECORD_ENUM_METHODS_LIB="$RECORD_ENUM_METHODS_LIB" \
+            UBDG_LIBRARY_MODE_DEMO_LIB="$LIBRARY_MODE_DEMO_LIB" \
+            ./scripts/build_bindings.sh
+      - name: Library-mode golden tests
+        run: |
+          case "$(uname -s)" in
+            Darwin) EXT="dylib" ;;
+            Linux) EXT="so" ;;
+            *) echo "unsupported platform" >&2; exit 1 ;;
+          esac
+          UBDG_RECORD_ENUM_METHODS_LIB="$PWD/binding_tests/native/libuniffi_record_enum_methods.$EXT" \
+            UBDG_LIBRARY_MODE_DEMO_LIB="$PWD/binding_tests/native/libuniffi_library_mode_demo.$EXT" \
+            cargo test --workspace
       - name: Upload runtime artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -81,4 +94,5 @@ jobs:
           UBDG_COMPOUND_DEMO_LIB="$PWD/native/libuniffi_compound_demo.$EXT" \
           UBDG_COVERALL_DEMO_LIB="$PWD/native/libuniffi_coverall_demo.$EXT" \
           UBDG_KEYWORDS_DEMO_LIB="$PWD/native/libuniffi_keywords_demo.$EXT" \
+          UBDG_LIBRARY_MODE_DEMO_LIB="$PWD/native/libuniffi_library_mode_demo.$EXT" \
           dart test
