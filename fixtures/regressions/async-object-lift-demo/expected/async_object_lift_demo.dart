@@ -39,55 +39,7 @@ class AsyncObjectLiftDemoFfi {
     return ffi.DynamicLibrary.open(_libraryPath ?? libraryName);
   }
 
-  void _ensureApiIntegrity(ffi.DynamicLibrary lib) {
-    const int bindingsContractVersion = 30;
-    final int scaffoldingContractVersion;
-    try {
-      final int Function() ffiContractVersion = lib.lookupFunction<ffi.Uint32 Function(), int Function()>('ffi_crate_name_uniffi_contract_version');
-      scaffoldingContractVersion = ffiContractVersion();
-    } catch (err) {
-      throw StateError('Missing or invalid UniFFI contract-version symbol `ffi_crate_name_uniffi_contract_version`: $err');
-    }
-    if (bindingsContractVersion != scaffoldingContractVersion) {
-      throw StateError('UniFFI contract version mismatch: expected $bindingsContractVersion, got $scaffoldingContractVersion');
-    }
-    final int _checksum_uniffi_crate_name_checksum_func_echo_remote_counter_async;
-    try {
-      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_func_echo_remote_counter_async');
-      _checksum_uniffi_crate_name_checksum_func_echo_remote_counter_async = checksumFn();
-    } catch (err) {
-      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_func_echo_remote_counter_async`: $err');
-    }
-    if (_checksum_uniffi_crate_name_checksum_func_echo_remote_counter_async != 51873) {
-      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_echo_remote_counter_async`: expected 51873, got $_checksum_uniffi_crate_name_checksum_func_echo_remote_counter_async');
-    }
-    final int _checksum_uniffi_crate_name_checksum_method_counter_spawn_next;
-    try {
-      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_method_counter_spawn_next');
-      _checksum_uniffi_crate_name_checksum_method_counter_spawn_next = checksumFn();
-    } catch (err) {
-      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_method_counter_spawn_next`: $err');
-    }
-    if (_checksum_uniffi_crate_name_checksum_method_counter_spawn_next != 47568) {
-      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_method_counter_spawn_next`: expected 47568, got $_checksum_uniffi_crate_name_checksum_method_counter_spawn_next');
-    }
-    final int _checksum_uniffi_crate_name_checksum_constructor_counter_new;
-    try {
-      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_constructor_counter_new');
-      _checksum_uniffi_crate_name_checksum_constructor_counter_new = checksumFn();
-    } catch (err) {
-      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_constructor_counter_new`: $err');
-    }
-    if (_checksum_uniffi_crate_name_checksum_constructor_counter_new != 59192) {
-      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_constructor_counter_new`: expected 59192, got $_checksum_uniffi_crate_name_checksum_constructor_counter_new');
-    }
-  }
-
-  late final ffi.DynamicLibrary _lib = (() {
-    final ffi.DynamicLibrary lib = open();
-    _ensureApiIntegrity(lib);
-    return lib;
-  })();
+  late final ffi.DynamicLibrary _lib = open();
 
   late final void Function(ffi.Pointer<Utf8>) _rustStringFree = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<Utf8>), void Function(ffi.Pointer<Utf8>)>('rust_string_free');
 

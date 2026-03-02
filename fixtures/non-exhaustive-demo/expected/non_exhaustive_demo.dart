@@ -163,23 +163,5 @@ class NonExhaustiveDemoFfi {
     return ffi.DynamicLibrary.open(_libraryPath ?? libraryName);
   }
 
-  void _ensureApiIntegrity(ffi.DynamicLibrary lib) {
-    const int bindingsContractVersion = 30;
-    final int scaffoldingContractVersion;
-    try {
-      final int Function() ffiContractVersion = lib.lookupFunction<ffi.Uint32 Function(), int Function()>('ffi_crate_name_uniffi_contract_version');
-      scaffoldingContractVersion = ffiContractVersion();
-    } catch (err) {
-      throw StateError('Missing or invalid UniFFI contract-version symbol `ffi_crate_name_uniffi_contract_version`: $err');
-    }
-    if (bindingsContractVersion != scaffoldingContractVersion) {
-      throw StateError('UniFFI contract version mismatch: expected $bindingsContractVersion, got $scaffoldingContractVersion');
-    }
-  }
-
-  late final ffi.DynamicLibrary _lib = (() {
-    final ffi.DynamicLibrary lib = open();
-    _ensureApiIntegrity(lib);
-    return lib;
-  })();
+  late final ffi.DynamicLibrary _lib = open();
 }

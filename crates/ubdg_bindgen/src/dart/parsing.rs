@@ -551,14 +551,16 @@ pub(super) fn component_interface_to_metadata(
         namespace: Some(ci.namespace().to_string()),
         local_module_path: ci.crate_name().to_string(),
         namespace_docstring: ci.namespace_docstring().map(ToString::to_string),
-        uniffi_contract_version: Some(ci.uniffi_contract_version()),
-        ffi_uniffi_contract_version_symbol: Some(
-            ci.ffi_uniffi_contract_version().name().to_string(),
-        ),
-        api_checksums: ci
-            .iter_checksums()
-            .map(|(symbol, expected)| UdlApiChecksum { symbol, expected })
-            .collect(),
+        uniffi_contract_version: include_ffi_symbols.then(|| ci.uniffi_contract_version()),
+        ffi_uniffi_contract_version_symbol: include_ffi_symbols
+            .then(|| ci.ffi_uniffi_contract_version().name().to_string()),
+        api_checksums: if include_ffi_symbols {
+            ci.iter_checksums()
+                .map(|(symbol, expected)| UdlApiChecksum { symbol, expected })
+                .collect()
+        } else {
+            Vec::new()
+        },
         functions,
         objects,
         callback_interfaces,

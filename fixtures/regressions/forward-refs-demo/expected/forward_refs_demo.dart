@@ -23,55 +23,7 @@ class ForwardRefsDemoFfi {
     return ffi.DynamicLibrary.open(_libraryPath ?? libraryName);
   }
 
-  void _ensureApiIntegrity(ffi.DynamicLibrary lib) {
-    const int bindingsContractVersion = 30;
-    final int scaffoldingContractVersion;
-    try {
-      final int Function() ffiContractVersion = lib.lookupFunction<ffi.Uint32 Function(), int Function()>('ffi_crate_name_uniffi_contract_version');
-      scaffoldingContractVersion = ffiContractVersion();
-    } catch (err) {
-      throw StateError('Missing or invalid UniFFI contract-version symbol `ffi_crate_name_uniffi_contract_version`: $err');
-    }
-    if (bindingsContractVersion != scaffoldingContractVersion) {
-      throw StateError('UniFFI contract version mismatch: expected $bindingsContractVersion, got $scaffoldingContractVersion');
-    }
-    final int _checksum_uniffi_crate_name_checksum_func_create_node_a;
-    try {
-      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_func_create_node_a');
-      _checksum_uniffi_crate_name_checksum_func_create_node_a = checksumFn();
-    } catch (err) {
-      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_func_create_node_a`: $err');
-    }
-    if (_checksum_uniffi_crate_name_checksum_func_create_node_a != 55824) {
-      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_create_node_a`: expected 55824, got $_checksum_uniffi_crate_name_checksum_func_create_node_a');
-    }
-    final int _checksum_uniffi_crate_name_checksum_method_nodea_get_partner;
-    try {
-      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_method_nodea_get_partner');
-      _checksum_uniffi_crate_name_checksum_method_nodea_get_partner = checksumFn();
-    } catch (err) {
-      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_method_nodea_get_partner`: $err');
-    }
-    if (_checksum_uniffi_crate_name_checksum_method_nodea_get_partner != 50601) {
-      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_method_nodea_get_partner`: expected 50601, got $_checksum_uniffi_crate_name_checksum_method_nodea_get_partner');
-    }
-    final int _checksum_uniffi_crate_name_checksum_method_nodeb_get_partner;
-    try {
-      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_method_nodeb_get_partner');
-      _checksum_uniffi_crate_name_checksum_method_nodeb_get_partner = checksumFn();
-    } catch (err) {
-      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_method_nodeb_get_partner`: $err');
-    }
-    if (_checksum_uniffi_crate_name_checksum_method_nodeb_get_partner != 49612) {
-      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_method_nodeb_get_partner`: expected 49612, got $_checksum_uniffi_crate_name_checksum_method_nodeb_get_partner');
-    }
-  }
-
-  late final ffi.DynamicLibrary _lib = (() {
-    final ffi.DynamicLibrary lib = open();
-    _ensureApiIntegrity(lib);
-    return lib;
-  })();
+  late final ffi.DynamicLibrary _lib = open();
 
   late final int Function() _createNodeA = _lib.lookupFunction<ffi.Uint64 Function(), int Function()>('create_node_a');
 

@@ -328,8 +328,11 @@ pub extern "C" fn validate_html(source: *const c_char) -> *mut c_char {
 /// Return a ReturnOnlyDict.
 #[no_mangle]
 pub extern "C" fn output_return_only_dict() -> *mut c_char {
+    // The "e" field is a CoverallFlatError. Dart decodes it as a JSON string
+    // that gets double-parsed: the outer JSON yields a string value, which is
+    // then `jsonDecode`d by the error codec to extract the tag.
     let dict = serde_json::json!({
-        "e": "tooManyVariants"
+        "e": serde_json::json!({"tag": "tooManyVariants"}).to_string()
     });
     json_out(&dict)
 }
@@ -337,9 +340,10 @@ pub extern "C" fn output_return_only_dict() -> *mut c_char {
 /// Return a ReturnOnlyEnum.
 #[no_mangle]
 pub extern "C" fn output_return_only_enum() -> *mut c_char {
+    // Same double-parse pattern as output_return_only_dict for the "e" field.
     let val = serde_json::json!({
         "tag": "one",
-        "e": "tooManyVariants"
+        "e": serde_json::json!({"tag": "tooManyVariants"}).to_string()
     });
     json_out(&val)
 }
@@ -509,7 +513,7 @@ pub extern "C" fn coveralls_add_patch(handle: u64, patch_handle: u64) {
 pub extern "C" fn coveralls_add_repair(handle: u64, repair_json: *const c_char) {
     let json_str = c_str(repair_json);
     if let Ok(val) = serde_json::from_str::<Value>(&json_str) {
-        let when = val["when"].as_i64().unwrap_or(0);
+        let when = val["when_"].as_i64().unwrap_or(0);
         let patch_handle = val["patch"].as_u64().unwrap_or(0);
         if let Some(s) = COVERALLS.lock().unwrap().get_mut(&handle) {
             s.repairs.push((when, patch_handle));
@@ -529,7 +533,7 @@ pub extern "C" fn coveralls_get_repairs(handle: u64) -> *mut c_char {
         .iter()
         .map(|(when, patch)| {
             serde_json::json!({
-                "when": when,
+                "when_": when,
                 "patch": patch
             })
         })
@@ -714,11 +718,11 @@ pub extern "C" fn describe_maybe_dict(input: *const c_char) -> *mut c_char {
     }
 }
 
-/// Return an optional Color enum — JSON string or nullptr.
+/// Return an optional Color enum as a bare UTF-8 variant name, or nullptr for None.
 #[no_mangle]
 pub extern "C" fn get_maybe_color(return_value: bool) -> *mut c_char {
     if return_value {
-        c_string_out("\"red\"")
+        c_string_out("red")
     } else {
         std::ptr::null_mut()
     }
