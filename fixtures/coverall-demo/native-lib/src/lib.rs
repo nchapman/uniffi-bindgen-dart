@@ -416,6 +416,111 @@ pub extern "C" fn get_int_map(key: u32, value: u64) -> RustBuffer {
     RustBuffer { data: ptr, len }
 }
 
+/// Return an optional u32 — JSON-encoded as "42" or "null".
+#[no_mangle]
+pub extern "C" fn get_maybe_count(return_value: bool) -> *mut c_char {
+    if return_value {
+        c_string_out("42")
+    } else {
+        c_string_out("null")
+    }
+}
+
+/// Return an optional boolean — JSON-encoded as "true" or "null".
+#[no_mangle]
+pub extern "C" fn get_maybe_flag(return_value: bool) -> *mut c_char {
+    if return_value {
+        c_string_out("true")
+    } else {
+        c_string_out("null")
+    }
+}
+
+/// Return an optional SimpleDict — JSON string or nullptr.
+#[no_mangle]
+pub extern "C" fn get_maybe_dict(return_value: bool) -> *mut c_char {
+    if return_value {
+        let dict = serde_json::json!({
+            "text": "hello",
+            "maybeCount": 42,
+            "flag": true,
+            "color": "red",
+            "tags": ["a"],
+            "counts": {"x": 1},
+            "maybeText": null,
+            "maybePatch": null
+        });
+        json_out(&dict)
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
+/// Describe an optional SimpleDict parameter.
+#[no_mangle]
+pub extern "C" fn describe_maybe_dict(input: *const c_char) -> *mut c_char {
+    if input.is_null() {
+        c_string_out("null")
+    } else {
+        let s = c_str(input);
+        c_string_out(&format!("dict:{}", s))
+    }
+}
+
+/// Return an optional Color enum — JSON string or nullptr.
+#[no_mangle]
+pub extern "C" fn get_maybe_color(return_value: bool) -> *mut c_char {
+    if return_value {
+        c_string_out("\"red\"")
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
+/// Describe an optional Color enum parameter.
+#[no_mangle]
+pub extern "C" fn describe_maybe_color(input: *const c_char) -> *mut c_char {
+    if input.is_null() {
+        c_string_out("null")
+    } else {
+        let s = c_str(input);
+        c_string_out(&format!("color:{}", s))
+    }
+}
+
+// --- Coveralls optional-object methods ---
+
+/// Per-handle "other" reference.
+static OTHER_REFS: LazyLock<Mutex<HashMap<u64, Option<u64>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+#[no_mangle]
+pub extern "C" fn coveralls_take_other(handle: u64, other: u64) {
+    let other_val = if other == 0 { None } else { Some(other) };
+    OTHER_REFS.lock().unwrap().insert(handle, other_val);
+}
+
+#[no_mangle]
+pub extern "C" fn coveralls_get_other(handle: u64) -> u64 {
+    OTHER_REFS
+        .lock()
+        .unwrap()
+        .get(&handle)
+        .and_then(|o| *o)
+        .unwrap_or(0)
+}
+
+#[no_mangle]
+pub extern "C" fn coveralls_get_tags(handle: u64) -> *mut c_char {
+    let state = COVERALLS.lock().unwrap();
+    let name = state
+        .get(&handle)
+        .map(|s| s.name.clone())
+        .unwrap_or_default();
+    let tags = serde_json::json!([name, null, "tag"]);
+    json_out(&tags)
+}
+
 // --- ThreadsafeCounter ---
 
 #[no_mangle]

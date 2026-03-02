@@ -744,6 +744,16 @@ class CoverallDemoFfi {
     if (_checksum_uniffi_crate_name_checksum_func_get_maybe_color != 27958) {
       throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_get_maybe_color`: expected 27958, got $_checksum_uniffi_crate_name_checksum_func_get_maybe_color');
     }
+    final int _checksum_uniffi_crate_name_checksum_func_get_maybe_count;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_func_get_maybe_count');
+      _checksum_uniffi_crate_name_checksum_func_get_maybe_count = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_func_get_maybe_count`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_func_get_maybe_count != 58188) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_get_maybe_count`: expected 58188, got $_checksum_uniffi_crate_name_checksum_func_get_maybe_count');
+    }
     final int _checksum_uniffi_crate_name_checksum_func_get_maybe_dict;
     try {
       final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_func_get_maybe_dict');
@@ -753,6 +763,16 @@ class CoverallDemoFfi {
     }
     if (_checksum_uniffi_crate_name_checksum_func_get_maybe_dict != 50623) {
       throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_get_maybe_dict`: expected 50623, got $_checksum_uniffi_crate_name_checksum_func_get_maybe_dict');
+    }
+    final int _checksum_uniffi_crate_name_checksum_func_get_maybe_flag;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_func_get_maybe_flag');
+      _checksum_uniffi_crate_name_checksum_func_get_maybe_flag = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_func_get_maybe_flag`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_func_get_maybe_flag != 59146) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_get_maybe_flag`: expected 59146, got $_checksum_uniffi_crate_name_checksum_func_get_maybe_flag');
     }
     final int _checksum_uniffi_crate_name_checksum_func_get_maybe_simple_dict;
     try {
@@ -1261,6 +1281,22 @@ class CoverallDemoFfi {
       }
   }
 
+  late final ffi.Pointer<Utf8> Function(bool returnValue) _getMaybeCount = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Bool returnValue), ffi.Pointer<Utf8> Function(bool returnValue)>('get_maybe_count');
+
+  int? getMaybeCount(bool returnValue) {
+      final ffi.Pointer<Utf8> resultPtr = _getMaybeCount(returnValue);
+      if (resultPtr == ffi.nullptr) {
+        throw StateError('Rust returned null for get_maybe_count');
+      }
+      try {
+        final String payload = resultPtr.toDartString();
+        final Object? decoded = jsonDecode(payload);
+        return decoded == null ? null : (() { final __tmp = decoded; return (__tmp as num).toInt(); })();
+      } finally {
+        _rustStringFree(resultPtr);
+      }
+  }
+
   late final ffi.Pointer<Utf8> Function(bool returnValue) _getMaybeDict = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Bool returnValue), ffi.Pointer<Utf8> Function(bool returnValue)>('get_maybe_dict');
 
   SimpleDict? getMaybeDict(bool returnValue) {
@@ -1271,6 +1307,22 @@ class CoverallDemoFfi {
       try {
         final String payload = resultPtr.toDartString();
         return SimpleDict.fromJson(jsonDecode(payload) as Map<String, dynamic>);
+      } finally {
+        _rustStringFree(resultPtr);
+      }
+  }
+
+  late final ffi.Pointer<Utf8> Function(bool returnValue) _getMaybeFlag = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Bool returnValue), ffi.Pointer<Utf8> Function(bool returnValue)>('get_maybe_flag');
+
+  bool? getMaybeFlag(bool returnValue) {
+      final ffi.Pointer<Utf8> resultPtr = _getMaybeFlag(returnValue);
+      if (resultPtr == ffi.nullptr) {
+        throw StateError('Rust returned null for get_maybe_flag');
+      }
+      try {
+        final String payload = resultPtr.toDartString();
+        final Object? decoded = jsonDecode(payload);
+        return decoded == null ? null : (() { final __tmp = decoded; return __tmp as bool; })();
       } finally {
         _rustStringFree(resultPtr);
       }
@@ -2039,9 +2091,19 @@ Color? getMaybeColor(bool returnValue) {
   return _bindings().getMaybeColor(returnValue);
 }
 
+/// Return an optional u32 based on a flag.
+int? getMaybeCount(bool returnValue) {
+  return _bindings().getMaybeCount(returnValue);
+}
+
 /// Return an optional SimpleDict based on a flag.
 SimpleDict? getMaybeDict(bool returnValue) {
   return _bindings().getMaybeDict(returnValue);
+}
+
+/// Return an optional boolean based on a flag.
+bool? getMaybeFlag(bool returnValue) {
+  return _bindings().getMaybeFlag(returnValue);
 }
 
 /// Return an enum variant based on a numeric selector.

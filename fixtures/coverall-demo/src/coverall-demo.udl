@@ -52,6 +52,12 @@ namespace coverall_demo {
 
   /// Accept an optional Color enum parameter.
   string describe_maybe_color(Color? input);
+
+  /// Return an optional u32 based on a flag.
+  u32? get_maybe_count(boolean return_value);
+
+  /// Return an optional boolean based on a flag.
+  boolean? get_maybe_flag(boolean return_value);
 };
 
 /// Simple three-variant flat enum.

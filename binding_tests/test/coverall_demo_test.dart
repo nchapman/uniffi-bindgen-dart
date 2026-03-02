@@ -23,10 +23,9 @@ void main() {
     resetDefaultBindings();
   });
 
-  // Not tested: makeRustGetters, testGetters, ancestorNames,
-  // Coveralls.takeOther, Coveralls.getOther, Coveralls.getTags
-  // The native-lib stub does not implement callback interfaces or
-  // object-ref chains. These are covered by the golden test fixture.
+  // Not tested: makeRustGetters, testGetters, ancestorNames
+  // The native-lib stub does not implement callback interfaces.
+  // These are covered by the golden test fixture.
 
   test('generated bindings file exists', () {
     final generated = File('generated/coverall_demo.dart');
@@ -137,6 +136,74 @@ void main() {
       expect(getNumAlive(), before + 1);
       c.close();
       expect(getNumAlive(), before);
+    });
+
+    test('getMaybeCount returns value when true', () {
+      final result = getMaybeCount(true);
+      expect(result, 42);
+    });
+
+    test('getMaybeCount returns null when false', () {
+      final result = getMaybeCount(false);
+      expect(result, isNull);
+    });
+
+    test('getMaybeFlag returns value when true', () {
+      final result = getMaybeFlag(true);
+      expect(result, isTrue);
+    });
+
+    test('getMaybeFlag returns null when false', () {
+      final result = getMaybeFlag(false);
+      expect(result, isNull);
+    });
+
+    test('getMaybeDict returns dict when true', () {
+      final result = getMaybeDict(true);
+      expect(result, isNotNull);
+      expect(result!.text, 'hello');
+      expect(result.maybeCount, 42);
+    });
+
+    test('getMaybeDict returns null when false', () {
+      final result = getMaybeDict(false);
+      expect(result, isNull);
+    });
+
+    test('describeMaybeDict with value', () {
+      final dict = createSomeDict();
+      final result = describeMaybeDict(dict);
+      expect(result, startsWith('dict:'));
+    });
+
+    test('describeMaybeDict with null', () {
+      final result = describeMaybeDict(null);
+      expect(result, 'null');
+    });
+
+    test('getMaybeColor returns color when true', () {
+      final result = getMaybeColor(true);
+      expect(result, Color.red);
+    });
+
+    test('getMaybeColor returns null when false', () {
+      final result = getMaybeColor(false);
+      expect(result, isNull);
+    });
+
+    test('describeMaybeColor with value', () {
+      final result = describeMaybeColor(Color.green);
+      expect(result, startsWith('color:'));
+    });
+
+    test('describeMaybeColor with null', () {
+      final result = describeMaybeColor(null);
+      expect(result, 'null');
+    });
+
+    test('getIntMap round-trip', () {
+      final result = getIntMap(31, 42);
+      expect(result[31], 42);
     });
   });
 
@@ -277,6 +344,29 @@ void main() {
       expect(metadata['name'], 'meta');
       expect(metadata.containsKey('version'), isTrue);
       expect(metadata['version'], isNull);
+      c.close();
+    });
+
+    test('takeOther and getOther', () {
+      final c1 = Coveralls.create('parent');
+      final c2 = Coveralls.create('child');
+      c1.takeOther(c2);
+      final other = c1.getOther();
+      expect(other, isNotNull);
+      other!.close();
+      c1.takeOther(null);
+      expect(c1.getOther(), isNull);
+      c1.close();
+      c2.close();
+    });
+
+    test('getTags returns sequence with nulls', () {
+      final c = Coveralls.create('tagged');
+      final tags = c.getTags();
+      expect(tags, hasLength(3));
+      expect(tags[0], 'tagged');
+      expect(tags[1], isNull);
+      expect(tags[2], 'tag');
       c.close();
     });
 
