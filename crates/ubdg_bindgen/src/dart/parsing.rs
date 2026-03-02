@@ -461,6 +461,7 @@ pub(super) fn component_interface_to_metadata(
             UdlObject {
                 name: obj.name().to_string(),
                 docstring: obj.docstring().map(ToString::to_string),
+                is_error: ci.is_name_used_as_error(obj.name()),
                 constructors: obj
                     .constructors()
                     .into_iter()

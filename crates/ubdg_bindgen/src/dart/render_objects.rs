@@ -25,12 +25,20 @@ pub(super) fn render_object_classes(
             "final class {token_name} {{\n  const {token_name}(this.free, this.handle);\n  final void Function(int) free;\n  final int handle;\n}}\n\n"
         ));
         out.push_str(&render_doc_comment(object.docstring.as_deref(), ""));
+        let mut implements = Vec::new();
+        if object.is_error {
+            implements.push("Exception".to_string());
+        }
         if object.trait_methods.ord_cmp.is_some() {
-            out.push_str(&format!(
-                "final class {object_name} implements Comparable<{object_name}> {{\n"
-            ));
-        } else {
+            implements.push(format!("Comparable<{object_name}>"));
+        }
+        if implements.is_empty() {
             out.push_str(&format!("final class {object_name} {{\n"));
+        } else {
+            out.push_str(&format!(
+                "final class {object_name} implements {} {{\n",
+                implements.join(", ")
+            ));
         }
         out.push_str(&format!("  {object_name}._(this._ffi, this._handle) {{\n"));
         out.push_str(&format!(

@@ -1890,6 +1890,7 @@ interface Outcome {
         let objects = vec![UdlObject {
             name: "widget".to_string(),
             docstring: None,
+            is_error: false,
             constructors: vec![UdlObjectConstructor {
                 name: "new".to_string(),
                 ffi_symbol: Some("uniffi_demo_ctor_widget_new".to_string()),

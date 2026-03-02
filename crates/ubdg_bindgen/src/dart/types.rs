@@ -29,6 +29,8 @@ pub(super) struct UdlArg {
 pub(super) struct UdlObject {
     pub(super) name: String,
     pub(super) docstring: Option<String>,
+    /// True when this object is used as a `[Throws=...]` error type.
+    pub(super) is_error: bool,
     pub(super) constructors: Vec<UdlObjectConstructor>,
     pub(super) methods: Vec<UdlObjectMethod>,
     pub(super) trait_methods: UdlObjectTraitMethods,

@@ -24,6 +24,24 @@ pub(super) fn render_doc_comment(docstring: Option<&str>, indent: &str) -> Strin
     out
 }
 
+/// Render the throw expression for an error in a JSON-envelope function.
+///
+/// For enum errors: `throw ErrorExceptionFfiCodec.decode(errRaw);`
+/// For object errors: `throw ErrorName._(this, (errRaw as num).toInt());`
+pub(super) fn render_throws_expr(throws_type: &Type, err_value: &str, indent: &str) -> String {
+    if is_throws_object_type(throws_type) {
+        let name = throws_name_from_type(throws_type)
+            .map(to_upper_camel)
+            .unwrap_or_else(|| "Object".to_string());
+        format!("{indent}throw {name}._(this, ({err_value} as num).toInt());\n")
+    } else {
+        let name = throws_name_from_type(throws_type)
+            .map(to_upper_camel)
+            .unwrap_or_else(|| "Unknown".to_string());
+        format!("{indent}throw {name}ExceptionFfiCodec.decode({err_value});\n")
+    }
+}
+
 pub(super) fn escape_dart_string_literal(value: &str) -> String {
     value
         .replace('\\', "\\\\")

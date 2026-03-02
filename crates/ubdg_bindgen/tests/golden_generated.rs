@@ -227,6 +227,20 @@ fn golden_coverall_demo() {
 }
 
 #[test]
+fn golden_error_types_demo() {
+    let root = repo_root();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let out_dir = temp.path().join("out");
+
+    let source = root.join("fixtures/error-types-demo/src/error-types-demo.udl");
+    let config = root.join("fixtures/error-types-demo/uniffi.toml");
+    let expected = root.join("fixtures/error-types-demo/expected/error_types_demo.dart");
+
+    generate(&source, &out_dir, Some(&config));
+    assert_matches_expected(&out_dir.join("error_types_demo.dart"), &expected);
+}
+
+#[test]
 fn golden_non_exhaustive_demo() {
     let root = repo_root();
     let temp = tempfile::tempdir().expect("tempdir");

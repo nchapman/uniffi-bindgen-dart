@@ -1,0 +1,4 @@
+[bindings.dart]
+module_name = "error_types_demo"
+ffi_class_name = "ErrorTypesDemoBindings"
+library_name = "uniffi_error_types_demo"

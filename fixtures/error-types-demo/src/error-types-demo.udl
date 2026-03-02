@@ -1,0 +1,19 @@
+[Traits=(Debug, Display)]
+interface ErrorInterface {
+  sequence<string> chain();
+  string? link(u64 index);
+};
+
+interface TestInterface {
+  constructor();
+
+  [Throws=ErrorInterface]
+  void oops();
+};
+
+namespace error_types_demo {
+  [Throws=ErrorInterface]
+  void oops();
+
+  ErrorInterface get_error(string message);
+};

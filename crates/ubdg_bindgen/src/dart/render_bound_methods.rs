@@ -1023,21 +1023,28 @@ pub(super) fn render_bound_methods(
                     return_ffi_elements + 3
                 ));
                 out.push_str("        rustRetBufferPtrs.add(errBufPtr);\n");
-                if let Some(throws_name) = function
-                    .throws_type
-                    .as_ref()
-                    .and_then(enum_name_from_type)
-                    .map(to_upper_camel)
-                {
-                    let exception_name = format!("{throws_name}Exception");
-                    out.push_str("        if (statusCode == _uniFfiRustCallStatusError) {\n");
-                    out.push_str(
-                        "          final Uint8List errBytes = errBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(errBufPtr.ref.data.asTypedList(errBufPtr.ref.len));\n",
-                    );
-                    out.push_str(&format!(
-                        "          throw _uniffiLift{exception_name}(errBytes);\n"
-                    ));
-                    out.push_str("        }\n");
+                if let Some(throws_type) = function.throws_type.as_ref() {
+                    if let Some(throws_name) =
+                        throws_name_from_type(throws_type).map(to_upper_camel)
+                    {
+                        out.push_str("        if (statusCode == _uniFfiRustCallStatusError) {\n");
+                        out.push_str(
+                            "          final Uint8List errBytes = errBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(errBufPtr.ref.data.asTypedList(errBufPtr.ref.len));\n",
+                        );
+                        if is_throws_object_type(throws_type) {
+                            out.push_str("          final ByteData _errBd = ByteData.sublistView(errBytes);\n");
+                            out.push_str("          final int _errHandle = _errBd.getUint64(0, Endian.little);\n");
+                            out.push_str(&format!(
+                                "          throw {throws_name}._(this, _errHandle);\n"
+                            ));
+                        } else {
+                            let exception_name = format!("{throws_name}Exception");
+                            out.push_str(&format!(
+                                "          throw _uniffiLift{exception_name}(errBytes);\n"
+                            ));
+                        }
+                        out.push_str("        }\n");
+                    }
                 }
                 out.push_str(
                     "        throw StateError('UniFFI ffibuffer call failed with status $statusCode');\n",
@@ -1791,73 +1798,86 @@ pub(super) fn render_bound_methods(
             }
             out.push_str("        }\n");
             debug_assert!(
-                function.throws_type.as_ref().and_then(enum_name_from_type).is_some()
+                function.throws_type.as_ref().and_then(throws_name_from_type).is_some()
                     || function.throws_type.is_none(),
-                "throws_type passed is_runtime_throws_enum_type but enum_name_from_type returned None"
+                "throws_type passed is_runtime_throws_enum_type but throws_name_from_type returned None"
             );
-            if let Some(throws_name) = function
-                .throws_type
-                .as_ref()
-                .and_then(enum_name_from_type)
-                .map(to_upper_camel)
-            {
-                // Free any bytes-like result buffer on the error path to prevent leaks.
-                if let Some(ret_type) = function.return_type.as_ref() {
-                    if is_runtime_bytes_type(ret_type) || is_runtime_non_string_map_type(ret_type) {
-                        out.push_str("        {\n");
-                        out.push_str("          final _RustBuffer buf = resultValue;\n");
-                        out.push_str("          if (buf.len > 0 && buf.data != ffi.nullptr) {\n");
-                        out.push_str("            _rustBytesFree(buf);\n");
-                        out.push_str("          }\n");
-                        out.push_str("        }\n");
-                    } else if is_runtime_optional_bytes_type(ret_type) {
-                        out.push_str("        {\n");
-                        out.push_str("          final _RustBufferOpt opt = resultValue;\n");
-                        out.push_str("          if (opt.isSome != 0) {\n");
-                        out.push_str("            final _RustBuffer buf = opt.value;\n");
-                        out.push_str("            if (buf.len > 0 && buf.data != ffi.nullptr) {\n");
-                        out.push_str("              _rustBytesFree(buf);\n");
-                        out.push_str("            }\n");
-                        out.push_str("          }\n");
-                        out.push_str("        }\n");
-                    } else if is_runtime_sequence_bytes_type(ret_type) {
-                        out.push_str("        {\n");
-                        out.push_str("          final _RustBufferVec vec = resultValue;\n");
-                        out.push_str("          if (vec.len > 0 && vec.data != ffi.nullptr) {\n");
-                        out.push_str("            _rustBytesVecFree(vec);\n");
-                        out.push_str("          }\n");
-                        out.push_str("        }\n");
-                    } else if is_runtime_sequence_json_type(ret_type)
-                        || is_runtime_map_with_string_key_type(ret_type)
-                    {
-                        out.push_str("        {\n");
-                        out.push_str("          final ffi.Pointer<Utf8> ptr = resultPtr;\n");
-                        out.push_str("          if (ptr != ffi.nullptr) _rustStringFree(ptr);\n");
-                        out.push_str("        }\n");
+            if let Some(throws_type) = function.throws_type.as_ref() {
+                if let Some(throws_name) = throws_name_from_type(throws_type).map(to_upper_camel) {
+                    // Free any bytes-like result buffer on the error path to prevent leaks.
+                    if let Some(ret_type) = function.return_type.as_ref() {
+                        if is_runtime_bytes_type(ret_type)
+                            || is_runtime_non_string_map_type(ret_type)
+                        {
+                            out.push_str("        {\n");
+                            out.push_str("          final _RustBuffer buf = resultValue;\n");
+                            out.push_str(
+                                "          if (buf.len > 0 && buf.data != ffi.nullptr) {\n",
+                            );
+                            out.push_str("            _rustBytesFree(buf);\n");
+                            out.push_str("          }\n");
+                            out.push_str("        }\n");
+                        } else if is_runtime_optional_bytes_type(ret_type) {
+                            out.push_str("        {\n");
+                            out.push_str("          final _RustBufferOpt opt = resultValue;\n");
+                            out.push_str("          if (opt.isSome != 0) {\n");
+                            out.push_str("            final _RustBuffer buf = opt.value;\n");
+                            out.push_str(
+                                "            if (buf.len > 0 && buf.data != ffi.nullptr) {\n",
+                            );
+                            out.push_str("              _rustBytesFree(buf);\n");
+                            out.push_str("            }\n");
+                            out.push_str("          }\n");
+                            out.push_str("        }\n");
+                        } else if is_runtime_sequence_bytes_type(ret_type) {
+                            out.push_str("        {\n");
+                            out.push_str("          final _RustBufferVec vec = resultValue;\n");
+                            out.push_str(
+                                "          if (vec.len > 0 && vec.data != ffi.nullptr) {\n",
+                            );
+                            out.push_str("            _rustBytesVecFree(vec);\n");
+                            out.push_str("          }\n");
+                            out.push_str("        }\n");
+                        } else if is_runtime_sequence_json_type(ret_type)
+                            || is_runtime_map_with_string_key_type(ret_type)
+                        {
+                            out.push_str("        {\n");
+                            out.push_str("          final ffi.Pointer<Utf8> ptr = resultPtr;\n");
+                            out.push_str(
+                                "          if (ptr != ffi.nullptr) _rustStringFree(ptr);\n",
+                            );
+                            out.push_str("        }\n");
+                        }
                     }
+                    out.push_str("        if (statusCode == _rustCallStatusError) {\n");
+                    out.push_str(
+                        "          final ffi.Pointer<Utf8> errorPtr = outStatusPtr.ref.errorBuf;\n",
+                    );
+                    out.push_str("          if (errorPtr != ffi.nullptr) {\n");
+                    out.push_str("            try {\n");
+                    out.push_str(
+                        "              final String errorPayload = errorPtr.toDartString();\n",
+                    );
+                    if is_throws_object_type(throws_type) {
+                        out.push_str(&format!(
+                            "              throw {throws_name}._(this, (jsonDecode(errorPayload) as num).toInt());\n"
+                        ));
+                    } else {
+                        out.push_str(&format!(
+                            "              throw {}ExceptionFfiCodec.decode(jsonDecode(errorPayload));\n",
+                            throws_name
+                        ));
+                    }
+                    out.push_str("            } finally {\n");
+                    out.push_str("              _rustStringFree(errorPtr);\n");
+                    out.push_str("            }\n");
+                    out.push_str("          }\n");
+                    out.push_str(&format!(
+                        "          throw StateError('Rust async error without payload for {}');\n",
+                        function.name
+                    ));
+                    out.push_str("        }\n");
                 }
-                out.push_str("        if (statusCode == _rustCallStatusError) {\n");
-                out.push_str(
-                    "          final ffi.Pointer<Utf8> errorPtr = outStatusPtr.ref.errorBuf;\n",
-                );
-                out.push_str("          if (errorPtr != ffi.nullptr) {\n");
-                out.push_str("            try {\n");
-                out.push_str(
-                    "              final String errorPayload = errorPtr.toDartString();\n",
-                );
-                out.push_str(&format!(
-                    "              throw {}ExceptionFfiCodec.decode(jsonDecode(errorPayload));\n",
-                    throws_name
-                ));
-                out.push_str("            } finally {\n");
-                out.push_str("              _rustStringFree(errorPtr);\n");
-                out.push_str("            }\n");
-                out.push_str("          }\n");
-                out.push_str(&format!(
-                    "          throw StateError('Rust async error without payload for {}');\n",
-                    function.name
-                ));
-                out.push_str("        }\n");
             }
             out.push_str("        if (statusCode == _rustCallStatusCancelled) {\n");
             out.push_str(&format!(
@@ -1913,12 +1933,10 @@ pub(super) fn render_bound_methods(
         }
         let call_expr = format!("{field_name}({})", call_args.join(", "));
         if is_throwing {
-            let Some(throws_name) = function
-                .throws_type
-                .as_ref()
-                .and_then(enum_name_from_type)
-                .map(to_upper_camel)
-            else {
+            let Some(throws_type) = function.throws_type.as_ref() else {
+                continue;
+            };
+            let Some(_throws_name) = throws_name_from_type(throws_type) else {
                 continue;
             };
             let ok_decode = function
@@ -1945,10 +1963,7 @@ pub(super) fn render_bound_methods(
             );
             out.push_str("      final Object? errRaw = envelope['err'];\n");
             out.push_str("      if (errRaw != null) {\n");
-            out.push_str(&format!(
-                "        throw {}ExceptionFfiCodec.decode(errRaw);\n",
-                throws_name
-            ));
+            out.push_str(&render_throws_expr(throws_type, "errRaw", "        "));
             out.push_str("      }\n");
             if let Some(ok_decode) = ok_decode {
                 out.push_str("      if (!envelope.containsKey('ok')) {\n");
@@ -2488,21 +2503,30 @@ pub(super) fn render_bound_methods(
                         return_ffi_elements + 3
                     ));
                     out.push_str("        rustRetBufferPtrs.add(errBufPtr);\n");
-                    if let Some(throws_name) = ctor
-                        .throws_type
-                        .as_ref()
-                        .and_then(enum_name_from_type)
-                        .map(to_upper_camel)
-                    {
-                        let exception_name = format!("{throws_name}Exception");
-                        out.push_str("        if (statusCode == _uniFfiRustCallStatusError) {\n");
-                        out.push_str(
-                            "          final Uint8List errBytes = errBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(errBufPtr.ref.data.asTypedList(errBufPtr.ref.len));\n",
-                        );
-                        out.push_str(&format!(
-                            "          throw _uniffiLift{exception_name}(errBytes);\n"
-                        ));
-                        out.push_str("        }\n");
+                    if let Some(throws_type) = ctor.throws_type.as_ref() {
+                        if let Some(throws_name) =
+                            throws_name_from_type(throws_type).map(to_upper_camel)
+                        {
+                            out.push_str(
+                                "        if (statusCode == _uniFfiRustCallStatusError) {\n",
+                            );
+                            out.push_str(
+                                "          final Uint8List errBytes = errBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(errBufPtr.ref.data.asTypedList(errBufPtr.ref.len));\n",
+                            );
+                            if is_throws_object_type(throws_type) {
+                                out.push_str("          final ByteData _errBd = ByteData.sublistView(errBytes);\n");
+                                out.push_str("          final int _errHandle = _errBd.getUint64(0, Endian.little);\n");
+                                out.push_str(&format!(
+                                    "          throw {throws_name}._(this, _errHandle);\n"
+                                ));
+                            } else {
+                                let exception_name = format!("{throws_name}Exception");
+                                out.push_str(&format!(
+                                    "          throw _uniffiLift{exception_name}(errBytes);\n"
+                                ));
+                            }
+                            out.push_str("        }\n");
+                        }
                     }
                     out.push_str(
                         "        throw StateError('UniFFI ffibuffer call failed with status $statusCode');\n",
@@ -2720,34 +2744,39 @@ pub(super) fn render_bound_methods(
                     "          return {object_name}._(this, resultValue);\n"
                 ));
                 out.push_str("        }\n");
-                if let Some(throws_name) = ctor
-                    .throws_type
-                    .as_ref()
-                    .and_then(enum_name_from_type)
-                    .map(to_upper_camel)
-                {
-                    out.push_str("        if (statusCode == _rustCallStatusError) {\n");
-                    out.push_str(
-                        "          final ffi.Pointer<Utf8> errorPtr = outStatusPtr.ref.errorBuf;\n",
-                    );
-                    out.push_str("          if (errorPtr != ffi.nullptr) {\n");
-                    out.push_str("            try {\n");
-                    out.push_str(
-                        "              final String errorPayload = errorPtr.toDartString();\n",
-                    );
-                    out.push_str(&format!(
-                        "              throw {}ExceptionFfiCodec.decode(jsonDecode(errorPayload));\n",
-                        throws_name
-                    ));
-                    out.push_str("            } finally {\n");
-                    out.push_str("              _rustStringFree(errorPtr);\n");
-                    out.push_str("            }\n");
-                    out.push_str("          }\n");
-                    out.push_str(&format!(
-                        "          throw StateError('Rust async error without payload for {}');\n",
-                        ctor_symbol
-                    ));
-                    out.push_str("        }\n");
+                if let Some(throws_type) = ctor.throws_type.as_ref() {
+                    if let Some(throws_name) =
+                        throws_name_from_type(throws_type).map(to_upper_camel)
+                    {
+                        out.push_str("        if (statusCode == _rustCallStatusError) {\n");
+                        out.push_str(
+                            "          final ffi.Pointer<Utf8> errorPtr = outStatusPtr.ref.errorBuf;\n",
+                        );
+                        out.push_str("          if (errorPtr != ffi.nullptr) {\n");
+                        out.push_str("            try {\n");
+                        out.push_str(
+                            "              final String errorPayload = errorPtr.toDartString();\n",
+                        );
+                        if is_throws_object_type(throws_type) {
+                            out.push_str(&format!(
+                                "              throw {throws_name}._(this, (jsonDecode(errorPayload) as num).toInt());\n"
+                            ));
+                        } else {
+                            out.push_str(&format!(
+                                "              throw {}ExceptionFfiCodec.decode(jsonDecode(errorPayload));\n",
+                                throws_name
+                            ));
+                        }
+                        out.push_str("            } finally {\n");
+                        out.push_str("              _rustStringFree(errorPtr);\n");
+                        out.push_str("            }\n");
+                        out.push_str("          }\n");
+                        out.push_str(&format!(
+                            "          throw StateError('Rust async error without payload for {}');\n",
+                            ctor_symbol
+                        ));
+                        out.push_str("        }\n");
+                    }
                 }
                 out.push_str("        if (statusCode == _rustCallStatusCancelled) {\n");
                 out.push_str(&format!(
@@ -2813,12 +2842,10 @@ pub(super) fn render_bound_methods(
                 out.push_str("    try {\n");
             }
             if is_throwing {
-                let Some(throws_name) = ctor
-                    .throws_type
-                    .as_ref()
-                    .and_then(enum_name_from_type)
-                    .map(to_upper_camel)
-                else {
+                let Some(throws_type) = ctor.throws_type.as_ref() else {
+                    continue;
+                };
+                let Some(_throws_name) = throws_name_from_type(throws_type) else {
                     continue;
                 };
                 out.push_str(&format!(
@@ -2842,10 +2869,7 @@ pub(super) fn render_bound_methods(
                 );
                 out.push_str("    final Object? errRaw = envelope['err'];\n");
                 out.push_str("    if (errRaw != null) {\n");
-                out.push_str(&format!(
-                    "      throw {}ExceptionFfiCodec.decode(errRaw);\n",
-                    throws_name
-                ));
+                out.push_str(&render_throws_expr(throws_type, "errRaw", "      "));
                 out.push_str("    }\n");
                 out.push_str("    final Object? okRaw = envelope['ok'];\n");
                 out.push_str("    final int handle = (okRaw as num).toInt();\n");
@@ -3158,21 +3182,30 @@ pub(super) fn render_bound_methods(
                         return_ffi_elements + 3
                     ));
                     out.push_str("        rustRetBufferPtrs.add(errBufPtr);\n");
-                    if let Some(throws_name) = method
-                        .throws_type
-                        .as_ref()
-                        .and_then(enum_name_from_type)
-                        .map(to_upper_camel)
-                    {
-                        let exception_name = format!("{throws_name}Exception");
-                        out.push_str("        if (statusCode == _uniFfiRustCallStatusError) {\n");
-                        out.push_str(
-                            "          final Uint8List errBytes = errBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(errBufPtr.ref.data.asTypedList(errBufPtr.ref.len));\n",
-                        );
-                        out.push_str(&format!(
-                            "          throw _uniffiLift{exception_name}(errBytes);\n"
-                        ));
-                        out.push_str("        }\n");
+                    if let Some(throws_type) = method.throws_type.as_ref() {
+                        if let Some(throws_name) =
+                            throws_name_from_type(throws_type).map(to_upper_camel)
+                        {
+                            out.push_str(
+                                "        if (statusCode == _uniFfiRustCallStatusError) {\n",
+                            );
+                            out.push_str(
+                                "          final Uint8List errBytes = errBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(errBufPtr.ref.data.asTypedList(errBufPtr.ref.len));\n",
+                            );
+                            if is_throws_object_type(throws_type) {
+                                out.push_str("          final ByteData _errBd = ByteData.sublistView(errBytes);\n");
+                                out.push_str("          final int _errHandle = _errBd.getUint64(0, Endian.little);\n");
+                                out.push_str(&format!(
+                                    "          throw {throws_name}._(this, _errHandle);\n"
+                                ));
+                            } else {
+                                let exception_name = format!("{throws_name}Exception");
+                                out.push_str(&format!(
+                                    "          throw _uniffiLift{exception_name}(errBytes);\n"
+                                ));
+                            }
+                            out.push_str("        }\n");
+                        }
                     }
                     out.push_str(
                         "        throw StateError('UniFFI ffibuffer call failed with status $statusCode');\n",
@@ -3848,83 +3881,90 @@ pub(super) fn render_bound_methods(
                 }
                 out.push_str("        }\n");
                 debug_assert!(
-                    method.throws_type.as_ref().and_then(enum_name_from_type).is_some()
+                    method.throws_type.as_ref().and_then(throws_name_from_type).is_some()
                         || method.throws_type.is_none(),
-                    "throws_type passed is_runtime_throws_enum_type but enum_name_from_type returned None"
+                    "throws_type passed is_runtime_throws_enum_type but throws_name_from_type returned None"
                 );
-                if let Some(throws_name) = method
-                    .throws_type
-                    .as_ref()
-                    .and_then(enum_name_from_type)
-                    .map(to_upper_camel)
-                {
-                    // Free any bytes-like result buffer on the error path to prevent leaks.
-                    if let Some(ret_type) = method.return_type.as_ref() {
-                        if is_runtime_bytes_type(ret_type)
-                            || is_runtime_non_string_map_type(ret_type)
-                        {
-                            out.push_str("        {\n");
-                            out.push_str("          final _RustBuffer buf = resultValue;\n");
-                            out.push_str(
-                                "          if (buf.len > 0 && buf.data != ffi.nullptr) {\n",
-                            );
-                            out.push_str("            _rustBytesFree(buf);\n");
-                            out.push_str("          }\n");
-                            out.push_str("        }\n");
-                        } else if is_runtime_optional_bytes_type(ret_type) {
-                            out.push_str("        {\n");
-                            out.push_str("          final _RustBufferOpt opt = resultValue;\n");
-                            out.push_str("          if (opt.isSome != 0) {\n");
-                            out.push_str("            final _RustBuffer buf = opt.value;\n");
-                            out.push_str(
-                                "            if (buf.len > 0 && buf.data != ffi.nullptr) {\n",
-                            );
-                            out.push_str("              _rustBytesFree(buf);\n");
-                            out.push_str("            }\n");
-                            out.push_str("          }\n");
-                            out.push_str("        }\n");
-                        } else if is_runtime_sequence_bytes_type(ret_type) {
-                            out.push_str("        {\n");
-                            out.push_str("          final _RustBufferVec vec = resultValue;\n");
-                            out.push_str(
-                                "          if (vec.len > 0 && vec.data != ffi.nullptr) {\n",
-                            );
-                            out.push_str("            _rustBytesVecFree(vec);\n");
-                            out.push_str("          }\n");
-                            out.push_str("        }\n");
-                        } else if is_runtime_sequence_json_type(ret_type)
-                            || is_runtime_map_with_string_key_type(ret_type)
-                        {
-                            out.push_str("        {\n");
-                            out.push_str("          final ffi.Pointer<Utf8> ptr = resultPtr;\n");
-                            out.push_str(
-                                "          if (ptr != ffi.nullptr) _rustStringFree(ptr);\n",
-                            );
-                            out.push_str("        }\n");
+                if let Some(throws_type) = method.throws_type.as_ref() {
+                    if let Some(throws_name) =
+                        throws_name_from_type(throws_type).map(to_upper_camel)
+                    {
+                        // Free any bytes-like result buffer on the error path to prevent leaks.
+                        if let Some(ret_type) = method.return_type.as_ref() {
+                            if is_runtime_bytes_type(ret_type)
+                                || is_runtime_non_string_map_type(ret_type)
+                            {
+                                out.push_str("        {\n");
+                                out.push_str("          final _RustBuffer buf = resultValue;\n");
+                                out.push_str(
+                                    "          if (buf.len > 0 && buf.data != ffi.nullptr) {\n",
+                                );
+                                out.push_str("            _rustBytesFree(buf);\n");
+                                out.push_str("          }\n");
+                                out.push_str("        }\n");
+                            } else if is_runtime_optional_bytes_type(ret_type) {
+                                out.push_str("        {\n");
+                                out.push_str("          final _RustBufferOpt opt = resultValue;\n");
+                                out.push_str("          if (opt.isSome != 0) {\n");
+                                out.push_str("            final _RustBuffer buf = opt.value;\n");
+                                out.push_str(
+                                    "            if (buf.len > 0 && buf.data != ffi.nullptr) {\n",
+                                );
+                                out.push_str("              _rustBytesFree(buf);\n");
+                                out.push_str("            }\n");
+                                out.push_str("          }\n");
+                                out.push_str("        }\n");
+                            } else if is_runtime_sequence_bytes_type(ret_type) {
+                                out.push_str("        {\n");
+                                out.push_str("          final _RustBufferVec vec = resultValue;\n");
+                                out.push_str(
+                                    "          if (vec.len > 0 && vec.data != ffi.nullptr) {\n",
+                                );
+                                out.push_str("            _rustBytesVecFree(vec);\n");
+                                out.push_str("          }\n");
+                                out.push_str("        }\n");
+                            } else if is_runtime_sequence_json_type(ret_type)
+                                || is_runtime_map_with_string_key_type(ret_type)
+                            {
+                                out.push_str("        {\n");
+                                out.push_str(
+                                    "          final ffi.Pointer<Utf8> ptr = resultPtr;\n",
+                                );
+                                out.push_str(
+                                    "          if (ptr != ffi.nullptr) _rustStringFree(ptr);\n",
+                                );
+                                out.push_str("        }\n");
+                            }
                         }
+                        out.push_str("        if (statusCode == _rustCallStatusError) {\n");
+                        out.push_str(
+                            "          final ffi.Pointer<Utf8> errorPtr = outStatusPtr.ref.errorBuf;\n",
+                        );
+                        out.push_str("          if (errorPtr != ffi.nullptr) {\n");
+                        out.push_str("            try {\n");
+                        out.push_str(
+                            "              final String errorPayload = errorPtr.toDartString();\n",
+                        );
+                        if is_throws_object_type(throws_type) {
+                            out.push_str(&format!(
+                                "              throw {throws_name}._(this, (jsonDecode(errorPayload) as num).toInt());\n"
+                            ));
+                        } else {
+                            out.push_str(&format!(
+                                "              throw {}ExceptionFfiCodec.decode(jsonDecode(errorPayload));\n",
+                                throws_name
+                            ));
+                        }
+                        out.push_str("            } finally {\n");
+                        out.push_str("              _rustStringFree(errorPtr);\n");
+                        out.push_str("            }\n");
+                        out.push_str("          }\n");
+                        out.push_str(&format!(
+                            "          throw StateError('Rust async error without payload for {}');\n",
+                            method_symbol
+                        ));
+                        out.push_str("        }\n");
                     }
-                    out.push_str("        if (statusCode == _rustCallStatusError) {\n");
-                    out.push_str(
-                        "          final ffi.Pointer<Utf8> errorPtr = outStatusPtr.ref.errorBuf;\n",
-                    );
-                    out.push_str("          if (errorPtr != ffi.nullptr) {\n");
-                    out.push_str("            try {\n");
-                    out.push_str(
-                        "              final String errorPayload = errorPtr.toDartString();\n",
-                    );
-                    out.push_str(&format!(
-                        "              throw {}ExceptionFfiCodec.decode(jsonDecode(errorPayload));\n",
-                        throws_name
-                    ));
-                    out.push_str("            } finally {\n");
-                    out.push_str("              _rustStringFree(errorPtr);\n");
-                    out.push_str("            }\n");
-                    out.push_str("          }\n");
-                    out.push_str(&format!(
-                        "          throw StateError('Rust async error without payload for {}');\n",
-                        method_symbol
-                    ));
-                    out.push_str("        }\n");
                 }
                 out.push_str("        if (statusCode == _rustCallStatusCancelled) {\n");
                 out.push_str(&format!(
@@ -3980,12 +4020,10 @@ pub(super) fn render_bound_methods(
                 out.push_str("    try {\n");
             }
             if is_throwing {
-                let Some(throws_name) = method
-                    .throws_type
-                    .as_ref()
-                    .and_then(enum_name_from_type)
-                    .map(to_upper_camel)
-                else {
+                let Some(throws_type) = method.throws_type.as_ref() else {
+                    continue;
+                };
+                let Some(_throws_name) = throws_name_from_type(throws_type) else {
                     continue;
                 };
                 out.push_str(&format!(
@@ -4009,10 +4047,7 @@ pub(super) fn render_bound_methods(
                 );
                 out.push_str("    final Object? errRaw = envelope['err'];\n");
                 out.push_str("    if (errRaw != null) {\n");
-                out.push_str(&format!(
-                    "      throw {}ExceptionFfiCodec.decode(errRaw);\n",
-                    throws_name
-                ));
+                out.push_str(&render_throws_expr(throws_type, "errRaw", "      "));
                 out.push_str("    }\n");
                 if let Some(ret_type) = method.return_type.as_ref() {
                     out.push_str("    final Object? okRaw = envelope['ok'];\n");
