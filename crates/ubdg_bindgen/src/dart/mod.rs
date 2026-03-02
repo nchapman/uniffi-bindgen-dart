@@ -2011,7 +2011,11 @@ interface Outcome {
         assert!(content.contains("uniffi_ffibuffer_demo_method_widget_value"));
         assert!(!content.contains("throw UnsupportedError('placeholder (new)');"));
         assert!(!content.contains("throw UnsupportedError('placeholder (value)');"));
-        assert!(content.contains("throw UnsupportedError('placeholder (async_label)');"));
+        // async_label has a String RustBuffer arg which is now handled by the
+        // unified arg serialization helper, so it generates ffi-buffer async
+        // code instead of an UnsupportedError stub.
+        assert!(!content.contains("throw UnsupportedError('placeholder (async_label)');"));
+        assert!(content.contains("_widgetAsyncLabelFfiBuffer"));
     }
 
     #[test]
