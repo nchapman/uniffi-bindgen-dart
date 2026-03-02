@@ -80,8 +80,7 @@ class DictWithDefaults {
 
 /// Empty record — tests zero-field record generation.
 class EmptyStruct {
-  const EmptyStruct({
-  });
+  const EmptyStruct();
 
 
   Map<String, dynamic> toJson() {
@@ -1062,27 +1061,11 @@ EmptyStruct _uniffiDecodeEmptyStruct(Uint8List bytes) {
 }
 
 Uint8List _uniffiEncodeRepair(Repair value) {
-  final writer = _UniFfiBinaryWriter();
-  final Duration __epochOffset = value.when_.difference(DateTime.fromMillisecondsSinceEpoch(0, isUtc: true));
-  int __seconds = __epochOffset.inSeconds;
-  int __nanos = (__epochOffset.inMicroseconds.remainder(1000000)) * 1000;
-  if (__nanos < 0) { __nanos = -__nanos; }
-  writer.writeI64(__seconds);
-  writer.writeU32(__nanos);
-  throw UnsupportedError('UniFFI binary write not implemented for Patch');
-  return writer.toBytes();
+  throw UnsupportedError('UniFFI binary encode not fully supported for Repair');
 }
 
 Repair _uniffiDecodeRepair(Uint8List bytes) {
-  final reader = _UniFfiBinaryReader(bytes);
-  final value = Repair(
-    when_: throw UnsupportedError('UniFFI binary read not implemented for DateTime'),
-    patch: throw UnsupportedError('UniFFI binary read not implemented for Patch'),
-  );
-  if (!reader.isDone) {
-    throw StateError('extra bytes remaining while decoding Repair');
-  }
-  return value;
+  throw UnsupportedError('UniFFI binary decode not fully supported for Repair');
 }
 
 Uint8List _uniffiEncodeReturnOnlyDict(ReturnOnlyDict value) {
@@ -1105,127 +1088,11 @@ ReturnOnlyDict _uniffiDecodeReturnOnlyDict(Uint8List bytes) {
 }
 
 Uint8List _uniffiEncodeSimpleDict(SimpleDict value) {
-  final writer = _UniFfiBinaryWriter();
-  writer.writeString(value.text);
-  writer.writeU64(value.maybeCount);
-  writer.writeBool(value.flag);
-  final Uint8List __encoded = _uniffiEncodeColor(value.color);
-  writer.writeI32(__encoded.length);
-  writer.writeBytes(__encoded);
-  writer.writeI32(value.tags.length);
-  for (final item in value.tags) {
-    writer.writeString(item);
-  }
-  writer.writeI32(value.counts.length);
-  for (final entry in value.counts.entries) {
-    writer.writeString(entry.key);
-    writer.writeU64(entry.value);
-  }
-  if (value.maybeText == null) {
-    writer.writeI8(0);
-  } else {
-    writer.writeI8(1);
-    writer.writeString(value.maybeText!);
-  }
-  if (value.maybePatch == null) {
-    writer.writeI8(0);
-  } else {
-    writer.writeI8(1);
-    throw UnsupportedError('UniFFI binary write not implemented for Patch');
-  }
-  if (value.maybeU8 == null) {
-    writer.writeI8(0);
-  } else {
-    writer.writeI8(1);
-    writer.writeU8(value.maybeU8!);
-  }
-  if (value.maybeU16 == null) {
-    writer.writeI8(0);
-  } else {
-    writer.writeI8(1);
-    writer.writeU16(value.maybeU16!);
-  }
-  if (value.maybeU64 == null) {
-    writer.writeI8(0);
-  } else {
-    writer.writeI8(1);
-    writer.writeU64(value.maybeU64!);
-  }
-  if (value.maybeI8 == null) {
-    writer.writeI8(0);
-  } else {
-    writer.writeI8(1);
-    writer.writeI8(value.maybeI8!);
-  }
-  if (value.maybeI64 == null) {
-    writer.writeI8(0);
-  } else {
-    writer.writeI8(1);
-    writer.writeI64(value.maybeI64!);
-  }
-  if (value.maybeF32 == null) {
-    writer.writeI8(0);
-  } else {
-    writer.writeI8(1);
-    writer.writeF32(value.maybeF32!);
-  }
-  if (value.maybeF64 == null) {
-    writer.writeI8(0);
-  } else {
-    writer.writeI8(1);
-    writer.writeF64(value.maybeF64!);
-  }
-  if (value.maybeBool == null) {
-    writer.writeI8(0);
-  } else {
-    writer.writeI8(1);
-    writer.writeBool(value.maybeBool!);
-  }
-  if (value.maybeBytes == null) {
-    writer.writeI8(0);
-  } else {
-    writer.writeI8(1);
-    writer.writeI32(value.maybeBytes!.length);
-    writer.writeBytes(value.maybeBytes!);
-  }
-  writer.writeI32(value.someBytes.length);
-  writer.writeBytes(value.someBytes);
-  if (value.coveralls == null) {
-    writer.writeI8(0);
-  } else {
-    writer.writeI8(1);
-    throw UnsupportedError('UniFFI binary write not implemented for Coveralls');
-  }
-  return writer.toBytes();
+  throw UnsupportedError('UniFFI binary encode not fully supported for SimpleDict');
 }
 
 SimpleDict _uniffiDecodeSimpleDict(Uint8List bytes) {
-  final reader = _UniFfiBinaryReader(bytes);
-  final value = SimpleDict(
-    text: reader.readString(),
-    maybeCount: reader.readU64(),
-    flag: reader.readBool(),
-    color: (() { final int __len = reader.readI32(); final Uint8List __bytes = reader.readBytes(__len); return _uniffiDecodeColor(__bytes); })(),
-    tags: (() { final int __len = reader.readI32(); final out = <String>[]; for (var i = 0; i < __len; i++) { out.add(reader.readString()); } return out; })(),
-    counts: (() { final int __len = reader.readI32(); final out = <String, int>{}; for (var i = 0; i < __len; i++) { final key = reader.readString(); final value = reader.readU64(); out[key] = value; } return out; })(),
-    maybeText: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readString(); })(),
-    maybePatch: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return throw UnsupportedError('UniFFI binary read not implemented for Patch'); })(),
-    maybeU8: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readU8(); })(),
-    maybeU16: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readU16(); })(),
-    maybeU64: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readU64(); })(),
-    maybeI8: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readI8(); })(),
-    maybeI64: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readI64(); })(),
-    maybeF32: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readF32(); })(),
-    maybeF64: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readF64(); })(),
-    maybeBool: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readBool(); })(),
-    maybeBytes: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return (() { final int __len = reader.readI32(); return reader.readBytes(__len); })(); })(),
-    someBytes: (() { final int __len = reader.readI32(); return reader.readBytes(__len); })(),
-    coveralls: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return throw UnsupportedError('UniFFI binary read not implemented for Coveralls'); })(),
-  );
-  if (!reader.isDone) {
-    throw StateError('extra bytes remaining while decoding SimpleDict');
-  }
-  return value;
+  throw UnsupportedError('UniFFI binary decode not fully supported for SimpleDict');
 }
 
 Uint8List _uniffiEncodeColor(Color value) {
@@ -1395,40 +1262,11 @@ HTMLError _uniffiDecodeHTMLError(Uint8List bytes) {
 }
 
 Uint8List _uniffiEncodeMaybeObject(MaybeObject value) {
-  final writer = _UniFfiBinaryWriter();
-  if (value is MaybeObjectObj) {
-    writer.writeI32(1);
-    throw UnsupportedError('UniFFI binary write not implemented for Patch');
-  }
-  else if (value is MaybeObjectNah) {
-    writer.writeI32(2);
-  }
-  else {
-    throw StateError('Unknown MaybeObject variant instance: $value');
-  }
-  return writer.toBytes();
+  throw UnsupportedError('UniFFI binary encode not fully supported for MaybeObject');
 }
 
 MaybeObject _uniffiDecodeMaybeObject(Uint8List bytes) {
-  final reader = _UniFfiBinaryReader(bytes);
-  final int tag = reader.readI32();
-  final MaybeObject value;
-  switch (tag) {
-    case 1:
-      value = MaybeObjectObj(
-        p: throw UnsupportedError('UniFFI binary read not implemented for Patch'),
-      );
-      break;
-    case 2:
-      value = const MaybeObjectNah();
-      break;
-    default:
-      throw StateError('Unknown MaybeObject variant tag: $tag');
-  }
-  if (!reader.isDone) {
-    throw StateError('extra bytes remaining while decoding MaybeObject');
-  }
-  return value;
+  throw UnsupportedError('UniFFI binary decode not fully supported for MaybeObject');
 }
 
 Uint8List _uniffiEncodeMaybeSimpleDict(MaybeSimpleDict value) {

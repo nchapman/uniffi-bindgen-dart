@@ -102,6 +102,45 @@ pub(super) fn render_json_decode_expr(value_expr: &str, type_: &Type) -> String 
     }
 }
 
+/// Returns true when every field in the list can be serialized by the binary codec.
+fn all_fields_binary_supported(fields: &[UdlArg], enums: &[UdlEnum]) -> bool {
+    fields
+        .iter()
+        .all(|f| is_binary_supported_type(&f.type_, enums))
+}
+
+fn is_binary_supported_type(type_: &Type, enums: &[UdlEnum]) -> bool {
+    match type_ {
+        Type::Custom { builtin, .. } => is_binary_supported_type(builtin, enums),
+        Type::UInt8
+        | Type::Int8
+        | Type::UInt16
+        | Type::Int16
+        | Type::UInt32
+        | Type::Int32
+        | Type::UInt64
+        | Type::Int64
+        | Type::Float32
+        | Type::Float64
+        | Type::Boolean
+        | Type::String
+        | Type::Bytes
+        | Type::Timestamp
+        | Type::Duration => true,
+        Type::Optional { inner_type } => is_binary_supported_type(inner_type, enums),
+        Type::Sequence { inner_type } => is_binary_supported_type(inner_type, enums),
+        Type::Map {
+            key_type,
+            value_type,
+        } => {
+            is_binary_supported_type(key_type, enums) && is_binary_supported_type(value_type, enums)
+        }
+        Type::Record { .. } => true,
+        Type::Enum { .. } if is_runtime_enum_type(type_, enums) => true,
+        _ => false,
+    }
+}
+
 pub(super) fn render_uniffi_binary_helpers(records: &[UdlRecord], enums: &[UdlEnum]) -> String {
     let mut out = String::new();
     out.push_str("final class _UniFfiBinaryWriter {\n");
@@ -200,50 +239,81 @@ pub(super) fn render_uniffi_binary_helpers(records: &[UdlRecord], enums: &[UdlEn
 
     for record in records {
         let type_name = to_upper_camel(&record.name);
+        let supported = all_fields_binary_supported(&record.fields, enums);
         out.push_str(&format!(
             "Uint8List _uniffiEncode{type_name}({type_name} value) {{\n"
         ));
-        out.push_str("  final writer = _UniFfiBinaryWriter();\n");
-        for field in &record.fields {
-            let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
-            let stmt = render_uniffi_binary_write_statement(
-                &field.type_,
-                &format!("value.{field_name}"),
-                "writer",
-                enums,
-                "  ",
-            );
-            out.push_str(&stmt);
+        if supported {
+            out.push_str("  final writer = _UniFfiBinaryWriter();\n");
+            for field in &record.fields {
+                let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
+                let stmt = render_uniffi_binary_write_statement(
+                    &field.type_,
+                    &format!("value.{field_name}"),
+                    "writer",
+                    enums,
+                    "  ",
+                );
+                out.push_str(&stmt);
+            }
+            out.push_str("  return writer.toBytes();\n");
+        } else {
+            out.push_str(&format!(
+                "  throw UnsupportedError('UniFFI binary encode not fully supported for {type_name}');\n"
+            ));
         }
-        out.push_str("  return writer.toBytes();\n");
         out.push_str("}\n\n");
 
         out.push_str(&format!(
             "{type_name} _uniffiDecode{type_name}(Uint8List bytes) {{\n"
         ));
-        out.push_str("  final reader = _UniFfiBinaryReader(bytes);\n");
-        out.push_str(&format!("  final value = {type_name}(\n"));
-        for field in &record.fields {
-            let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
-            let expr = render_uniffi_binary_read_expression(&field.type_, "reader", enums);
-            out.push_str(&format!("    {field_name}: {expr},\n"));
+        if supported {
+            out.push_str("  final reader = _UniFfiBinaryReader(bytes);\n");
+            out.push_str(&format!("  final value = {type_name}(\n"));
+            for field in &record.fields {
+                let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
+                let expr = render_uniffi_binary_read_expression(&field.type_, "reader", enums);
+                out.push_str(&format!("    {field_name}: {expr},\n"));
+            }
+            out.push_str("  );\n");
+            out.push_str("  if (!reader.isDone) {\n");
+            out.push_str(&format!(
+                "    throw StateError('extra bytes remaining while decoding {type_name}');\n"
+            ));
+            out.push_str("  }\n");
+            out.push_str("  return value;\n");
+        } else {
+            out.push_str(&format!(
+                "  throw UnsupportedError('UniFFI binary decode not fully supported for {type_name}');\n"
+            ));
         }
-        out.push_str("  );\n");
-        out.push_str("  if (!reader.isDone) {\n");
-        out.push_str(&format!(
-            "    throw StateError('extra bytes remaining while decoding {type_name}');\n"
-        ));
-        out.push_str("  }\n");
-        out.push_str("  return value;\n");
         out.push_str("}\n\n");
     }
 
     for enum_ in enums {
         let type_name = to_upper_camel(&enum_.name);
         let is_flat_enum = !enum_.is_error && enum_.variants.iter().all(|v| v.fields.is_empty());
+        let all_variants_supported = enum_
+            .variants
+            .iter()
+            .all(|v| all_fields_binary_supported(&v.fields, enums));
         out.push_str(&format!(
             "Uint8List _uniffiEncode{type_name}({type_name} value) {{\n"
         ));
+        if !all_variants_supported {
+            out.push_str(&format!(
+                "  throw UnsupportedError('UniFFI binary encode not fully supported for {type_name}');\n"
+            ));
+            out.push_str("}\n\n");
+            out.push_str(&format!(
+                "{type_name} _uniffiDecode{type_name}(Uint8List bytes) {{\n"
+            ));
+            out.push_str(&format!(
+                "  throw UnsupportedError('UniFFI binary decode not fully supported for {type_name}');\n"
+            ));
+            out.push_str("}\n\n");
+            continue;
+        }
         out.push_str("  final writer = _UniFfiBinaryWriter();\n");
         if is_flat_enum {
             out.push_str("  final int tag = switch (value) {\n");

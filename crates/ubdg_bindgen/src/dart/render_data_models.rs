@@ -14,21 +14,25 @@ pub(super) fn render_data_models(
         let class_name = to_upper_camel(&record.name);
         out.push_str(&render_doc_comment(record.docstring.as_deref(), ""));
         out.push_str(&format!("class {class_name} {{\n"));
-        out.push_str(&format!("  const {class_name}({{\n"));
-        for field in &record.fields {
-            out.push_str(&render_doc_comment(field.docstring.as_deref(), "    "));
-            let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
-            if let Some(default_expr) = field
-                .default
-                .as_ref()
-                .and_then(|d| render_default_value_expr(d, &field.type_, enums))
-            {
-                out.push_str(&format!("    this.{field_name} = {default_expr},\n"));
-            } else {
-                out.push_str(&format!("    required this.{field_name},\n"));
+        if record.fields.is_empty() {
+            out.push_str(&format!("  const {class_name}();\n\n"));
+        } else {
+            out.push_str(&format!("  const {class_name}({{\n"));
+            for field in &record.fields {
+                out.push_str(&render_doc_comment(field.docstring.as_deref(), "    "));
+                let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
+                if let Some(default_expr) = field
+                    .default
+                    .as_ref()
+                    .and_then(|d| render_default_value_expr(d, &field.type_, enums))
+                {
+                    out.push_str(&format!("    this.{field_name} = {default_expr},\n"));
+                } else {
+                    out.push_str(&format!("    required this.{field_name},\n"));
+                }
             }
+            out.push_str("  });\n\n");
         }
-        out.push_str("  });\n\n");
         for field in &record.fields {
             out.push_str(&render_doc_comment(field.docstring.as_deref(), "  "));
             let field_name = safe_dart_identifier(&to_lower_camel(&field.name));

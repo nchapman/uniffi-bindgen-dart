@@ -584,7 +584,7 @@ void main() {
       final patch = Patch.create(Color.red);
       final obj = MaybeObjectObj(p: patch);
       expect(obj, isA<MaybeObjectObj>());
-      expect((obj as MaybeObjectObj).p.getColor(), Color.red);
+      expect(obj.p.getColor(), Color.red);
       patch.close();
     });
 
