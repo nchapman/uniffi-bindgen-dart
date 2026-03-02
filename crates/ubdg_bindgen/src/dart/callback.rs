@@ -768,7 +768,7 @@ pub(super) fn render_callback_async_result_return_field(
         Type::Int64 => Some("  @ffi.Int64()\n  external int returnValue;\n\n".to_string()),
         Type::Float32 => Some("  @ffi.Float()\n  external double returnValue;\n\n".to_string()),
         Type::Float64 => Some("  @ffi.Double()\n  external double returnValue;\n\n".to_string()),
-        Type::Boolean => Some("  @ffi.Uint8()\n  external int returnValue;\n\n".to_string()),
+        Type::Boolean => Some("  @ffi.Bool()\n  external bool returnValue;\n\n".to_string()),
         Type::Timestamp | Type::Duration => {
             Some("  @ffi.Int64()\n  external int returnValue;\n\n".to_string())
         }
@@ -936,7 +936,8 @@ pub(super) fn render_callback_return_encode_expr(
         }
         Type::Timestamp => format!("{value_expr}.toUtc().microsecondsSinceEpoch"),
         Type::Duration => format!("{value_expr}.inMicroseconds"),
-        Type::Boolean => format!("{value_expr} ? 1 : 0"),
+        // Result struct field is @ffi.Bool() / external bool — no int conversion needed.
+        Type::Boolean => value_expr.to_string(),
         _ => value_expr.to_string(),
     }
 }

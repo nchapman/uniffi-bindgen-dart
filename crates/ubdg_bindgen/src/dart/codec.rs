@@ -10,7 +10,7 @@ pub(super) fn render_json_encode_expr(value_expr: &str, type_: &Type) -> String 
         Type::Optional { inner_type } => {
             let inner = render_json_encode_expr("__tmp", inner_type);
             format!(
-                "{value_expr} == null ? null : (() {{ final __tmp = {value_expr}; return {inner}; }})()"
+                "{value_expr} == null ? null : (() {{ final __tmp = {value_expr}!; return {inner}; }})()"
             )
         }
         Type::Sequence { inner_type } => {

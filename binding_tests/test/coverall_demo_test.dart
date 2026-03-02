@@ -362,7 +362,7 @@ void main() {
       final c = Coveralls.create('test');
       final p = Patch.create(Color.green);
       final now = DateTime.now().toUtc();
-      c.addRepair(Repair(when: now, patch: p));
+      c.addRepair(Repair(when_: now, patch: p));
       final repairs = c.getRepairs();
       expect(repairs, hasLength(1));
       p.close();
