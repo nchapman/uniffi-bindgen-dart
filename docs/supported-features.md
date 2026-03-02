@@ -12,7 +12,7 @@ Legend:
 |---|---|---|
 | Top-level functions | Implemented | includes primitives, temporal, bytes, records/enums, typed throws envelope paths, and metadata-backed default-argument rendering in generated Dart wrapper signatures |
 | Objects/interfaces | Implemented | sync/async constructors and methods + lifecycle (`close`/finalizer); async constructors use real Rust-future poll/complete lifecycle (including `[Async, Throws=X]`); async wrappers for `[Async]` methods generated across all supported return families; optional object parameters and returns (`Object?`) supported via handle-based null sentinel |
-| Trait methods | Partial | object-level `Display`/`Debug`/`Hash`/`Eq`/`Ord` traits map to idiomatic Dart `toString()`/`hashCode`/`operator ==`/`Comparable<T>.compareTo`; record/enum-level trait synthesis (`[Traits=(Display, Eq, Hash)]` on dictionary/enum) not yet implemented |
+| Trait methods | Implemented | object-level `Display`/`Debug`/`Hash`/`Eq`/`Ord` traits map to idiomatic Dart `toString()`/`hashCode`/`operator ==`/`Comparable<T>.compareTo`; record and data-carrying enum trait synthesis (`[Traits=(Display, Eq, Hash)]`) generates `toString()`, `operator ==`, `hashCode` using `Object.hash`; flat enums use Dart-native implementations |
 | Foreign-implementable traits | Implemented | `[Trait, WithForeign]` generates full vtable FFI glue with `NativeCallable.isolateLocal` dispatch, odd/even handle map, and Dart-to-Rust callback registration |
 | Records | Implemented | model generation + JSON codecs + `copyWith`; record field defaults are rendered in Dart constructors and respected in `fromJson` when keys are absent |
 | Enums | Implemented | flat + data-carrying codecs; `[NonExhaustive]` enums generate `unknown` fallback variant for forward-compatible deserialization; enum discriminant values supported via Dart 2.17 enhanced enums |
@@ -32,10 +32,9 @@ Legend:
 | Skip warnings | Implemented | unsupported constructs emit warning comments in generated code and stderr messages during generation |
 
 ## Known Limitations
-- **Callback interface as function parameter**: Top-level functions accepting callback interface parameters (e.g., `test_getters(Getters getters)`) are not yet supported.
+- **Recursive callback interfaces**: Callback interfaces whose methods take or return the same callback type (e.g., `NodeTrait` with `set_parent(NodeTrait?)`) cannot be used as function parameters.
+- **Callback interface as return type**: Functions returning a callback interface type (e.g., `Getters make_rust_getters()`) are not yet supported.
 - **Error interface methods**: Error types generated from `[Error]` enums do not support methods.
-- **Traits on records/enums**: `[Traits=(Display, Eq, Hash)]` on dictionary/enum types is parsed without error but trait methods are not synthesized (only supported on interfaces).
-- **Optional<Record>** and **Optional<Enum>**: Optional record/enum types as function parameters or return types are not yet supported at the FFI boundary (they work fine inside records/maps via JSON).
 
 ## Notes
 - Current fixture coverage includes 19 golden tests across all major feature domains, anchored by `coverall-demo` (comprehensive feature combinations) and `simple-fns` (rich runtime interactions).
