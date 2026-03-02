@@ -1606,11 +1606,13 @@ interface Outcome {
             docstring: None,
             is_error: true,
             is_non_exhaustive: false,
+            has_discr_type: false,
             variants: vec![
                 UdlEnumVariant {
                     name: "division_by_zero".to_string(),
                     docstring: None,
                     fields: vec![],
+                    discr: None,
                 },
                 UdlEnumVariant {
                     name: "negative_input".to_string(),
@@ -1621,6 +1623,7 @@ interface Outcome {
                         docstring: None,
                         default: None,
                     }],
+                    discr: None,
                 },
             ],
             methods: vec![],
@@ -1662,16 +1665,19 @@ interface Outcome {
             docstring: None,
             is_error: false,
             is_non_exhaustive: false,
+            has_discr_type: false,
             variants: vec![
                 UdlEnumVariant {
                     name: "on".to_string(),
                     docstring: None,
                     fields: vec![],
+                    discr: None,
                 },
                 UdlEnumVariant {
                     name: "off".to_string(),
                     docstring: None,
                     fields: vec![],
+                    discr: None,
                 },
             ],
             methods: vec![UdlObjectMethod {
@@ -1716,6 +1722,98 @@ interface Outcome {
         assert!(content.contains("_stateRank = _lib.lookupFunction<"));
         assert!(content.contains(">('point_checksum');"));
         assert!(content.contains(">('state_rank');"));
+    }
+
+    #[test]
+    fn flat_enum_with_discriminants_renders_enhanced_enum() {
+        use uniffi_bindgen::interface::{Literal, Radix};
+
+        let enums = vec![UdlEnum {
+            name: "Priority".to_string(),
+            docstring: None,
+            is_error: false,
+            is_non_exhaustive: false,
+            has_discr_type: true,
+            variants: vec![
+                UdlEnumVariant {
+                    name: "low".to_string(),
+                    docstring: None,
+                    fields: vec![],
+                    discr: Some(Literal::UInt(1, Radix::Decimal, Type::UInt8)),
+                },
+                UdlEnumVariant {
+                    name: "medium".to_string(),
+                    docstring: None,
+                    fields: vec![],
+                    discr: Some(Literal::UInt(5, Radix::Decimal, Type::UInt8)),
+                },
+                UdlEnumVariant {
+                    name: "high".to_string(),
+                    docstring: None,
+                    fields: vec![],
+                    discr: Some(Literal::UInt(10, Radix::Decimal, Type::UInt8)),
+                },
+            ],
+            methods: vec![],
+        }];
+
+        let content = render_data_models(&[], &enums, &[], false);
+        assert!(
+            content.contains("low(1),"),
+            "expected low(1), got:\n{content}"
+        );
+        assert!(
+            content.contains("medium(5),"),
+            "expected medium(5), got:\n{content}"
+        );
+        assert!(
+            content.contains("high(10);"),
+            "expected high(10); got:\n{content}"
+        );
+        assert!(
+            content.contains("const Priority(this.value);"),
+            "expected enhanced enum constructor, got:\n{content}"
+        );
+        assert!(
+            content.contains("final int value;"),
+            "expected value field, got:\n{content}"
+        );
+    }
+
+    #[test]
+    fn flat_enum_without_discriminants_renders_plain_enum() {
+        let enums = vec![UdlEnum {
+            name: "Color".to_string(),
+            docstring: None,
+            is_error: false,
+            is_non_exhaustive: false,
+            has_discr_type: false,
+            variants: vec![
+                UdlEnumVariant {
+                    name: "red".to_string(),
+                    docstring: None,
+                    fields: vec![],
+                    discr: None,
+                },
+                UdlEnumVariant {
+                    name: "green".to_string(),
+                    docstring: None,
+                    fields: vec![],
+                    discr: None,
+                },
+            ],
+            methods: vec![],
+        }];
+
+        let content = render_data_models(&[], &enums, &[], false);
+        assert!(
+            content.contains("  red,\n"),
+            "expected plain variant, got:\n{content}"
+        );
+        assert!(
+            !content.contains("final int value;"),
+            "should not have value field, got:\n{content}"
+        );
     }
 
     #[test]

@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use uniffi_bindgen::interface::{ffi::FfiType, DefaultValue, Type};
+use uniffi_bindgen::interface::{ffi::FfiType, DefaultValue, Literal, Type};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct UdlFunction {
@@ -104,6 +104,9 @@ pub(super) struct UdlEnum {
     pub(super) docstring: Option<String>,
     pub(super) is_error: bool,
     pub(super) is_non_exhaustive: bool,
+    /// true when the enum has an explicit `#[repr(u8)]` (or similar) discriminant type.
+    /// This is a proc-macro-only feature; UDL enums always have `has_discr_type = false`.
+    pub(super) has_discr_type: bool,
     pub(super) variants: Vec<UdlEnumVariant>,
     pub(super) methods: Vec<UdlObjectMethod>,
 }
@@ -113,6 +116,8 @@ pub(super) struct UdlEnumVariant {
     pub(super) name: String,
     pub(super) docstring: Option<String>,
     pub(super) fields: Vec<UdlArg>,
+    /// Explicit discriminant value (e.g. `= 10`), populated only for `#[repr(...)]` enums.
+    pub(super) discr: Option<Literal>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -1,3 +1,5 @@
+use uniffi_bindgen::interface::Literal;
+
 use super::*;
 
 pub(super) fn render_data_models(
@@ -149,16 +151,38 @@ pub(super) fn render_data_models(
             out.push_str(&format!("enum {enum_name} {{\n"));
             for variant in &enum_.variants {
                 out.push_str(&render_doc_comment(variant.docstring.as_deref(), "  "));
-                out.push_str(&format!(
-                    "  {},\n",
-                    safe_dart_identifier(&to_lower_camel(&variant.name))
-                ));
+                let variant_name = safe_dart_identifier(&to_lower_camel(&variant.name));
+                if let Some(lit) = &variant.discr {
+                    out.push_str(&format!(
+                        "  {variant_name}({}),\n",
+                        render_discr_literal(lit)
+                    ));
+                } else {
+                    out.push_str(&format!("  {variant_name},\n"));
+                }
             }
             if enum_.is_non_exhaustive {
                 out.push_str(
                     "  /// Unknown variant for forward-compatibility with non-exhaustive enums.\n",
                 );
-                out.push_str("  unknown,\n");
+                if enum_.has_discr_type {
+                    out.push_str("  unknown(-1);\n");
+                } else {
+                    out.push_str("  unknown,\n");
+                }
+            }
+            if enum_.has_discr_type {
+                // Enhanced enum with discriminant values (Dart 2.17+).
+                if !enum_.is_non_exhaustive {
+                    // Replace trailing comma on last variant with semicolon.
+                    let trimmed = out.trim_end().trim_end_matches(',');
+                    out.truncate(trimmed.len());
+                    out.push_str(";\n");
+                }
+                out.push('\n');
+                out.push_str(&format!("  const {enum_name}(this.value);\n\n"));
+                out.push_str("  /// The raw discriminant value of this enum variant.\n");
+                out.push_str("  final int value;\n");
             }
             out.push_str("}\n\n");
             if !enum_.methods.is_empty() {
@@ -590,4 +614,13 @@ pub(super) fn render_data_models(
     }
 
     out
+}
+
+/// Render a discriminant literal as a Dart integer literal.
+fn render_discr_literal(lit: &Literal) -> String {
+    match lit {
+        Literal::UInt(v, _, _) => v.to_string(),
+        Literal::Int(v, _, _) => v.to_string(),
+        _ => "0".to_string(), // unreachable for valid discriminants
+    }
 }

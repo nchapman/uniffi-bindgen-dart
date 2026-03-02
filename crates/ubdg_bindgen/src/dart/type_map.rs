@@ -46,8 +46,24 @@ pub(super) fn is_runtime_throws_enum_type(type_: &Type, enums: &[UdlEnum]) -> bo
             let is_external = !is_local && !module_path.is_empty();
             is_local || is_external
         }
+        // Accept object types used as errors (interface throws).
+        // The UDL parser has already validated the type exists.
+        Type::Object { .. } => true,
         _ => false,
     }
+}
+
+/// Extract the name from a throws type, whether it's an enum or an object.
+pub(super) fn throws_name_from_type(type_: &Type) -> Option<&str> {
+    match runtime_unwrapped_type(type_) {
+        Type::Enum { name, .. } | Type::Object { name, .. } => Some(name.as_str()),
+        _ => None,
+    }
+}
+
+/// Returns true when the throws type is an object (interface used as error).
+pub(super) fn is_throws_object_type(type_: &Type) -> bool {
+    matches!(runtime_unwrapped_type(type_), Type::Object { .. })
 }
 
 pub(super) fn is_runtime_record_or_enum_string_type(type_: &Type, enums: &[UdlEnum]) -> bool {

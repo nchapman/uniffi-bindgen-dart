@@ -213,67 +213,77 @@ pub(super) fn component_interface_to_metadata(
     let enums = ci
         .enum_definitions()
         .iter()
-        .map(|enum_| UdlEnum {
-            name: enum_.name().to_string(),
-            docstring: enum_.docstring().map(ToString::to_string),
-            is_error: ci.is_name_used_as_error(enum_.name()),
-            is_non_exhaustive: enum_.is_non_exhaustive(),
-            variants: enum_
-                .variants()
-                .iter()
-                .map(|variant| UdlEnumVariant {
-                    name: variant.name().to_string(),
-                    docstring: variant.docstring().map(ToString::to_string),
-                    fields: variant
-                        .fields()
-                        .iter()
-                        .map(|field| UdlArg {
-                            name: field.name().to_string(),
-                            type_: field.as_type(),
-                            docstring: field.docstring().map(ToString::to_string),
-                            default: field.default_value().cloned(),
-                        })
-                        .collect(),
-                })
-                .collect(),
-            methods: enum_
-                .methods()
-                .iter()
-                .map(|m| UdlObjectMethod {
-                    name: m.name().to_string(),
-                    ffi_symbol: include_ffi_symbols.then(|| m.ffi_func().name().to_string()),
-                    ffi_arg_types: if include_ffi_symbols {
-                        m.ffi_func().arguments().iter().map(|a| a.type_()).collect()
-                    } else {
-                        Vec::new()
-                    },
-                    ffi_return_type: include_ffi_symbols
-                        .then(|| m.ffi_func().return_type().cloned())
-                        .flatten(),
-                    ffi_has_rust_call_status: if include_ffi_symbols {
-                        m.ffi_func().has_rust_call_status_arg()
-                    } else {
-                        false
-                    },
-                    runtime_unsupported: include_ffi_symbols
-                        .then(|| runtime_unsupported_reason_for_ffi_func(m.ffi_func()))
-                        .flatten(),
-                    docstring: m.docstring().map(ToString::to_string),
-                    is_async: m.is_async(),
-                    return_type: m.return_type().cloned(),
-                    throws_type: m.throws_type().cloned(),
-                    args: m
-                        .arguments()
-                        .into_iter()
-                        .map(|a| UdlArg {
-                            name: a.name().to_string(),
-                            type_: a.as_type(),
-                            docstring: None,
-                            default: a.default_value().cloned(),
-                        })
-                        .collect(),
-                })
-                .collect(),
+        .map(|enum_| {
+            let has_discr = enum_.variant_discr_type().is_some();
+            UdlEnum {
+                name: enum_.name().to_string(),
+                docstring: enum_.docstring().map(ToString::to_string),
+                is_error: ci.is_name_used_as_error(enum_.name()),
+                is_non_exhaustive: enum_.is_non_exhaustive(),
+                has_discr_type: has_discr,
+                variants: enum_
+                    .variants()
+                    .iter()
+                    .enumerate()
+                    .map(|(i, variant)| UdlEnumVariant {
+                        name: variant.name().to_string(),
+                        docstring: variant.docstring().map(ToString::to_string),
+                        fields: variant
+                            .fields()
+                            .iter()
+                            .map(|field| UdlArg {
+                                name: field.name().to_string(),
+                                type_: field.as_type(),
+                                docstring: field.docstring().map(ToString::to_string),
+                                default: field.default_value().cloned(),
+                            })
+                            .collect(),
+                        discr: if has_discr {
+                            enum_.variant_discr(i).ok()
+                        } else {
+                            None
+                        },
+                    })
+                    .collect(),
+                methods: enum_
+                    .methods()
+                    .iter()
+                    .map(|m| UdlObjectMethod {
+                        name: m.name().to_string(),
+                        ffi_symbol: include_ffi_symbols.then(|| m.ffi_func().name().to_string()),
+                        ffi_arg_types: if include_ffi_symbols {
+                            m.ffi_func().arguments().iter().map(|a| a.type_()).collect()
+                        } else {
+                            Vec::new()
+                        },
+                        ffi_return_type: include_ffi_symbols
+                            .then(|| m.ffi_func().return_type().cloned())
+                            .flatten(),
+                        ffi_has_rust_call_status: if include_ffi_symbols {
+                            m.ffi_func().has_rust_call_status_arg()
+                        } else {
+                            false
+                        },
+                        runtime_unsupported: include_ffi_symbols
+                            .then(|| runtime_unsupported_reason_for_ffi_func(m.ffi_func()))
+                            .flatten(),
+                        docstring: m.docstring().map(ToString::to_string),
+                        is_async: m.is_async(),
+                        return_type: m.return_type().cloned(),
+                        throws_type: m.throws_type().cloned(),
+                        args: m
+                            .arguments()
+                            .into_iter()
+                            .map(|a| UdlArg {
+                                name: a.name().to_string(),
+                                type_: a.as_type(),
+                                docstring: None,
+                                default: a.default_value().cloned(),
+                            })
+                            .collect(),
+                    })
+                    .collect(),
+            }
         })
         .collect::<Vec<_>>();
     let objects = ci
