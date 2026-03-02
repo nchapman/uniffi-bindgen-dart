@@ -435,8 +435,15 @@ pub(super) fn render_bound_methods(
                     let arg_name = safe_dart_identifier(&to_lower_camel(&arg.name));
                     match ffi_type {
                         FfiType::RustBuffer(_) => {
-                            let is_map_type =
-                                matches!(runtime_unwrapped_type(&arg.type_), Type::Map { .. });
+                            let needs_writer = matches!(
+                                runtime_unwrapped_type(&arg.type_),
+                                Type::Map { .. }
+                                    | Type::Sequence { .. }
+                                    | Type::Optional { .. }
+                                    | Type::Timestamp
+                                    | Type::Duration
+                            );
+                            let writer_name = format!("{arg_name}Writer");
                             let encode_expr = match runtime_unwrapped_type(&arg.type_) {
                                 Type::Record { name, .. } | Type::Enum { name, .. } => {
                                     format!("_uniffiEncode{}({arg_name})", to_upper_camel(name))
@@ -445,8 +452,12 @@ pub(super) fn render_bound_methods(
                                     format!("Uint8List.fromList(utf8.encode({arg_name}))")
                                 }
                                 Type::Bytes => arg_name.clone(),
-                                Type::Map { .. } => {
-                                    format!("{arg_name}MapWriter.toBytes()")
+                                Type::Map { .. }
+                                | Type::Sequence { .. }
+                                | Type::Optional { .. }
+                                | Type::Timestamp
+                                | Type::Duration => {
+                                    format!("{writer_name}.toBytes()")
                                 }
                                 _ => {
                                     out.push_str(&format!(
@@ -456,16 +467,16 @@ pub(super) fn render_bound_methods(
                                     continue;
                                 }
                             };
-                            if is_map_type {
+                            if needs_writer {
                                 let write_stmt = render_uniffi_binary_write_statement(
                                     &arg.type_,
                                     &arg_name,
-                                    &format!("{arg_name}MapWriter"),
+                                    &writer_name,
                                     enums,
                                     "      ",
                                 );
                                 out.push_str(&format!(
-                                    "      final {arg_name}MapWriter = _UniFfiBinaryWriter();\n"
+                                    "      final {writer_name} = _UniFfiBinaryWriter();\n"
                                 ));
                                 out.push_str(&write_stmt);
                             }
@@ -935,8 +946,15 @@ pub(super) fn render_bound_methods(
                     let arg_name = safe_dart_identifier(&to_lower_camel(&arg.name));
                     match ffi_type {
                         FfiType::RustBuffer(_) => {
-                            let is_map_type =
-                                matches!(runtime_unwrapped_type(&arg.type_), Type::Map { .. });
+                            let needs_writer = matches!(
+                                runtime_unwrapped_type(&arg.type_),
+                                Type::Map { .. }
+                                    | Type::Sequence { .. }
+                                    | Type::Optional { .. }
+                                    | Type::Timestamp
+                                    | Type::Duration
+                            );
+                            let writer_name = format!("{arg_name}Writer");
                             let encode_expr = match runtime_unwrapped_type(&arg.type_) {
                                 Type::Record { name, .. } | Type::Enum { name, .. } => {
                                     format!("_uniffiEncode{}({arg_name})", to_upper_camel(name))
@@ -945,8 +963,12 @@ pub(super) fn render_bound_methods(
                                     format!("Uint8List.fromList(utf8.encode({arg_name}))")
                                 }
                                 Type::Bytes => arg_name.clone(),
-                                Type::Map { .. } => {
-                                    format!("{arg_name}MapWriter.toBytes()")
+                                Type::Map { .. }
+                                | Type::Sequence { .. }
+                                | Type::Optional { .. }
+                                | Type::Timestamp
+                                | Type::Duration => {
+                                    format!("{writer_name}.toBytes()")
                                 }
                                 _ => {
                                     let escaped_reason = reason.replace('\'', "\\'");
@@ -957,16 +979,16 @@ pub(super) fn render_bound_methods(
                                     continue;
                                 }
                             };
-                            if is_map_type {
+                            if needs_writer {
                                 let write_stmt = render_uniffi_binary_write_statement(
                                     &arg.type_,
                                     &arg_name,
-                                    &format!("{arg_name}MapWriter"),
+                                    &writer_name,
                                     enums,
                                     "      ",
                                 );
                                 out.push_str(&format!(
-                                    "      final {arg_name}MapWriter = _UniFfiBinaryWriter();\n"
+                                    "      final {writer_name} = _UniFfiBinaryWriter();\n"
                                 ));
                                 out.push_str(&write_stmt);
                             }
@@ -2634,14 +2656,25 @@ pub(super) fn render_bound_methods(
                         let arg_name = safe_dart_identifier(&to_lower_camel(&arg.name));
                         match ffi_type {
                             FfiType::RustBuffer(_) => {
-                                let is_map_type =
-                                    matches!(runtime_unwrapped_type(&arg.type_), Type::Map { .. });
+                                let needs_writer = matches!(
+                                    runtime_unwrapped_type(&arg.type_),
+                                    Type::Map { .. }
+                                        | Type::Sequence { .. }
+                                        | Type::Optional { .. }
+                                        | Type::Timestamp
+                                        | Type::Duration
+                                );
+                                let writer_name = format!("{arg_name}Writer");
                                 let encode_expr = match runtime_unwrapped_type(&arg.type_) {
                                     Type::Record { name, .. } | Type::Enum { name, .. } => {
                                         format!("_uniffiEncode{}({arg_name})", to_upper_camel(name))
                                     }
-                                    Type::Map { .. } => {
-                                        format!("{arg_name}MapWriter.toBytes()")
+                                    Type::Map { .. }
+                                    | Type::Sequence { .. }
+                                    | Type::Optional { .. }
+                                    | Type::Timestamp
+                                    | Type::Duration => {
+                                        format!("{writer_name}.toBytes()")
                                     }
                                     _ => {
                                         out.push_str(&format!(
@@ -2651,15 +2684,17 @@ pub(super) fn render_bound_methods(
                                         continue;
                                     }
                                 };
-                                if is_map_type {
+                                if needs_writer {
                                     let write_stmt = render_uniffi_binary_write_statement(
                                         &arg.type_,
                                         &arg_name,
-                                        &format!("{arg_name}MapWriter"),
+                                        &writer_name,
                                         enums,
                                         "      ",
                                     );
-                                    out.push_str(&format!("      final {arg_name}MapWriter = _UniFfiBinaryWriter();\n"));
+                                    out.push_str(&format!(
+                                        "      final {writer_name} = _UniFfiBinaryWriter();\n"
+                                    ));
                                     out.push_str(&write_stmt);
                                 }
                                 out.push_str(&format!(
@@ -3357,14 +3392,25 @@ pub(super) fn render_bound_methods(
                         let arg_name = safe_dart_identifier(&to_lower_camel(&arg.name));
                         match ffi_type {
                             FfiType::RustBuffer(_) => {
-                                let is_map_type =
-                                    matches!(runtime_unwrapped_type(&arg.type_), Type::Map { .. });
+                                let needs_writer = matches!(
+                                    runtime_unwrapped_type(&arg.type_),
+                                    Type::Map { .. }
+                                        | Type::Sequence { .. }
+                                        | Type::Optional { .. }
+                                        | Type::Timestamp
+                                        | Type::Duration
+                                );
+                                let writer_name = format!("{arg_name}Writer");
                                 let encode_expr = match runtime_unwrapped_type(&arg.type_) {
                                     Type::Record { name, .. } | Type::Enum { name, .. } => {
                                         format!("_uniffiEncode{}({arg_name})", to_upper_camel(name))
                                     }
-                                    Type::Map { .. } => {
-                                        format!("{arg_name}MapWriter.toBytes()")
+                                    Type::Map { .. }
+                                    | Type::Sequence { .. }
+                                    | Type::Optional { .. }
+                                    | Type::Timestamp
+                                    | Type::Duration => {
+                                        format!("{writer_name}.toBytes()")
                                     }
                                     _ => {
                                         out.push_str(&format!(
@@ -3374,15 +3420,17 @@ pub(super) fn render_bound_methods(
                                         continue;
                                     }
                                 };
-                                if is_map_type {
+                                if needs_writer {
                                     let write_stmt = render_uniffi_binary_write_statement(
                                         &arg.type_,
                                         &arg_name,
-                                        &format!("{arg_name}MapWriter"),
+                                        &writer_name,
                                         enums,
                                         "      ",
                                     );
-                                    out.push_str(&format!("      final {arg_name}MapWriter = _UniFfiBinaryWriter();\n"));
+                                    out.push_str(&format!(
+                                        "      final {writer_name} = _UniFfiBinaryWriter();\n"
+                                    ));
                                     out.push_str(&write_stmt);
                                 }
                                 out.push_str(&format!(

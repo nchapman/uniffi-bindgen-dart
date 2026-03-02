@@ -845,13 +845,13 @@ class LibraryModeDemoFfi {
     final foreignArgPtrs = <ffi.Pointer<ffi.Uint8>>[];
     final rustRetBufferPtrs = <ffi.Pointer<_UniFfiRustBuffer>>[];
     try {
-      final mMapWriter = _UniFfiBinaryWriter();
-      mMapWriter.writeI32(m.length);
+      final mWriter = _UniFfiBinaryWriter();
+      mWriter.writeI32(m.length);
       for (final entry in m.entries) {
-        mMapWriter.writeString(entry.key);
-        mMapWriter.writeI32(entry.value);
+        mWriter.writeString(entry.key);
+        mWriter.writeI32(entry.value);
       }
-      final Uint8List mBytes = mMapWriter.toBytes();
+      final Uint8List mBytes = mWriter.toBytes();
       final ffi.Pointer<ffi.Uint8> mPtr = mBytes.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>(mBytes.length);
       if (mBytes.isNotEmpty) { mPtr.asTypedList(mBytes.length).setAll(0, mBytes); }
       foreignArgPtrs.add(mPtr);
@@ -939,7 +939,42 @@ class LibraryModeDemoFfi {
     final foreignArgPtrs = <ffi.Pointer<ffi.Uint8>>[];
     final rustRetBufferPtrs = <ffi.Pointer<_UniFfiRustBuffer>>[];
     try {
-      throw UnsupportedError('runtime invocation for this UniFFI ABI (RustCallStatus out-arg) is not implemented yet (echo_strings)');
+      final vWriter = _UniFfiBinaryWriter();
+      vWriter.writeI32(v.length);
+      for (final item in v) {
+        vWriter.writeString(item);
+      }
+      final Uint8List vBytes = vWriter.toBytes();
+      final ffi.Pointer<ffi.Uint8> vPtr = vBytes.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>(vBytes.length);
+      if (vBytes.isNotEmpty) { vPtr.asTypedList(vBytes.length).setAll(0, vBytes); }
+      foreignArgPtrs.add(vPtr);
+      final ffi.Pointer<_UniFfiRustCallStatus> vFromBytesStatusPtr = calloc<_UniFfiRustCallStatus>();
+      vFromBytesStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
+      vFromBytesStatusPtr.ref.errorBuf
+        ..capacity = 0
+        ..len = 0
+        ..data = ffi.nullptr;
+      final ffi.Pointer<_UniFfiForeignBytes> vForeignPtr = calloc<_UniFfiForeignBytes>();
+      vForeignPtr.ref
+        ..len = vBytes.length
+        ..data = vPtr;
+      final _UniFfiRustBuffer vRustBuffer = _uniFfiRustBufferFromBytes(vForeignPtr.ref, vFromBytesStatusPtr);
+      calloc.free(vForeignPtr);
+      final int vFromBytesCode = vFromBytesStatusPtr.ref.code;
+      final _UniFfiRustBuffer vFromBytesErrBuf = vFromBytesStatusPtr.ref.errorBuf;
+      calloc.free(vFromBytesStatusPtr);
+      if (vFromBytesCode != _uniFfiRustCallStatusSuccess) {
+        final ffi.Pointer<_UniFfiRustBuffer> vFromBytesErrBufPtr = calloc<_UniFfiRustBuffer>();
+        vFromBytesErrBufPtr.ref
+          ..capacity = vFromBytesErrBuf.capacity
+          ..len = vFromBytesErrBuf.len
+          ..data = vFromBytesErrBuf.data;
+        rustRetBufferPtrs.add(vFromBytesErrBufPtr);
+        throw StateError('UniFFI rustbuffer_from_bytes failed with status $vFromBytesCode');
+      }
+      (argBuf + 0).ref.u64 = vRustBuffer.capacity;
+      (argBuf + 1).ref.u64 = vRustBuffer.len;
+      (argBuf + 2).ref.ptr = vRustBuffer.data.cast<ffi.Void>();
       _echoStringsFfiBuffer(argBuf, returnBuf);
       final int statusCode = (returnBuf + 3).ref.i8;
       if (statusCode != _uniFfiRustCallStatusSuccess) {
@@ -1280,7 +1315,44 @@ class LibraryModeDemoFfi {
     final foreignArgPtrs = <ffi.Pointer<ffi.Uint8>>[];
     final rustRetBufferPtrs = <ffi.Pointer<_UniFfiRustBuffer>>[];
     try {
-      throw UnsupportedError('runtime invocation for this UniFFI ABI (RustCallStatus out-arg) is not implemented yet (maybe_greet)');
+      final nameWriter = _UniFfiBinaryWriter();
+      if (name == null) {
+        nameWriter.writeI8(0);
+      } else {
+        nameWriter.writeI8(1);
+        nameWriter.writeString(name!);
+      }
+      final Uint8List nameBytes = nameWriter.toBytes();
+      final ffi.Pointer<ffi.Uint8> namePtr = nameBytes.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>(nameBytes.length);
+      if (nameBytes.isNotEmpty) { namePtr.asTypedList(nameBytes.length).setAll(0, nameBytes); }
+      foreignArgPtrs.add(namePtr);
+      final ffi.Pointer<_UniFfiRustCallStatus> nameFromBytesStatusPtr = calloc<_UniFfiRustCallStatus>();
+      nameFromBytesStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
+      nameFromBytesStatusPtr.ref.errorBuf
+        ..capacity = 0
+        ..len = 0
+        ..data = ffi.nullptr;
+      final ffi.Pointer<_UniFfiForeignBytes> nameForeignPtr = calloc<_UniFfiForeignBytes>();
+      nameForeignPtr.ref
+        ..len = nameBytes.length
+        ..data = namePtr;
+      final _UniFfiRustBuffer nameRustBuffer = _uniFfiRustBufferFromBytes(nameForeignPtr.ref, nameFromBytesStatusPtr);
+      calloc.free(nameForeignPtr);
+      final int nameFromBytesCode = nameFromBytesStatusPtr.ref.code;
+      final _UniFfiRustBuffer nameFromBytesErrBuf = nameFromBytesStatusPtr.ref.errorBuf;
+      calloc.free(nameFromBytesStatusPtr);
+      if (nameFromBytesCode != _uniFfiRustCallStatusSuccess) {
+        final ffi.Pointer<_UniFfiRustBuffer> nameFromBytesErrBufPtr = calloc<_UniFfiRustBuffer>();
+        nameFromBytesErrBufPtr.ref
+          ..capacity = nameFromBytesErrBuf.capacity
+          ..len = nameFromBytesErrBuf.len
+          ..data = nameFromBytesErrBuf.data;
+        rustRetBufferPtrs.add(nameFromBytesErrBufPtr);
+        throw StateError('UniFFI rustbuffer_from_bytes failed with status $nameFromBytesCode');
+      }
+      (argBuf + 0).ref.u64 = nameRustBuffer.capacity;
+      (argBuf + 1).ref.u64 = nameRustBuffer.len;
+      (argBuf + 2).ref.ptr = nameRustBuffer.data.cast<ffi.Void>();
       _maybeGreetFfiBuffer(argBuf, returnBuf);
       final int statusCode = (returnBuf + 3).ref.i8;
       if (statusCode != _uniFfiRustCallStatusSuccess) {

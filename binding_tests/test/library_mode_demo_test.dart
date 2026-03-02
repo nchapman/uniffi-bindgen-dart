@@ -40,24 +40,21 @@ void main() {
       );
     });
 
-    // The following tests exercise collection/optional types whose runtime
-    // ffibuffer ABI (RustCallStatus out-arg) is not yet implemented.
-    // They are skipped until the runtime catches up.
     test('echoStrings round-trips list', () {
       expect(echoStrings(['a', 'b', 'c']), ['a', 'b', 'c']);
-    }, skip: 'ffibuffer RustCallStatus out-arg ABI not yet implemented');
+    });
 
     test('echoMap round-trips map', () {
       expect(echoMap({'x': 1, 'y': 2}), {'x': 1, 'y': 2});
-    }, skip: 'ffibuffer RustCallStatus out-arg ABI not yet implemented');
+    });
 
     test('maybeGreet with value', () {
       expect(maybeGreet('Alice'), 'Hello, Alice!');
-    }, skip: 'ffibuffer RustCallStatus out-arg ABI not yet implemented');
+    });
 
     test('maybeGreet with null', () {
       expect(maybeGreet(null), isNull);
-    }, skip: 'ffibuffer RustCallStatus out-arg ABI not yet implemented');
+    });
   });
 
   group('records and enums', () {
@@ -107,7 +104,7 @@ void main() {
       final c = Counter.create(42);
       expect(await c.asyncGet(), 42);
       c.close();
-    }, skip: 'ffibuffer RustCallStatus out-arg ABI not yet implemented');
+    }, skip: 'async object methods require rust-future polling (not yet implemented)');
 
     test('Counter throws after close', () {
       final c = Counter.create(0);
