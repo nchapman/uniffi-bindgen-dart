@@ -1,5 +1,7 @@
+use std::collections::HashMap;
 use uniffi_bindgen::interface::Type;
 
+use super::config::CustomTypeConfig;
 use super::*;
 
 pub(super) fn is_runtime_string_type(type_: &Type) -> bool {
@@ -158,15 +160,69 @@ pub(super) fn is_runtime_string_like_type(type_: &Type) -> bool {
     is_runtime_string_type(type_) || is_runtime_optional_string_type(type_)
 }
 
-pub(super) fn render_plain_ffi_decode_expr(type_: &Type, call_expr: &str) -> String {
-    match runtime_unwrapped_type(type_) {
+pub(super) fn render_plain_ffi_decode_expr(
+    type_: &Type,
+    call_expr: &str,
+    custom_types: &HashMap<String, CustomTypeConfig>,
+) -> String {
+    let decoded = match runtime_unwrapped_type(type_) {
         Type::Timestamp => format!("DateTime.fromMicrosecondsSinceEpoch({call_expr}, isUtc: true)"),
         Type::Duration => format!("Duration(microseconds: {call_expr})"),
         _ => call_expr.to_string(),
-    }
+    };
+    lift_custom_if_needed(&decoded, type_, custom_types)
 }
 
-pub(super) fn map_uniffi_type_to_dart(type_: &Type) -> String {
+/// Wrap a decoded expression with the custom-type lift template when configured.
+/// Checks both top-level `Custom` and `Optional<Custom<...>>` since
+/// `runtime_unwrapped_type` strips both wrappers in type-dispatch branches.
+/// Pass the original type, not the result of `runtime_unwrapped_type`.
+pub(super) fn lift_custom_if_needed(
+    decoded_expr: &str,
+    type_: &Type,
+    custom_types: &HashMap<String, CustomTypeConfig>,
+) -> String {
+    if let Type::Custom { name, .. } = type_ {
+        if let Some(cfg) = custom_types.get(name.as_str()) {
+            return cfg.lift_expr(decoded_expr);
+        }
+    }
+    if let Type::Optional { inner_type } = type_ {
+        if let Type::Custom { name, .. } = inner_type.as_ref() {
+            if let Some(cfg) = custom_types.get(name.as_str()) {
+                return cfg.lift_expr(decoded_expr);
+            }
+        }
+    }
+    decoded_expr.to_string()
+}
+
+/// Wrap a value expression with the custom-type lower template when configured.
+/// Mirror of `lift_custom_if_needed` for the arg/encode direction.
+pub(super) fn lower_custom_if_needed(
+    value_expr: &str,
+    type_: &Type,
+    custom_types: &HashMap<String, CustomTypeConfig>,
+) -> String {
+    if let Type::Custom { name, .. } = type_ {
+        if let Some(cfg) = custom_types.get(name.as_str()) {
+            return cfg.lower_expr(value_expr);
+        }
+    }
+    if let Type::Optional { inner_type } = type_ {
+        if let Type::Custom { name, .. } = inner_type.as_ref() {
+            if let Some(cfg) = custom_types.get(name.as_str()) {
+                return cfg.lower_expr(value_expr);
+            }
+        }
+    }
+    value_expr.to_string()
+}
+
+pub(super) fn map_uniffi_type_to_dart(
+    type_: &Type,
+    custom_types: &HashMap<String, CustomTypeConfig>,
+) -> String {
     match type_ {
         Type::UInt8
         | Type::Int8
@@ -182,21 +238,33 @@ pub(super) fn map_uniffi_type_to_dart(type_: &Type) -> String {
         Type::Bytes => "Uint8List".to_string(),
         Type::Timestamp => "DateTime".to_string(),
         Type::Duration => "Duration".to_string(),
-        Type::Optional { inner_type } => format!("{}?", map_uniffi_type_to_dart(inner_type)),
-        Type::Sequence { inner_type } => format!("List<{}>", map_uniffi_type_to_dart(inner_type)),
+        Type::Optional { inner_type } => {
+            format!("{}?", map_uniffi_type_to_dart(inner_type, custom_types))
+        }
+        Type::Sequence { inner_type } => format!(
+            "List<{}>",
+            map_uniffi_type_to_dart(inner_type, custom_types)
+        ),
         Type::Map {
             key_type,
             value_type,
         } => format!(
             "Map<{}, {}>",
-            map_uniffi_type_to_dart(key_type),
-            map_uniffi_type_to_dart(value_type)
+            map_uniffi_type_to_dart(key_type, custom_types),
+            map_uniffi_type_to_dart(value_type, custom_types)
         ),
         Type::Enum { name, .. }
         | Type::Object { name, .. }
         | Type::Record { name, .. }
         | Type::CallbackInterface { name, .. } => to_upper_camel(name),
-        Type::Custom { builtin, .. } => map_uniffi_type_to_dart(builtin),
+        Type::Custom { name, builtin, .. } => {
+            if let Some(cfg) = custom_types.get(name.as_str()) {
+                if let Some(type_name) = &cfg.type_name {
+                    return type_name.clone();
+                }
+            }
+            map_uniffi_type_to_dart(builtin, custom_types)
+        }
     }
 }
 
@@ -226,6 +294,33 @@ pub(super) fn uniffi_type_uses_bytes(type_: &Type) -> bool {
         } => uniffi_type_uses_bytes(key_type) || uniffi_type_uses_bytes(value_type),
         Type::Custom { builtin, .. } => uniffi_type_uses_bytes(builtin),
         _ => false,
+    }
+}
+
+/// Collect all `Type::Custom` entries found in a type tree into the given map.
+/// Maps custom type name → builtin Dart type string.
+pub(super) fn collect_custom_types(
+    type_: &Type,
+    custom_types_config: &HashMap<String, CustomTypeConfig>,
+    customs: &mut std::collections::BTreeMap<String, String>,
+) {
+    match type_ {
+        Type::Custom { name, builtin, .. } => {
+            customs
+                .entry(name.clone())
+                .or_insert_with(|| map_uniffi_type_to_dart(builtin, custom_types_config));
+        }
+        Type::Optional { inner_type } | Type::Sequence { inner_type } => {
+            collect_custom_types(inner_type, custom_types_config, customs);
+        }
+        Type::Map {
+            key_type,
+            value_type,
+        } => {
+            collect_custom_types(key_type, custom_types_config, customs);
+            collect_custom_types(value_type, custom_types_config, customs);
+        }
+        _ => {}
     }
 }
 

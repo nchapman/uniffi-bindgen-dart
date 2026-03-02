@@ -1,4 +1,6 @@
+use super::config::CustomTypeConfig;
 use super::*;
+use std::collections::HashMap;
 
 pub(super) fn render_object_classes(
     objects: &[UdlObject],
@@ -7,6 +9,7 @@ pub(super) fn render_object_classes(
     api_overrides: &ApiOverrides,
     records: &[UdlRecord],
     enums: &[UdlEnum],
+    custom_types: &HashMap<String, CustomTypeConfig>,
 ) -> String {
     let mut out = String::new();
     for object in objects {
@@ -21,6 +24,7 @@ pub(super) fn render_object_classes(
                 api_overrides,
                 records,
                 enums,
+                custom_types,
             ));
         } else {
             out.push_str(&render_plain_object(
@@ -30,6 +34,7 @@ pub(super) fn render_object_classes(
                 api_overrides,
                 records,
                 enums,
+                custom_types,
             ));
         }
     }
@@ -51,6 +56,7 @@ fn render_trait_interface(
     api_overrides: &ApiOverrides,
     records: &[UdlRecord],
     enums: &[UdlEnum],
+    custom_types: &HashMap<String, CustomTypeConfig>,
 ) -> String {
     let object_name = api_overrides
         .renamed_or_default(&ApiOverrides::object_key(&object.name), || {
@@ -83,14 +89,14 @@ fn render_trait_interface(
         let value_return_type = method
             .return_type
             .as_ref()
-            .map(map_uniffi_type_to_dart)
+            .map(|t| map_uniffi_type_to_dart(t, custom_types))
             .unwrap_or_else(|| "void".to_string());
         let signature_return = if method.is_async {
             format!("Future<{value_return_type}>")
         } else {
             value_return_type
         };
-        let args = render_callable_args_signature(&method.args, enums);
+        let args = render_callable_args_signature(&method.args, enums, custom_types);
         out.push_str(&render_doc_comment(method.docstring.as_deref(), "  "));
         out.push_str(&format!("  {signature_return} {method_name}({args});\n"));
     }
@@ -153,7 +159,14 @@ fn render_trait_interface(
             .iter()
             .all(|a| is_runtime_ffi_compatible_type(&a.type_, records, enums))
         {
-            emit_constructor_skip_warning(&mut out, &impl_class_name, &ctor.name, &ctor.args, "  ");
+            emit_constructor_skip_warning(
+                &mut out,
+                &impl_class_name,
+                &ctor.name,
+                &ctor.args,
+                custom_types,
+                "  ",
+            );
             continue;
         }
         let ctor_camel = to_upper_camel(&ctor.name);
@@ -168,7 +181,7 @@ fn render_trait_interface(
                 }
             },
         ));
-        let args = render_callable_args_signature(&ctor.args, enums);
+        let args = render_callable_args_signature(&ctor.args, enums, custom_types);
         let arg_names = render_callable_arg_names(&ctor.args);
         let invoke_expr = format!("_bindings().{ctor_invoker}({arg_names})");
         let signature_return = if ctor.is_async {
@@ -217,7 +230,14 @@ fn render_trait_interface(
             .iter()
             .all(|a| is_runtime_ffi_compatible_type(&a.type_, records, enums));
         if !has_callback_args && (!supported_return || !supports_runtime_args) {
-            emit_method_skip_warning(&mut out, &impl_class_name, &method.name, &method.args, "  ");
+            emit_method_skip_warning(
+                &mut out,
+                &impl_class_name,
+                &method.name,
+                &method.args,
+                custom_types,
+                "  ",
+            );
             continue;
         }
         let method_name = safe_dart_identifier(&api_overrides.renamed_or_default(
@@ -229,14 +249,14 @@ fn render_trait_interface(
         let return_type = method
             .return_type
             .as_ref()
-            .map(map_uniffi_type_to_dart)
+            .map(|t| map_uniffi_type_to_dart(t, custom_types))
             .unwrap_or_else(|| "void".to_string());
         let signature_return = if method.is_async {
             format!("Future<{return_type}>")
         } else {
             return_type.clone()
         };
-        let args = render_callable_args_signature(&method.args, enums);
+        let args = render_callable_args_signature(&method.args, enums, custom_types);
         let arg_names = render_callable_arg_names(&method.args);
         out.push_str(&render_doc_comment(method.docstring.as_deref(), "  "));
         out.push_str("  @override\n");
@@ -345,6 +365,7 @@ fn render_trait_interface(
         &vtable_struct_name,
         records,
         enums,
+        custom_types,
     ));
 
     // 5. FfiCodec that handles both Rust-backed and Dart-backed instances
@@ -379,6 +400,7 @@ fn render_plain_object(
     api_overrides: &ApiOverrides,
     records: &[UdlRecord],
     enums: &[UdlEnum],
+    custom_types: &HashMap<String, CustomTypeConfig>,
 ) -> String {
     let object_name = api_overrides
         .renamed_or_default(&ApiOverrides::object_key(&object.name), || {
@@ -447,7 +469,14 @@ fn render_plain_object(
             .iter()
             .all(|a| is_runtime_ffi_compatible_type(&a.type_, records, enums))
         {
-            emit_constructor_skip_warning(&mut out, &object_name, &ctor.name, &ctor.args, "  ");
+            emit_constructor_skip_warning(
+                &mut out,
+                &object_name,
+                &ctor.name,
+                &ctor.args,
+                custom_types,
+                "  ",
+            );
             continue;
         }
         let ctor_camel = to_upper_camel(&ctor.name);
@@ -462,7 +491,7 @@ fn render_plain_object(
                 }
             },
         ));
-        let args = render_callable_args_signature(&ctor.args, enums);
+        let args = render_callable_args_signature(&ctor.args, enums, custom_types);
         let arg_names = render_callable_arg_names(&ctor.args);
         let invoke_expr = format!("_bindings().{ctor_invoker}({arg_names})");
         let signature_return = if ctor.is_async {
@@ -510,7 +539,14 @@ fn render_plain_object(
             .iter()
             .all(|a| is_runtime_ffi_compatible_type(&a.type_, records, enums));
         if !has_callback_args && (!supported_return || !supports_runtime_args) {
-            emit_method_skip_warning(&mut out, &object_name, &method.name, &method.args, "  ");
+            emit_method_skip_warning(
+                &mut out,
+                &object_name,
+                &method.name,
+                &method.args,
+                custom_types,
+                "  ",
+            );
             continue;
         }
         let method_name = safe_dart_identifier(&api_overrides.renamed_or_default(
@@ -522,14 +558,14 @@ fn render_plain_object(
         let return_type = method
             .return_type
             .as_ref()
-            .map(map_uniffi_type_to_dart)
+            .map(|t| map_uniffi_type_to_dart(t, custom_types))
             .unwrap_or_else(|| "void".to_string());
         let signature_return = if method.is_async {
             format!("Future<{return_type}>")
         } else {
             return_type.clone()
         };
-        let args = render_callable_args_signature(&method.args, enums);
+        let args = render_callable_args_signature(&method.args, enums, custom_types);
         let arg_names = render_callable_arg_names(&method.args);
         out.push_str(&render_doc_comment(method.docstring.as_deref(), "  "));
         out.push_str(&format!("  {signature_return} {method_name}({args}) {{\n"));
@@ -685,6 +721,7 @@ fn render_trait_callback_bridge(
     vtable_struct_name: &str,
     records: &[UdlRecord],
     enums: &[UdlEnum],
+    custom_types: &HashMap<String, CustomTypeConfig>,
 ) -> String {
     let mut out = String::new();
     out.push_str(&format!("final class {bridge_name} {{\n"));
@@ -770,7 +807,11 @@ fn render_trait_callback_bridge(
             ffi_args.push(format!("{arg_native} {arg_name}"));
             dart_args.push(format!("{arg_dart} {arg_name}"));
             callback_args.push(render_callback_arg_decode_expr(
-                &arg.type_, &arg_name, records, enums,
+                &arg.type_,
+                &arg_name,
+                records,
+                enums,
+                custom_types,
             ));
         }
 
@@ -808,7 +849,13 @@ fn render_trait_callback_bridge(
                 "      final result = callback.{method_name}({});\n",
                 callback_args.join(", ")
             ));
-            let encoded = render_callback_return_encode_expr(return_type, "result", records, enums);
+            let encoded = render_callback_return_encode_expr(
+                return_type,
+                "result",
+                records,
+                enums,
+                custom_types,
+            );
             out.push_str(&format!("      outReturn.value = {encoded};\n"));
         } else {
             out.push_str(&format!(

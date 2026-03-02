@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use uniffi_bindgen::interface::{DefaultValue, Literal, Radix, Type};
 
+use super::config::CustomTypeConfig;
 use super::*;
 
 pub(super) fn render_doc_comment(docstring: Option<&str>, indent: &str) -> String {
@@ -55,14 +56,19 @@ pub(super) fn render_default_value_expr(
     default: &DefaultValue,
     type_: &Type,
     enums: &[UdlEnum],
+    custom_types: &HashMap<String, CustomTypeConfig>,
 ) -> Option<String> {
     match default {
-        DefaultValue::Default => render_type_default_expr(type_, enums),
-        DefaultValue::Literal(lit) => render_literal_default_expr(lit, type_, enums),
+        DefaultValue::Default => render_type_default_expr(type_, enums, custom_types),
+        DefaultValue::Literal(lit) => render_literal_default_expr(lit, type_, enums, custom_types),
     }
 }
 
-pub(super) fn render_type_default_expr(type_: &Type, enums: &[UdlEnum]) -> Option<String> {
+pub(super) fn render_type_default_expr(
+    type_: &Type,
+    enums: &[UdlEnum],
+    custom_types: &HashMap<String, CustomTypeConfig>,
+) -> Option<String> {
     match type_ {
         Type::Boolean => Some("false".to_string()),
         Type::String => Some("''".to_string()),
@@ -81,7 +87,14 @@ pub(super) fn render_type_default_expr(type_: &Type, enums: &[UdlEnum]) -> Optio
         Type::Optional { .. } => Some("null".to_string()),
         Type::Sequence { .. } => Some("const []".to_string()),
         Type::Map { .. } => Some("const {}".to_string()),
-        Type::Custom { builtin, .. } => render_type_default_expr(builtin, enums),
+        Type::Custom { name, builtin, .. } => {
+            let builtin_default = render_type_default_expr(builtin, enums, custom_types)?;
+            if let Some(cfg) = custom_types.get(name.as_str()) {
+                Some(cfg.lift_expr(&builtin_default))
+            } else {
+                Some(builtin_default)
+            }
+        }
         Type::Enum { name, .. } => {
             let enum_name = to_upper_camel(name);
             let enum_def = enums
@@ -105,17 +118,26 @@ pub(super) fn render_literal_default_expr(
     lit: &Literal,
     type_: &Type,
     enums: &[UdlEnum],
+    custom_types: &HashMap<String, CustomTypeConfig>,
 ) -> Option<String> {
     match lit {
         Literal::Boolean(v) => Some(v.to_string()),
-        Literal::String(v) => Some(format!("'{}'", escape_dart_string_literal(v))),
-        Literal::UInt(v, radix, _) => Some(match radix {
-            Radix::Decimal => v.to_string(),
-            Radix::Octal => format!("0{o:o}", o = v),
-            Radix::Hexadecimal => format!("0x{v:x}"),
-        }),
-        Literal::Int(v, _radix, _) => Some(v.to_string()),
-        Literal::Float(v, _) => Some(v.to_string()),
+        Literal::String(v) => {
+            let s = format!("'{}'", escape_dart_string_literal(v));
+            Some(lift_custom_if_needed(&s, type_, custom_types))
+        }
+        Literal::UInt(v, radix, _) => {
+            let s = match radix {
+                Radix::Decimal => v.to_string(),
+                Radix::Octal => format!("0{o:o}", o = v),
+                Radix::Hexadecimal => format!("0x{v:x}"),
+            };
+            Some(lift_custom_if_needed(&s, type_, custom_types))
+        }
+        Literal::Int(v, _radix, _) => {
+            Some(lift_custom_if_needed(&v.to_string(), type_, custom_types))
+        }
+        Literal::Float(v, _) => Some(lift_custom_if_needed(&v.to_string(), type_, custom_types)),
         Literal::Enum(variant, enum_type) => {
             let enum_name = match enum_type {
                 Type::Enum { name, .. } => to_upper_camel(name),
@@ -132,17 +154,21 @@ pub(super) fn render_literal_default_expr(
         Literal::EmptySequence => Some("const []".to_string()),
         Literal::EmptyMap => Some("const {}".to_string()),
         Literal::None => Some("null".to_string()),
-        Literal::Some { inner } => render_default_value_expr(inner, type_, enums),
+        Literal::Some { inner } => render_default_value_expr(inner, type_, enums, custom_types),
     }
 }
 
-pub(super) fn render_callable_args_signature(args: &[UdlArg], enums: &[UdlEnum]) -> String {
+pub(super) fn render_callable_args_signature(
+    args: &[UdlArg],
+    enums: &[UdlEnum],
+    custom_types: &HashMap<String, CustomTypeConfig>,
+) -> String {
     let defaults = args
         .iter()
         .map(|a| {
             a.default
                 .as_ref()
-                .and_then(|d| render_default_value_expr(d, &a.type_, enums))
+                .and_then(|d| render_default_value_expr(d, &a.type_, enums, custom_types))
         })
         .collect::<Vec<_>>();
     let has_defaults = defaults.iter().any(|d| d.is_some());
@@ -152,7 +178,7 @@ pub(super) fn render_callable_args_signature(args: &[UdlArg], enums: &[UdlEnum])
             .map(|a| {
                 format!(
                     "{} {}",
-                    map_uniffi_type_to_dart(&a.type_),
+                    map_uniffi_type_to_dart(&a.type_, custom_types),
                     safe_dart_identifier(&to_lower_camel(&a.name))
                 )
             })
@@ -164,7 +190,7 @@ pub(super) fn render_callable_args_signature(args: &[UdlArg], enums: &[UdlEnum])
         .iter()
         .zip(defaults.iter())
         .map(|(a, default_expr)| {
-            let field_type = map_uniffi_type_to_dart(&a.type_);
+            let field_type = map_uniffi_type_to_dart(&a.type_, custom_types);
             let field_name = safe_dart_identifier(&to_lower_camel(&a.name));
             if let Some(default_expr) = default_expr {
                 format!("{field_type} {field_name} = {default_expr}")
@@ -188,12 +214,36 @@ pub(super) fn append_runtime_arg_marshalling(
     arg_name: &str,
     type_: &Type,
     enums: &[UdlEnum],
+    custom_types: &HashMap<String, CustomTypeConfig>,
     pre_call: &mut Vec<String>,
     post_call: &mut Vec<String>,
     call_args: &mut Vec<String>,
 ) {
-    if let Type::Custom { builtin, .. } = type_ {
-        append_runtime_arg_marshalling(arg_name, builtin, enums, pre_call, post_call, call_args);
+    if let Type::Custom { name, builtin, .. } = type_ {
+        if let Some(cfg) = custom_types.get(name.as_str()) {
+            let lowered_name = format!("{arg_name}Lowered");
+            let lower_expr = cfg.lower_expr(arg_name);
+            pre_call.push(format!("    final {lowered_name} = {lower_expr};\n"));
+            append_runtime_arg_marshalling(
+                &lowered_name,
+                builtin,
+                enums,
+                custom_types,
+                pre_call,
+                post_call,
+                call_args,
+            );
+        } else {
+            append_runtime_arg_marshalling(
+                arg_name,
+                builtin,
+                enums,
+                custom_types,
+                pre_call,
+                post_call,
+                call_args,
+            );
+        }
         return;
     }
 
@@ -216,7 +266,7 @@ pub(super) fn append_runtime_arg_marshalling(
     } else if is_runtime_sequence_json_type(type_) || is_runtime_map_with_string_key_type(type_) {
         let native_name = format!("{arg_name}Native");
         let json_name = format!("{native_name}Json");
-        let payload_expr = render_json_encode_expr(arg_name, type_);
+        let payload_expr = render_json_encode_expr(arg_name, type_, custom_types);
         pre_call.push(format!(
             "    final String {json_name} = jsonEncode({payload_expr});\n"
         ));
@@ -230,8 +280,14 @@ pub(super) fn append_runtime_arg_marshalling(
         let buffer_ptr_name = format!("{arg_name}BufferPtr");
         let native_name = format!("{arg_name}Native");
         let writer_name = format!("{arg_name}Writer");
-        let write_stmt =
-            render_uniffi_binary_write_statement(type_, arg_name, &writer_name, enums, "    ");
+        let write_stmt = render_uniffi_binary_write_statement(
+            type_,
+            arg_name,
+            &writer_name,
+            enums,
+            "    ",
+            custom_types,
+        );
         pre_call.push(format!(
             "    final {writer_name} = _UniFfiBinaryWriter();\n"
         ));
@@ -572,9 +628,18 @@ pub(super) fn collect_external_crates_from_type<'a>(
 
 /// Format a human-readable argument signature for warning messages.
 /// Produces strings like `"int32 x, String name"`.
-pub(super) fn format_args_for_warning(args: &[UdlArg]) -> String {
+pub(super) fn format_args_for_warning(
+    args: &[UdlArg],
+    custom_types: &HashMap<String, CustomTypeConfig>,
+) -> String {
     args.iter()
-        .map(|a| format!("{} {}", map_uniffi_type_to_dart(&a.type_), a.name))
+        .map(|a| {
+            format!(
+                "{} {}",
+                map_uniffi_type_to_dart(&a.type_, custom_types),
+                a.name
+            )
+        })
         .collect::<Vec<_>>()
         .join(", ")
 }
@@ -586,9 +651,10 @@ pub(super) fn emit_constructor_skip_warning(
     object_name: &str,
     ctor_name: &str,
     args: &[UdlArg],
+    custom_types: &HashMap<String, CustomTypeConfig>,
     indent: &str,
 ) {
-    let sig = format_args_for_warning(args);
+    let sig = format_args_for_warning(args, custom_types);
     let display_name = if ctor_name == "new" {
         format!("{object_name}({sig})")
     } else {
@@ -613,9 +679,10 @@ pub(super) fn emit_method_skip_warning(
     object_name: &str,
     method_name: &str,
     args: &[UdlArg],
+    custom_types: &HashMap<String, CustomTypeConfig>,
     indent: &str,
 ) {
-    let sig = format_args_for_warning(args);
+    let sig = format_args_for_warning(args, custom_types);
     let display_name = format!("{object_name}.{method_name}({sig})");
     out.push_str(&format!(
         "{indent}// WARNING: Method '{display_name}' was omitted because\n"
@@ -635,9 +702,10 @@ pub(super) fn emit_function_skip_warning(
     out: &mut String,
     function_name: &str,
     args: &[UdlArg],
+    custom_types: &HashMap<String, CustomTypeConfig>,
     indent: &str,
 ) {
-    let sig = format_args_for_warning(args);
+    let sig = format_args_for_warning(args, custom_types);
     let display_name = format!("{function_name}({sig})");
     out.push_str(&format!(
         "{indent}// WARNING: Function '{display_name}' was omitted because\n"

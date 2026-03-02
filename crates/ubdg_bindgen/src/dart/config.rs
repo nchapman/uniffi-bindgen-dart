@@ -17,6 +17,38 @@ pub struct DartBindingsConfig {
     pub rename: HashMap<String, String>,
     pub exclude: Vec<String>,
     pub external_packages: HashMap<String, String>,
+    pub custom_types: HashMap<String, CustomTypeConfig>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
+pub struct CustomTypeConfig {
+    /// Dart type to use in signatures (default: builtin type).
+    pub type_name: Option<String>,
+    /// Extra imports needed for the custom type.
+    pub imports: Option<Vec<String>>,
+    /// Template converting builtin → custom: `"Uri.parse({})"`.
+    pub lift: Option<String>,
+    /// Template converting custom → builtin: `"{}.toString()"`.
+    pub lower: Option<String>,
+}
+
+impl CustomTypeConfig {
+    /// Apply the lift template (builtin → custom). Identity when unset.
+    pub fn lift_expr(&self, builtin_expr: &str) -> String {
+        match &self.lift {
+            Some(template) => template.replace("{}", builtin_expr),
+            None => builtin_expr.to_string(),
+        }
+    }
+
+    /// Apply the lower template (custom → builtin). Identity when unset.
+    pub fn lower_expr(&self, custom_expr: &str) -> String {
+        match &self.lower {
+            Some(template) => template.replace("{}", custom_expr),
+            None => custom_expr.to_string(),
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -125,6 +157,57 @@ external_packages = { other_crate = "package:other_bindings/other_bindings.dart"
             cfg.external_packages.get("other_crate").map(String::as_str),
             Some("package:other_bindings/other_bindings.dart")
         );
+    }
+
+    #[test]
+    fn parses_custom_types_config() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("uniffi.toml");
+        fs::write(
+            &config_path,
+            r#"
+[bindings.dart.custom_types.Url]
+type_name = "Uri"
+imports = ["dart:core"]
+lift = "Uri.parse({})"
+lower = "{}.toString()"
+
+[bindings.dart.custom_types.Count]
+lower = "{}.toInt()"
+lift = "Count({})"
+"#,
+        )
+        .expect("write config");
+
+        let args = GenerateArgs {
+            source: temp.path().join("demo.udl"),
+            out_dir: temp.path().join("out"),
+            library: false,
+            config: Some(config_path),
+            crate_name: None,
+            no_format: false,
+        };
+
+        let cfg = load(&args).expect("load config");
+        let url_cfg = cfg.custom_types.get("Url").expect("Url entry");
+        assert_eq!(url_cfg.type_name.as_deref(), Some("Uri"));
+        assert_eq!(
+            url_cfg
+                .imports
+                .as_ref()
+                .map(|v| v.iter().map(String::as_str).collect::<Vec<_>>()),
+            Some(vec!["dart:core"])
+        );
+        assert_eq!(url_cfg.lift_expr("raw"), "Uri.parse(raw)");
+        assert_eq!(url_cfg.lower_expr("value"), "value.toString()");
+
+        let count_cfg = cfg.custom_types.get("Count").expect("Count entry");
+        assert_eq!(count_cfg.type_name, None);
+        assert_eq!(count_cfg.lift_expr("raw"), "Count(raw)");
+        assert_eq!(count_cfg.lower_expr("value"), "value.toInt()");
+
+        // No entry → not present
+        assert!(!cfg.custom_types.contains_key("Label"));
     }
 
     #[test]

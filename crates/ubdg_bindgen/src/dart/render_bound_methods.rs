@@ -1,7 +1,10 @@
 use uniffi_bindgen::interface::{ffi::FfiType, Type};
 
+use super::config::CustomTypeConfig;
 use super::*;
+use std::collections::HashMap;
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn render_bound_methods(
     functions: &[UdlFunction],
     objects: &[UdlObject],
@@ -10,6 +13,7 @@ pub(super) fn render_bound_methods(
     local_module_path: &str,
     records: &[UdlRecord],
     enums: &[UdlEnum],
+    custom_types: &HashMap<String, CustomTypeConfig>,
 ) -> String {
     let mut out = String::new();
     let mut runtime_functions = functions.to_vec();
@@ -285,7 +289,7 @@ pub(super) fn render_bound_methods(
                 let value_return_type = function
                     .return_type
                     .as_ref()
-                    .map(map_uniffi_type_to_dart)
+                    .map(|t| map_uniffi_type_to_dart(t, custom_types))
                     .unwrap_or_else(|| "void".to_string());
                 let signature_return_type = format!("Future<{value_return_type}>");
                 let dart_sig = function
@@ -294,7 +298,7 @@ pub(super) fn render_bound_methods(
                     .map(|a| {
                         format!(
                             "{} {}",
-                            map_uniffi_type_to_dart(&a.type_),
+                            map_uniffi_type_to_dart(&a.type_, custom_types),
                             safe_dart_identifier(&to_lower_camel(&a.name))
                         )
                     })
@@ -442,6 +446,7 @@ pub(super) fn render_bound_methods(
                                 &escaped_reason,
                                 &function.name,
                                 enums,
+                                custom_types,
                             );
                         }
                         _ => {
@@ -452,6 +457,7 @@ pub(super) fn render_bound_methods(
                                 *offset,
                                 &escaped_reason,
                                 &function.name,
+                                custom_types,
                             );
                         }
                     }
@@ -496,6 +502,7 @@ pub(super) fn render_bound_methods(
                     local_module_path,
                     objects,
                     enums,
+                    custom_types,
                 );
                 render_ffibuffer_outer_cleanup(&mut out);
                 out.push_str("  }\n");
@@ -505,7 +512,7 @@ pub(super) fn render_bound_methods(
                 let value_return_type = function
                     .return_type
                     .as_ref()
-                    .map(map_uniffi_type_to_dart)
+                    .map(|t| map_uniffi_type_to_dart(t, custom_types))
                     .unwrap_or_else(|| "void".to_string());
                 let signature_return_type = if function.is_async {
                     format!("Future<{value_return_type}>")
@@ -518,7 +525,7 @@ pub(super) fn render_bound_methods(
                     .map(|a| {
                         format!(
                             "{} {}",
-                            map_uniffi_type_to_dart(&a.type_),
+                            map_uniffi_type_to_dart(&a.type_, custom_types),
                             safe_dart_identifier(&to_lower_camel(&a.name))
                         )
                     })
@@ -618,6 +625,7 @@ pub(super) fn render_bound_methods(
                                 &escaped_reason,
                                 &function.name,
                                 enums,
+                                custom_types,
                             );
                         }
                         _ => {
@@ -628,6 +636,7 @@ pub(super) fn render_bound_methods(
                                 *offset,
                                 &escaped_reason,
                                 &function.name,
+                                custom_types,
                             );
                         }
                     }
@@ -679,8 +688,14 @@ pub(super) fn render_bound_methods(
                     Some(ret_type) => match ffi_return_type.as_ref() {
                         Some(FfiType::RustBuffer(_)) => {
                             let decode_expr = match runtime_unwrapped_type(ret_type) {
-                                Type::String => "utf8.decode(retBytes)".to_string(),
-                                Type::Bytes => "retBytes".to_string(),
+                                Type::String => lift_custom_if_needed(
+                                    "utf8.decode(retBytes)",
+                                    ret_type,
+                                    custom_types,
+                                ),
+                                Type::Bytes => {
+                                    lift_custom_if_needed("retBytes", ret_type, custom_types)
+                                }
                                 Type::Record { name, .. } | Type::Enum { name, .. } => {
                                     format!("_uniffiDecode{}(retBytes)", to_upper_camel(name))
                                 }
@@ -688,6 +703,7 @@ pub(super) fn render_bound_methods(
                                     ret_type,
                                     "retReader",
                                     enums,
+                                    custom_types,
                                 ),
                             };
                             out.push_str(
@@ -761,7 +777,7 @@ pub(super) fn render_bound_methods(
             let value_return_type = function
                 .return_type
                 .as_ref()
-                .map(map_uniffi_type_to_dart)
+                .map(|t| map_uniffi_type_to_dart(t, custom_types))
                 .unwrap_or_else(|| "void".to_string());
             let signature_return_type = if function.is_async {
                 format!("Future<{value_return_type}>")
@@ -774,7 +790,7 @@ pub(super) fn render_bound_methods(
                 .map(|a| {
                     format!(
                         "{} {}",
-                        map_uniffi_type_to_dart(&a.type_),
+                        map_uniffi_type_to_dart(&a.type_, custom_types),
                         safe_dart_identifier(&to_lower_camel(&a.name))
                     )
                 })
@@ -805,7 +821,13 @@ pub(super) fn render_bound_methods(
         let has_callback_args =
             has_runtime_callback_args_in_args(&function.args, callback_interfaces, records, enums);
         if !is_runtime_supported && !is_sync_callback_supported && !has_callback_args {
-            emit_function_skip_warning(&mut out, &function.name, &function.args, "  ");
+            emit_function_skip_warning(
+                &mut out,
+                &function.name,
+                &function.args,
+                custom_types,
+                "  ",
+            );
             continue;
         }
         let field_name = format!("_{}", method_name);
@@ -814,7 +836,7 @@ pub(super) fn render_bound_methods(
             let return_type = function
                 .return_type
                 .as_ref()
-                .map(map_uniffi_type_to_dart)
+                .map(|t| map_uniffi_type_to_dart(t, custom_types))
                 .unwrap_or_else(|| "void".to_string());
             let native_return = function
                 .return_type
@@ -838,7 +860,7 @@ pub(super) fn render_bound_methods(
                 let arg_name = safe_dart_identifier(&to_lower_camel(&arg.name));
                 dart_args.push(format!(
                     "{} {}",
-                    map_uniffi_type_to_dart(&arg.type_),
+                    map_uniffi_type_to_dart(&arg.type_, custom_types),
                     arg_name
                 ));
                 if let Some(callback_name) = callback_interface_name_from_type(&arg.type_) {
@@ -867,6 +889,7 @@ pub(super) fn render_bound_methods(
                     &arg_name,
                     &arg.type_,
                     enums,
+                    custom_types,
                     &mut pre_call,
                     &mut post_call,
                     &mut call_args,
@@ -894,7 +917,7 @@ pub(super) fn render_bound_methods(
             match function.return_type.as_ref() {
                 None => out.push_str(&format!("    {call};\n")),
                 Some(ret_type) => {
-                    let decode = render_plain_ffi_decode_expr(ret_type, &call);
+                    let decode = render_plain_ffi_decode_expr(ret_type, &call, custom_types);
                     out.push_str(&format!("    return {decode};\n"));
                 }
             }
@@ -912,7 +935,7 @@ pub(super) fn render_bound_methods(
         let return_type = function
             .return_type
             .as_ref()
-            .map(map_uniffi_type_to_dart)
+            .map(|t| map_uniffi_type_to_dart(t, custom_types))
             .unwrap_or_else(|| "void".to_string());
         let is_throwing = is_runtime_throwing_ffi_compatible_function(
             function,
@@ -956,11 +979,23 @@ pub(super) fn render_bound_methods(
             });
 
         let Some(native_return) = native_return else {
-            emit_function_skip_warning(&mut out, &function.name, &function.args, "  ");
+            emit_function_skip_warning(
+                &mut out,
+                &function.name,
+                &function.args,
+                custom_types,
+                "  ",
+            );
             continue;
         };
         let Some(dart_ffi_return) = dart_ffi_return else {
-            emit_function_skip_warning(&mut out, &function.name, &function.args, "  ");
+            emit_function_skip_warning(
+                &mut out,
+                &function.name,
+                &function.args,
+                custom_types,
+                "  ",
+            );
             continue;
         };
 
@@ -976,7 +1011,7 @@ pub(super) fn render_bound_methods(
             let arg_name = safe_dart_identifier(&to_lower_camel(&arg.name));
             dart_args.push(format!(
                 "{} {}",
-                map_uniffi_type_to_dart(&arg.type_),
+                map_uniffi_type_to_dart(&arg.type_, custom_types),
                 arg_name
             ));
             if let Some(callback_name) = callback_interface_name_from_type(&arg.type_) {
@@ -1009,6 +1044,7 @@ pub(super) fn render_bound_methods(
                 &arg_name,
                 &arg.type_,
                 enums,
+                custom_types,
                 &mut pre_call,
                 &mut post_call,
                 &mut call_args,
@@ -1016,7 +1052,13 @@ pub(super) fn render_bound_methods(
         }
 
         if !signature_compatible {
-            emit_function_skip_warning(&mut out, &function.name, &function.args, "  ");
+            emit_function_skip_warning(
+                &mut out,
+                &function.name,
+                &function.args,
+                custom_types,
+                "  ",
+            );
             continue;
         }
 
@@ -1150,6 +1192,8 @@ pub(super) fn render_bound_methods(
             out.push_str("        if (statusCode == _rustCallStatusSuccess) {\n");
             if let Some(ret_type) = function.return_type.as_ref() {
                 if is_runtime_string_type(ret_type) {
+                    let lifted =
+                        lift_custom_if_needed("resultPtr.toDartString()", ret_type, custom_types);
                     out.push_str("          if (resultPtr == ffi.nullptr) {\n");
                     out.push_str(&format!(
                         "            throw StateError('Rust returned null for {}');\n",
@@ -1157,16 +1201,18 @@ pub(super) fn render_bound_methods(
                     ));
                     out.push_str("          }\n");
                     out.push_str("          try {\n");
-                    out.push_str("            return resultPtr.toDartString();\n");
+                    out.push_str(&format!("            return {lifted};\n"));
                     out.push_str("          } finally {\n");
                     out.push_str("            _rustStringFree(resultPtr);\n");
                     out.push_str("          }\n");
                 } else if is_runtime_optional_string_type(ret_type) {
+                    let lifted =
+                        lift_custom_if_needed("resultPtr.toDartString()", ret_type, custom_types);
                     out.push_str("          if (resultPtr == ffi.nullptr) {\n");
                     out.push_str("            return null;\n");
                     out.push_str("          }\n");
                     out.push_str("          try {\n");
-                    out.push_str("            return resultPtr.toDartString();\n");
+                    out.push_str(&format!("            return {lifted};\n"));
                     out.push_str("          } finally {\n");
                     out.push_str("            _rustStringFree(resultPtr);\n");
                     out.push_str("          }\n");
@@ -1266,7 +1312,7 @@ pub(super) fn render_bound_methods(
                     out.push_str("            _rustStringFree(resultPtr);\n");
                     out.push_str("          }\n");
                 } else if is_runtime_optional_primitive_type(ret_type) {
-                    let decode = render_json_decode_expr("decoded", ret_type);
+                    let decode = render_json_decode_expr("decoded", ret_type, custom_types);
                     out.push_str("          if (resultPtr == ffi.nullptr) {\n");
                     out.push_str(&format!(
                         "            throw StateError('Rust returned null for {}');\n",
@@ -1285,7 +1331,7 @@ pub(super) fn render_bound_methods(
                         Type::Sequence { inner_type } => inner_type,
                         _ => unreachable!(),
                     };
-                    let decode = render_json_decode_expr("item", inner_type);
+                    let decode = render_json_decode_expr("item", inner_type, custom_types);
                     out.push_str("          if (resultPtr == ffi.nullptr) {\n");
                     out.push_str(&format!(
                         "            throw StateError('Rust returned null for {}');\n",
@@ -1301,7 +1347,8 @@ pub(super) fn render_bound_methods(
                     out.push_str("            _rustStringFree(resultPtr);\n");
                     out.push_str("          }\n");
                 } else if is_runtime_map_with_string_key_type(ret_type) {
-                    let decode = render_json_decode_expr("jsonDecode(payload)", ret_type);
+                    let decode =
+                        render_json_decode_expr("jsonDecode(payload)", ret_type, custom_types);
                     out.push_str("          if (resultPtr == ffi.nullptr) {\n");
                     out.push_str(&format!(
                         "            throw StateError('Rust returned null for {}');\n",
@@ -1315,7 +1362,12 @@ pub(super) fn render_bound_methods(
                     out.push_str("            _rustStringFree(resultPtr);\n");
                     out.push_str("          }\n");
                 } else if is_runtime_map_type(ret_type) {
-                    let decode = render_uniffi_binary_read_expression(ret_type, "mapReader", enums);
+                    let decode = render_uniffi_binary_read_expression(
+                        ret_type,
+                        "mapReader",
+                        enums,
+                        custom_types,
+                    );
                     out.push_str("          final _RustBuffer resultBuf = resultValue;\n");
                     out.push_str(
                         "          final ffi.Pointer<ffi.Uint8> resultData = resultBuf.data;\n",
@@ -1440,7 +1492,8 @@ pub(super) fn render_bound_methods(
                 } else if is_runtime_duration_type(ret_type) {
                     out.push_str("          return Duration(microseconds: resultValue);\n");
                 } else {
-                    let decode = render_plain_ffi_decode_expr(ret_type, "resultValue");
+                    let decode =
+                        render_plain_ffi_decode_expr(ret_type, "resultValue", custom_types);
                     out.push_str(&format!("          return {decode};\n"));
                 }
             } else {
@@ -1592,7 +1645,7 @@ pub(super) fn render_bound_methods(
             let ok_decode = function
                 .return_type
                 .as_ref()
-                .map(|t| render_json_decode_expr("okRaw", t));
+                .map(|t| render_json_decode_expr("okRaw", t, custom_types));
             out.push_str(&format!(
                 "      final ffi.Pointer<Utf8> resultPtr = {call_expr};\n"
             ));
@@ -1630,6 +1683,8 @@ pub(super) fn render_bound_methods(
         } else {
             match function.return_type.as_ref() {
                 Some(type_) if is_runtime_string_type(type_) => {
+                    let lifted =
+                        lift_custom_if_needed("resultPtr.toDartString()", type_, custom_types);
                     out.push_str(&format!(
                         "      final ffi.Pointer<Utf8> resultPtr = {call_expr};\n"
                     ));
@@ -1640,12 +1695,14 @@ pub(super) fn render_bound_methods(
                     ));
                     out.push_str("      }\n");
                     out.push_str("      try {\n");
-                    out.push_str("        return resultPtr.toDartString();\n");
+                    out.push_str(&format!("        return {lifted};\n"));
                     out.push_str("      } finally {\n");
                     out.push_str("        _rustStringFree(resultPtr);\n");
                     out.push_str("      }\n");
                 }
                 Some(type_) if is_runtime_optional_string_type(type_) => {
+                    let lifted =
+                        lift_custom_if_needed("resultPtr.toDartString()", type_, custom_types);
                     out.push_str(&format!(
                         "      final ffi.Pointer<Utf8> resultPtr = {call_expr};\n"
                     ));
@@ -1653,7 +1710,7 @@ pub(super) fn render_bound_methods(
                     out.push_str("        return null;\n");
                     out.push_str("      }\n");
                     out.push_str("      try {\n");
-                    out.push_str("        return resultPtr.toDartString();\n");
+                    out.push_str(&format!("        return {lifted};\n"));
                     out.push_str("      } finally {\n");
                     out.push_str("        _rustStringFree(resultPtr);\n");
                     out.push_str("      }\n");
@@ -1886,7 +1943,7 @@ pub(super) fn render_bound_methods(
                     out.push_str("      }\n");
                 }
                 Some(type_) if is_runtime_optional_primitive_type(type_) => {
-                    let decode = render_json_decode_expr("decoded", type_);
+                    let decode = render_json_decode_expr("decoded", type_, custom_types);
                     out.push_str(&format!(
                         "      final ffi.Pointer<Utf8> resultPtr = {call_expr};\n"
                     ));
@@ -1909,7 +1966,7 @@ pub(super) fn render_bound_methods(
                         Type::Sequence { inner_type } => inner_type,
                         _ => unreachable!(),
                     };
-                    let decode = render_json_decode_expr("item", inner_type);
+                    let decode = render_json_decode_expr("item", inner_type, custom_types);
                     out.push_str(&format!(
                         "      final ffi.Pointer<Utf8> resultPtr = {call_expr};\n"
                     ));
@@ -1929,7 +1986,8 @@ pub(super) fn render_bound_methods(
                     out.push_str("      }\n");
                 }
                 Some(type_) if is_runtime_map_with_string_key_type(type_) => {
-                    let decode = render_json_decode_expr("jsonDecode(payload)", type_);
+                    let decode =
+                        render_json_decode_expr("jsonDecode(payload)", type_, custom_types);
                     out.push_str(&format!(
                         "      final ffi.Pointer<Utf8> resultPtr = {call_expr};\n"
                     ));
@@ -1947,7 +2005,12 @@ pub(super) fn render_bound_methods(
                     out.push_str("      }\n");
                 }
                 Some(type_) if is_runtime_map_type(type_) => {
-                    let decode = render_uniffi_binary_read_expression(type_, "mapReader", enums);
+                    let decode = render_uniffi_binary_read_expression(
+                        type_,
+                        "mapReader",
+                        enums,
+                        custom_types,
+                    );
                     out.push_str(&format!(
                         "      final _RustBuffer resultBuf = {call_expr};\n"
                     ));
@@ -2058,7 +2121,10 @@ pub(super) fn render_bound_methods(
                     .iter()
                     .map(|arg| {
                         let arg_name = safe_dart_identifier(&to_lower_camel(&arg.name));
-                        format!("{} {arg_name}", map_uniffi_type_to_dart(&arg.type_))
+                        format!(
+                            "{} {arg_name}",
+                            map_uniffi_type_to_dart(&arg.type_, custom_types)
+                        )
                     })
                     .collect::<Vec<_>>()
                     .join(", ");
@@ -2155,6 +2221,7 @@ pub(super) fn render_bound_methods(
                                     &escaped_reason,
                                     &ctor.name,
                                     enums,
+                                    custom_types,
                                 );
                             }
                             _ => {
@@ -2165,6 +2232,7 @@ pub(super) fn render_bound_methods(
                                     *offset,
                                     &escaped_reason,
                                     &ctor.name,
+                                    custom_types,
                                 );
                             }
                         }
@@ -2243,7 +2311,14 @@ pub(super) fn render_bound_methods(
                 .iter()
                 .all(|a| is_runtime_ffi_compatible_type(&a.type_, records, enums))
             {
-                emit_constructor_skip_warning(&mut out, &object_name, &ctor.name, &ctor.args, "  ");
+                emit_constructor_skip_warning(
+                    &mut out,
+                    &object_name,
+                    &ctor.name,
+                    &ctor.args,
+                    custom_types,
+                    "  ",
+                );
                 continue;
             }
             let ctor_camel = to_upper_camel(&ctor.name);
@@ -2277,19 +2352,27 @@ pub(super) fn render_bound_methods(
                 dart_ffi_args.push(format!("{dart_ffi_ty} {arg_name}"));
                 dart_args.push(format!(
                     "{} {arg_name}",
-                    map_uniffi_type_to_dart(&arg.type_)
+                    map_uniffi_type_to_dart(&arg.type_, custom_types)
                 ));
                 append_runtime_arg_marshalling(
                     &arg_name,
                     &arg.type_,
                     enums,
+                    custom_types,
                     &mut pre_call,
                     &mut post_call,
                     &mut call_args,
                 );
             }
             if !signature_compatible {
-                emit_constructor_skip_warning(&mut out, &object_name, &ctor.name, &ctor.args, "  ");
+                emit_constructor_skip_warning(
+                    &mut out,
+                    &object_name,
+                    &ctor.name,
+                    &ctor.args,
+                    custom_types,
+                    "  ",
+                );
                 continue;
             }
 
@@ -2557,7 +2640,7 @@ pub(super) fn render_bound_methods(
                 let value_return_type = method
                     .return_type
                     .as_ref()
-                    .map(map_uniffi_type_to_dart)
+                    .map(|t| map_uniffi_type_to_dart(t, custom_types))
                     .unwrap_or_else(|| "void".to_string());
                 let signature_return_type = if method.is_async {
                     format!("Future<{value_return_type}>")
@@ -2567,7 +2650,10 @@ pub(super) fn render_bound_methods(
                 let mut dart_args = vec!["int handle".to_string()];
                 dart_args.extend(method.args.iter().map(|arg| {
                     let arg_name = safe_dart_identifier(&to_lower_camel(&arg.name));
-                    format!("{} {arg_name}", map_uniffi_type_to_dart(&arg.type_))
+                    format!(
+                        "{} {arg_name}",
+                        map_uniffi_type_to_dart(&arg.type_, custom_types)
+                    )
                 }));
                 let escaped_reason = reason.replace('\'', "\\'");
                 let ffibuffer_eligible = is_ffibuffer_eligible_object_member(method);
@@ -2741,6 +2827,7 @@ pub(super) fn render_bound_methods(
                                     &escaped_reason,
                                     &method.name,
                                     enums,
+                                    custom_types,
                                 );
                             }
                             _ => {
@@ -2751,6 +2838,7 @@ pub(super) fn render_bound_methods(
                                     *offset,
                                     &escaped_reason,
                                     &method.name,
+                                    custom_types,
                                 );
                             }
                         }
@@ -2836,7 +2924,7 @@ pub(super) fn render_bound_methods(
                         }
                         Some(ret_type) if is_runtime_optional_primitive_type(ret_type) => {
                             // Optional primitives are JSON-encoded as Pointer<Utf8>.
-                            let decode = render_json_decode_expr("decoded", ret_type);
+                            let decode = render_json_decode_expr("decoded", ret_type, custom_types);
                             out.push_str("      final ffi.Pointer<Utf8> resultPtr = (returnBuf + 0).ref.pointer.cast<Utf8>();\n");
                             out.push_str("      if (resultPtr == ffi.nullptr) {\n");
                             out.push_str(&format!(
@@ -2866,6 +2954,7 @@ pub(super) fn render_bound_methods(
                                         ret_type,
                                         "retReader",
                                         enums,
+                                        custom_types,
                                     ),
                                     _ => {
                                         out.push_str(&format!(
@@ -3120,6 +3209,7 @@ pub(super) fn render_bound_methods(
                                     &escaped_reason,
                                     &method.name,
                                     enums,
+                                    custom_types,
                                 );
                             }
                             _ => {
@@ -3130,6 +3220,7 @@ pub(super) fn render_bound_methods(
                                     *offset,
                                     &escaped_reason,
                                     &method.name,
+                                    custom_types,
                                 );
                             }
                         }
@@ -3173,6 +3264,7 @@ pub(super) fn render_bound_methods(
                         local_module_path,
                         objects,
                         enums,
+                        custom_types,
                     );
 
                     // Cleanup.
@@ -3215,7 +3307,14 @@ pub(super) fn render_bound_methods(
                 .iter()
                 .all(|a| is_runtime_ffi_compatible_type(&a.type_, records, enums));
             if !has_callback_args && (!supported_return || !supports_runtime_args) {
-                emit_method_skip_warning(&mut out, &object_name, &method.name, &method.args, "  ");
+                emit_method_skip_warning(
+                    &mut out,
+                    &object_name,
+                    &method.name,
+                    &method.args,
+                    custom_types,
+                    "  ",
+                );
                 continue;
             }
             let method_camel = to_upper_camel(&method.name);
@@ -3242,7 +3341,7 @@ pub(super) fn render_bound_methods(
                 let arg_name = safe_dart_identifier(&to_lower_camel(&arg.name));
                 dart_args.push(format!(
                     "{} {arg_name}",
-                    map_uniffi_type_to_dart(&arg.type_)
+                    map_uniffi_type_to_dart(&arg.type_, custom_types)
                 ));
                 if has_callback_args {
                     if let Some(callback_name) = callback_interface_name_from_type(&arg.type_) {
@@ -3277,6 +3376,7 @@ pub(super) fn render_bound_methods(
                         &arg_name,
                         &arg.type_,
                         enums,
+                        custom_types,
                         &mut pre_call,
                         &mut post_call,
                         &mut call_args,
@@ -3298,6 +3398,7 @@ pub(super) fn render_bound_methods(
                         &arg_name,
                         &arg.type_,
                         enums,
+                        custom_types,
                         &mut pre_call,
                         &mut post_call,
                         &mut call_args,
@@ -3305,13 +3406,20 @@ pub(super) fn render_bound_methods(
                 }
             }
             if !signature_compatible {
-                emit_method_skip_warning(&mut out, &object_name, &method.name, &method.args, "  ");
+                emit_method_skip_warning(
+                    &mut out,
+                    &object_name,
+                    &method.name,
+                    &method.args,
+                    custom_types,
+                    "  ",
+                );
                 continue;
             }
             let return_type = method
                 .return_type
                 .as_ref()
-                .map(map_uniffi_type_to_dart)
+                .map(|t| map_uniffi_type_to_dart(t, custom_types))
                 .unwrap_or_else(|| "void".to_string());
             let native_return = if is_throwing {
                 "ffi.Pointer<Utf8>".to_string()
@@ -3460,11 +3568,13 @@ pub(super) fn render_bound_methods(
                 out.push_str("        if (statusCode == _rustCallStatusSuccess) {\n");
                 if method.return_type.is_none() {
                     out.push_str("          return;\n");
-                } else if method
+                } else if let Some(ret_type) = method
                     .return_type
                     .as_ref()
-                    .is_some_and(is_runtime_string_type)
+                    .filter(|t| is_runtime_string_type(t))
                 {
+                    let lifted =
+                        lift_custom_if_needed("resultPtr.toDartString()", ret_type, custom_types);
                     out.push_str("          if (resultPtr == ffi.nullptr) {\n");
                     out.push_str(&format!(
                         "            throw StateError('Rust returned null for {}');\n",
@@ -3472,20 +3582,22 @@ pub(super) fn render_bound_methods(
                     ));
                     out.push_str("          }\n");
                     out.push_str("          try {\n");
-                    out.push_str("            return resultPtr.toDartString();\n");
+                    out.push_str(&format!("            return {lifted};\n"));
                     out.push_str("          } finally {\n");
                     out.push_str("            _rustStringFree(resultPtr);\n");
                     out.push_str("          }\n");
-                } else if method
+                } else if let Some(ret_type) = method
                     .return_type
                     .as_ref()
-                    .is_some_and(is_runtime_optional_string_type)
+                    .filter(|t| is_runtime_optional_string_type(t))
                 {
+                    let lifted =
+                        lift_custom_if_needed("resultPtr.toDartString()", ret_type, custom_types);
                     out.push_str("          if (resultPtr == ffi.nullptr) {\n");
                     out.push_str("            return null;\n");
                     out.push_str("          }\n");
                     out.push_str("          try {\n");
-                    out.push_str("            return resultPtr.toDartString();\n");
+                    out.push_str(&format!("            return {lifted};\n"));
                     out.push_str("          } finally {\n");
                     out.push_str("            _rustStringFree(resultPtr);\n");
                     out.push_str("          }\n");
@@ -3552,7 +3664,7 @@ pub(super) fn render_bound_methods(
                             _ => None,
                         })
                         .expect("validated sequence type");
-                    let decode = render_json_decode_expr("item", inner_type);
+                    let decode = render_json_decode_expr("item", inner_type, custom_types);
                     out.push_str("          if (resultPtr == ffi.nullptr) {\n");
                     out.push_str(&format!(
                         "            throw StateError('Rust returned null for {}');\n",
@@ -3575,7 +3687,7 @@ pub(super) fn render_bound_methods(
                     let decode = method
                         .return_type
                         .as_ref()
-                        .map(|t| render_json_decode_expr("jsonDecode(payload)", t))
+                        .map(|t| render_json_decode_expr("jsonDecode(payload)", t, custom_types))
                         .unwrap_or_else(|| "null".to_string());
                     out.push_str("          if (resultPtr == ffi.nullptr) {\n");
                     out.push_str(&format!(
@@ -3593,7 +3705,14 @@ pub(super) fn render_bound_methods(
                     let decode = method
                         .return_type
                         .as_ref()
-                        .map(|t| render_uniffi_binary_read_expression(t, "mapReader", enums))
+                        .map(|t| {
+                            render_uniffi_binary_read_expression(
+                                t,
+                                "mapReader",
+                                enums,
+                                custom_types,
+                            )
+                        })
                         .unwrap_or_else(|| "null".to_string());
                     out.push_str("          final _RustBuffer resultBuf = resultValue;\n");
                     out.push_str(
@@ -3808,7 +3927,7 @@ pub(super) fn render_bound_methods(
                     let decode = method
                         .return_type
                         .as_ref()
-                        .map(|t| render_json_decode_expr("decoded", t))
+                        .map(|t| render_json_decode_expr("decoded", t, custom_types))
                         .unwrap_or_else(|| "null".to_string());
                     out.push_str("          if (resultPtr == ffi.nullptr) {\n");
                     out.push_str(&format!(
@@ -3838,7 +3957,8 @@ pub(super) fn render_bound_methods(
                 {
                     out.push_str("          return Duration(microseconds: resultValue);\n");
                 } else if let Some(ret_type) = method.return_type.as_ref() {
-                    let decode = render_plain_ffi_decode_expr(ret_type, "resultValue");
+                    let decode =
+                        render_plain_ffi_decode_expr(ret_type, "resultValue", custom_types);
                     out.push_str(&format!("          return {decode};\n"));
                 }
                 out.push_str("        }\n");
@@ -4013,7 +4133,7 @@ pub(super) fn render_bound_methods(
                 out.push_str("    }\n");
                 if let Some(ret_type) = method.return_type.as_ref() {
                     out.push_str("    final Object? okRaw = envelope['ok'];\n");
-                    let decode = render_json_decode_expr("okRaw", ret_type);
+                    let decode = render_json_decode_expr("okRaw", ret_type, custom_types);
                     out.push_str(&format!("    return {decode};\n"));
                 } else {
                     out.push_str("    return;\n");
@@ -4021,6 +4141,8 @@ pub(super) fn render_bound_methods(
             } else if let Some(ret) = &method.return_type {
                 let call_expr = format!("{method_field}({})", call_args.join(", "));
                 if is_runtime_string_type(ret) {
+                    let lifted =
+                        lift_custom_if_needed("resultPtr.toDartString()", ret, custom_types);
                     out.push_str(&format!(
                         "    final ffi.Pointer<Utf8> resultPtr = {call_expr};\n"
                     ));
@@ -4031,11 +4153,13 @@ pub(super) fn render_bound_methods(
                     ));
                     out.push_str("    }\n");
                     out.push_str("    try {\n");
-                    out.push_str("      return resultPtr.toDartString();\n");
+                    out.push_str(&format!("      return {lifted};\n"));
                     out.push_str("    } finally {\n");
                     out.push_str("      _rustStringFree(resultPtr);\n");
                     out.push_str("    }\n");
                 } else if is_runtime_optional_string_type(ret) {
+                    let lifted =
+                        lift_custom_if_needed("resultPtr.toDartString()", ret, custom_types);
                     out.push_str(&format!(
                         "    final ffi.Pointer<Utf8> resultPtr = {call_expr};\n"
                     ));
@@ -4043,7 +4167,7 @@ pub(super) fn render_bound_methods(
                     out.push_str("      return null;\n");
                     out.push_str("    }\n");
                     out.push_str("    try {\n");
-                    out.push_str("      return resultPtr.toDartString();\n");
+                    out.push_str(&format!("      return {lifted};\n"));
                     out.push_str("    } finally {\n");
                     out.push_str("      _rustStringFree(resultPtr);\n");
                     out.push_str("    }\n");
@@ -4156,7 +4280,7 @@ pub(super) fn render_bound_methods(
                     out.push_str("      _rustStringFree(resultPtr);\n");
                     out.push_str("    }\n");
                 } else if is_runtime_optional_primitive_type(ret) {
-                    let decode = render_json_decode_expr("decoded", ret);
+                    let decode = render_json_decode_expr("decoded", ret, custom_types);
                     out.push_str(&format!(
                         "    final ffi.Pointer<Utf8> resultPtr = {call_expr};\n"
                     ));
@@ -4178,7 +4302,7 @@ pub(super) fn render_bound_methods(
                         Type::Sequence { inner_type } => inner_type,
                         _ => unreachable!(),
                     };
-                    let decode = render_json_decode_expr("item", inner_type);
+                    let decode = render_json_decode_expr("item", inner_type, custom_types);
                     out.push_str(&format!(
                         "    final ffi.Pointer<Utf8> resultPtr = {call_expr};\n"
                     ));
@@ -4197,7 +4321,7 @@ pub(super) fn render_bound_methods(
                     out.push_str("      _rustStringFree(resultPtr);\n");
                     out.push_str("    }\n");
                 } else if is_runtime_map_with_string_key_type(ret) {
-                    let decode = render_json_decode_expr("jsonDecode(payload)", ret);
+                    let decode = render_json_decode_expr("jsonDecode(payload)", ret, custom_types);
                     out.push_str(&format!(
                         "    final ffi.Pointer<Utf8> resultPtr = {call_expr};\n"
                     ));
@@ -4214,7 +4338,8 @@ pub(super) fn render_bound_methods(
                     out.push_str("      _rustStringFree(resultPtr);\n");
                     out.push_str("    }\n");
                 } else if is_runtime_map_type(ret) {
-                    let decode = render_uniffi_binary_read_expression(ret, "mapReader", enums);
+                    let decode =
+                        render_uniffi_binary_read_expression(ret, "mapReader", enums, custom_types);
                     out.push_str(&format!("    final _RustBuffer resultBuf = {call_expr};\n"));
                     out.push_str("    final ffi.Pointer<ffi.Uint8> resultData = resultBuf.data;\n");
                     out.push_str("    final int resultLen = resultBuf.len;\n");
@@ -4325,7 +4450,7 @@ pub(super) fn render_bound_methods(
                     out.push_str("      _rustBytesVecFree(resultVec);\n");
                     out.push_str("    }\n");
                 } else {
-                    let decode = render_plain_ffi_decode_expr(ret, &call_expr);
+                    let decode = render_plain_ffi_decode_expr(ret, &call_expr, custom_types);
                     out.push_str(&format!("    return {decode};\n"));
                 }
             } else {

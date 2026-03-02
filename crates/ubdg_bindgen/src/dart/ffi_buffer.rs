@@ -1,5 +1,8 @@
+use std::collections::HashMap;
+
 use uniffi_bindgen::interface::{ffi::FfiType, Type};
 
+use super::config::CustomTypeConfig;
 use super::*;
 
 pub(super) fn ffi_type_contains_rust_buffer(type_: &FfiType) -> bool {
@@ -235,8 +238,20 @@ pub(super) fn render_ffibuffer_rustbuffer_arg_serialization(
     escaped_reason: &str,
     error_name: &str,
     enums: &[UdlEnum],
+    custom_types: &HashMap<String, CustomTypeConfig>,
 ) {
     let arg_name = safe_dart_identifier(&to_lower_camel(&arg.name));
+    // Compute the lowered expression for custom types (used in encode paths
+    // that bypass render_uniffi_binary_write_statement).
+    let lowered_arg = if let Type::Custom { name, .. } = &arg.type_ {
+        if let Some(cfg) = custom_types.get(name.as_str()) {
+            cfg.lower_expr(&arg_name)
+        } else {
+            arg_name.clone()
+        }
+    } else {
+        arg_name.clone()
+    };
     let needs_writer = matches!(
         runtime_unwrapped_type(&arg.type_),
         Type::Map { .. }
@@ -248,12 +263,12 @@ pub(super) fn render_ffibuffer_rustbuffer_arg_serialization(
     let writer_name = format!("{arg_name}Writer");
     let encode_expr = match runtime_unwrapped_type(&arg.type_) {
         Type::Record { name, .. } | Type::Enum { name, .. } => {
-            format!("_uniffiEncode{}({arg_name})", to_upper_camel(name))
+            format!("_uniffiEncode{}({lowered_arg})", to_upper_camel(name))
         }
         Type::String => {
-            format!("Uint8List.fromList(utf8.encode({arg_name}))")
+            format!("Uint8List.fromList(utf8.encode({lowered_arg}))")
         }
-        Type::Bytes => arg_name.clone(),
+        Type::Bytes => lowered_arg.clone(),
         Type::Map { .. }
         | Type::Sequence { .. }
         | Type::Optional { .. }
@@ -275,6 +290,7 @@ pub(super) fn render_ffibuffer_rustbuffer_arg_serialization(
             &writer_name,
             enums,
             "      ",
+            custom_types,
         );
         out.push_str(&format!(
             "      final {writer_name} = _UniFfiBinaryWriter();\n"
@@ -362,8 +378,19 @@ pub(super) fn render_ffibuffer_primitive_arg_write(
     offset: usize,
     escaped_reason: &str,
     error_name: &str,
+    custom_types: &HashMap<String, CustomTypeConfig>,
 ) {
     let arg_name = safe_dart_identifier(&to_lower_camel(&arg.name));
+    // Apply lower transform for custom types backed by primitives.
+    let lowered_arg = if let Type::Custom { name, .. } = &arg.type_ {
+        if let Some(cfg) = custom_types.get(name.as_str()) {
+            cfg.lower_expr(&arg_name)
+        } else {
+            arg_name.clone()
+        }
+    } else {
+        arg_name.clone()
+    };
     let Some(union_field) = ffibuffer_primitive_union_field(ffi_type) else {
         out.push_str(&format!(
             "      throw UnsupportedError('{escaped_reason} ({error_name})');\n"
@@ -373,14 +400,14 @@ pub(super) fn render_ffibuffer_primitive_arg_write(
     if union_field == "ptr" {
         out.push_str(&format!(
             "      (argBuf + {}).ref.ptr = {}.cast<ffi.Void>();\n",
-            offset, arg_name
+            offset, lowered_arg
         ));
     } else {
         let value_expr =
             if union_field == "i8" && matches!(runtime_unwrapped_type(&arg.type_), Type::Boolean) {
-                format!("{arg_name} ? 1 : 0")
+                format!("{lowered_arg} ? 1 : 0")
             } else {
-                arg_name.clone()
+                lowered_arg.clone()
             };
         out.push_str(&format!(
             "      (argBuf + {}).ref.{} = {};\n",
@@ -407,6 +434,7 @@ pub(super) fn render_ffibuffer_async_complete_and_decode(
     local_module_path: &str,
     objects: &[UdlObject],
     enums: &[UdlEnum],
+    custom_types: &HashMap<String, CustomTypeConfig>,
 ) {
     out.push_str(
         "        final ffi.Pointer<_UniFfiRustCallStatus> outStatusPtr = calloc<_UniFfiRustCallStatus>();\n",
@@ -434,12 +462,19 @@ pub(super) fn render_ffibuffer_async_complete_and_decode(
     } else if async_spec.suffix == "rust_buffer" {
         if let Some(ret_type) = return_type {
             let decode_expr = match runtime_unwrapped_type(ret_type) {
-                Type::String => "utf8.decode(resultBytes)".to_string(),
-                Type::Bytes => "resultBytes".to_string(),
+                Type::String => {
+                    lift_custom_if_needed("utf8.decode(resultBytes)", ret_type, custom_types)
+                }
+                Type::Bytes => lift_custom_if_needed("resultBytes", ret_type, custom_types),
                 Type::Record { name, .. } | Type::Enum { name, .. } => {
                     format!("_uniffiDecode{}(resultBytes)", to_upper_camel(name))
                 }
-                _ => render_uniffi_binary_read_expression(ret_type, "resultReader", enums),
+                _ => render_uniffi_binary_read_expression(
+                    ret_type,
+                    "resultReader",
+                    enums,
+                    custom_types,
+                ),
             };
             out.push_str(
                 "            final ffi.Pointer<_UniFfiRustBuffer> resultBufPtr = calloc<_UniFfiRustBuffer>();\n",
@@ -504,7 +539,7 @@ pub(super) fn render_ffibuffer_async_complete_and_decode(
         } else if is_runtime_duration_type(ret_type) {
             out.push_str("            return Duration(microseconds: resultValue);\n");
         } else if is_runtime_optional_primitive_type(ret_type) {
-            let decode = render_json_decode_expr("decoded", ret_type);
+            let decode = render_json_decode_expr("decoded", ret_type, custom_types);
             out.push_str("            if (resultValue == ffi.nullptr) {\n");
             out.push_str(&format!(
                 "              throw StateError('Rust returned null pointer for {error_name}');\n"
@@ -518,7 +553,7 @@ pub(super) fn render_ffibuffer_async_complete_and_decode(
             out.push_str("              _rustStringFree(resultValue);\n");
             out.push_str("            }\n");
         } else {
-            let decode = render_plain_ffi_decode_expr(ret_type, "resultValue");
+            let decode = render_plain_ffi_decode_expr(ret_type, "resultValue", custom_types);
             out.push_str(&format!("            return {decode};\n"));
         }
     }

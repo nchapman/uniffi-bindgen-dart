@@ -1,20 +1,26 @@
+use std::collections::HashMap;
 use uniffi_bindgen::interface::Type;
 
+use super::config::CustomTypeConfig;
 use super::*;
 
-pub(super) fn render_json_encode_expr(value_expr: &str, type_: &Type) -> String {
+pub(super) fn render_json_encode_expr(
+    value_expr: &str,
+    type_: &Type,
+    custom_types: &HashMap<String, CustomTypeConfig>,
+) -> String {
     match type_ {
         Type::Timestamp => format!("{value_expr}.toUtc().microsecondsSinceEpoch"),
         Type::Duration => format!("{value_expr}.inMicroseconds"),
         Type::Bytes => format!("base64Encode({value_expr})"),
         Type::Optional { inner_type } => {
-            let inner = render_json_encode_expr("__tmp", inner_type);
+            let inner = render_json_encode_expr("__tmp", inner_type, custom_types);
             format!(
                 "{value_expr} == null ? null : (() {{ final __tmp = {value_expr}!; return {inner}; }})()"
             )
         }
         Type::Sequence { inner_type } => {
-            let inner = render_json_encode_expr("item", inner_type);
+            let inner = render_json_encode_expr("item", inner_type, custom_types);
             format!("{value_expr}.map((item) => {inner}).toList()")
         }
         // Only reached for string-keyed maps; non-string maps use the binary codec path.
@@ -27,10 +33,17 @@ pub(super) fn render_json_encode_expr(value_expr: &str, type_: &Type) -> String 
                 "render_json_encode_expr called for non-string map key: {:?}",
                 key_type
             );
-            let inner = render_json_encode_expr("value", value_type);
+            let inner = render_json_encode_expr("value", value_type, custom_types);
             format!("{value_expr}.map((key, value) => MapEntry(key, {inner}))")
         }
-        Type::Custom { builtin, .. } => render_json_encode_expr(value_expr, builtin),
+        Type::Custom { name, builtin, .. } => {
+            if let Some(cfg) = custom_types.get(name.as_str()) {
+                let lowered = cfg.lower_expr(value_expr);
+                render_json_encode_expr(&lowered, builtin, custom_types)
+            } else {
+                render_json_encode_expr(value_expr, builtin, custom_types)
+            }
+        }
         Type::Record { .. } => format!("{value_expr}.toJson()"),
         Type::Object { name, .. } => {
             format!("{}FfiCodec.lower({value_expr})", to_upper_camel(name))
@@ -42,7 +55,11 @@ pub(super) fn render_json_encode_expr(value_expr: &str, type_: &Type) -> String 
     }
 }
 
-pub(super) fn render_json_decode_expr(value_expr: &str, type_: &Type) -> String {
+pub(super) fn render_json_decode_expr(
+    value_expr: &str,
+    type_: &Type,
+    custom_types: &HashMap<String, CustomTypeConfig>,
+) -> String {
     match type_ {
         Type::UInt8
         | Type::Int8
@@ -61,13 +78,13 @@ pub(super) fn render_json_decode_expr(value_expr: &str, type_: &Type) -> String 
         Type::Duration => format!("Duration(microseconds: ({value_expr} as num).toInt())"),
         Type::Bytes => format!("base64Decode({value_expr} as String)"),
         Type::Optional { inner_type } => {
-            let inner = render_json_decode_expr("__tmp", inner_type);
+            let inner = render_json_decode_expr("__tmp", inner_type, custom_types);
             format!(
                 "{value_expr} == null ? null : (() {{ final __tmp = {value_expr}; return {inner}; }})()"
             )
         }
         Type::Sequence { inner_type } => {
-            let inner = render_json_decode_expr("item", inner_type);
+            let inner = render_json_decode_expr("item", inner_type, custom_types);
             format!("({value_expr} as List).map((item) => {inner}).toList()")
         }
         // Only reached for string-keyed maps; non-string maps use the binary codec path.
@@ -80,10 +97,17 @@ pub(super) fn render_json_decode_expr(value_expr: &str, type_: &Type) -> String 
                 "render_json_decode_expr called for non-string map key: {:?}",
                 key_type
             );
-            let inner = render_json_decode_expr("value", value_type);
+            let inner = render_json_decode_expr("value", value_type, custom_types);
             format!("({value_expr} as Map<String, dynamic>).map((key, value) => MapEntry(key, {inner}))")
         }
-        Type::Custom { builtin, .. } => render_json_decode_expr(value_expr, builtin),
+        Type::Custom { name, builtin, .. } => {
+            let builtin_decoded = render_json_decode_expr(value_expr, builtin, custom_types);
+            if let Some(cfg) = custom_types.get(name.as_str()) {
+                cfg.lift_expr(&builtin_decoded)
+            } else {
+                builtin_decoded
+            }
+        }
         Type::Record { name, .. } => format!(
             "{}.fromJson({value_expr} as Map<String, dynamic>)",
             to_upper_camel(name)
@@ -141,7 +165,11 @@ fn is_binary_supported_type(type_: &Type, enums: &[UdlEnum]) -> bool {
     }
 }
 
-pub(super) fn render_uniffi_binary_helpers(records: &[UdlRecord], enums: &[UdlEnum]) -> String {
+pub(super) fn render_uniffi_binary_helpers(
+    records: &[UdlRecord],
+    enums: &[UdlEnum],
+    custom_types: &HashMap<String, CustomTypeConfig>,
+) -> String {
     let mut out = String::new();
     out.push_str("final class _UniFfiBinaryWriter {\n");
     out.push_str("  final BytesBuilder _builder = BytesBuilder(copy: false);\n\n");
@@ -253,6 +281,7 @@ pub(super) fn render_uniffi_binary_helpers(records: &[UdlRecord], enums: &[UdlEn
                     "writer",
                     enums,
                     "  ",
+                    custom_types,
                 );
                 out.push_str(&stmt);
             }
@@ -272,7 +301,12 @@ pub(super) fn render_uniffi_binary_helpers(records: &[UdlRecord], enums: &[UdlEn
             out.push_str(&format!("  final value = {type_name}(\n"));
             for field in &record.fields {
                 let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
-                let expr = render_uniffi_binary_read_expression(&field.type_, "reader", enums);
+                let expr = render_uniffi_binary_read_expression(
+                    &field.type_,
+                    "reader",
+                    enums,
+                    custom_types,
+                );
                 out.push_str(&format!("    {field_name}: {expr},\n"));
             }
             out.push_str("  );\n");
@@ -348,6 +382,7 @@ pub(super) fn render_uniffi_binary_helpers(records: &[UdlRecord], enums: &[UdlEn
                         "writer",
                         enums,
                         "    ",
+                        custom_types,
                     );
                     out.push_str(&stmt);
                 }
@@ -384,8 +419,12 @@ pub(super) fn render_uniffi_binary_helpers(records: &[UdlRecord], enums: &[UdlEn
                     out.push_str(&format!("      value = {variant_name}(\n"));
                     for field in &variant.fields {
                         let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
-                        let expr =
-                            render_uniffi_binary_read_expression(&field.type_, "reader", enums);
+                        let expr = render_uniffi_binary_read_expression(
+                            &field.type_,
+                            "reader",
+                            enums,
+                            custom_types,
+                        );
                         out.push_str(&format!("        {field_name}: {expr},\n"));
                     }
                     out.push_str("      );\n");
@@ -426,9 +465,22 @@ pub(super) fn render_uniffi_binary_write_statement(
     writer: &str,
     enums: &[UdlEnum],
     indent: &str,
+    custom_types: &HashMap<String, CustomTypeConfig>,
 ) -> String {
-    if let Type::Custom { builtin, .. } = type_ {
-        return render_uniffi_binary_write_statement(builtin, value_expr, writer, enums, indent);
+    if let Type::Custom { name, builtin, .. } = type_ {
+        let effective_value = if let Some(cfg) = custom_types.get(name.as_str()) {
+            cfg.lower_expr(value_expr)
+        } else {
+            value_expr.to_string()
+        };
+        return render_uniffi_binary_write_statement(
+            builtin,
+            &effective_value,
+            writer,
+            enums,
+            indent,
+            custom_types,
+        );
     }
     match type_ {
         Type::UInt8 => format!("{indent}{writer}.writeU8({value_expr});\n"),
@@ -459,6 +511,7 @@ pub(super) fn render_uniffi_binary_write_statement(
                 writer,
                 enums,
                 &(indent.to_string() + "  "),
+                custom_types,
             );
             format!(
                 "{indent}if ({value_expr} == null) {{\n{indent}  {writer}.writeI8(0);\n{indent}}} else {{\n{indent}  {writer}.writeI8(1);\n{inner_stmt}{indent}}}\n"
@@ -471,6 +524,7 @@ pub(super) fn render_uniffi_binary_write_statement(
                 writer,
                 enums,
                 &(indent.to_string() + "  "),
+                custom_types,
             );
             format!(
                 "{indent}{writer}.writeI32({value_expr}.length);\n{indent}for (final item in {value_expr}) {{\n{inner_stmt}{indent}}}\n"
@@ -478,13 +532,14 @@ pub(super) fn render_uniffi_binary_write_statement(
         }
         Type::Map { key_type, value_type } => {
             let key_stmt =
-                render_uniffi_binary_write_statement(key_type, "entry.key", writer, enums, &(indent.to_string() + "  "));
+                render_uniffi_binary_write_statement(key_type, "entry.key", writer, enums, &(indent.to_string() + "  "), custom_types);
             let value_stmt = render_uniffi_binary_write_statement(
                 value_type,
                 "entry.value",
                 writer,
                 enums,
                 &(indent.to_string() + "  "),
+                custom_types,
             );
             format!(
                 "{indent}{writer}.writeI32({value_expr}.length);\n{indent}for (final entry in {value_expr}.entries) {{\n{key_stmt}{value_stmt}{indent}}}\n"
@@ -504,7 +559,7 @@ pub(super) fn render_uniffi_binary_write_statement(
         }
         _ => format!(
             "{indent}throw UnsupportedError('UniFFI binary write not implemented for {}');\n",
-            map_uniffi_type_to_dart(type_)
+            map_uniffi_type_to_dart(type_, custom_types)
         ),
     }
 }
@@ -513,9 +568,16 @@ pub(super) fn render_uniffi_binary_read_expression(
     type_: &Type,
     reader: &str,
     enums: &[UdlEnum],
+    custom_types: &HashMap<String, CustomTypeConfig>,
 ) -> String {
-    if let Type::Custom { builtin, .. } = type_ {
-        return render_uniffi_binary_read_expression(builtin, reader, enums);
+    if let Type::Custom { name, builtin, .. } = type_ {
+        let builtin_expr =
+            render_uniffi_binary_read_expression(builtin, reader, enums, custom_types);
+        return if let Some(cfg) = custom_types.get(name.as_str()) {
+            cfg.lift_expr(&builtin_expr)
+        } else {
+            builtin_expr
+        };
     }
     match type_ {
         Type::UInt8 => format!("{reader}.readU8()"),
@@ -534,14 +596,16 @@ pub(super) fn render_uniffi_binary_read_expression(
             "(() {{ final int __len = {reader}.readI32(); return {reader}.readBytes(__len); }})()"
         ),
         Type::Optional { inner_type } => {
-            let inner = render_uniffi_binary_read_expression(inner_type, reader, enums);
+            let inner =
+                render_uniffi_binary_read_expression(inner_type, reader, enums, custom_types);
             format!(
                 "(() {{ final int __tag = {reader}.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return {inner}; }})()"
             )
         }
         Type::Sequence { inner_type } => {
-            let inner = render_uniffi_binary_read_expression(inner_type, reader, enums);
-            let inner_type_name = map_uniffi_type_to_dart(inner_type);
+            let inner =
+                render_uniffi_binary_read_expression(inner_type, reader, enums, custom_types);
+            let inner_type_name = map_uniffi_type_to_dart(inner_type, custom_types);
             format!(
                 "(() {{ final int __len = {reader}.readI32(); final out = <{inner_type_name}>[]; for (var i = 0; i < __len; i++) {{ out.add({inner}); }} return out; }})()"
             )
@@ -550,10 +614,11 @@ pub(super) fn render_uniffi_binary_read_expression(
             key_type,
             value_type,
         } => {
-            let key = render_uniffi_binary_read_expression(key_type, reader, enums);
-            let key_type_name = map_uniffi_type_to_dart(key_type);
-            let value = render_uniffi_binary_read_expression(value_type, reader, enums);
-            let value_type_name = map_uniffi_type_to_dart(value_type);
+            let key = render_uniffi_binary_read_expression(key_type, reader, enums, custom_types);
+            let key_type_name = map_uniffi_type_to_dart(key_type, custom_types);
+            let value =
+                render_uniffi_binary_read_expression(value_type, reader, enums, custom_types);
+            let value_type_name = map_uniffi_type_to_dart(value_type, custom_types);
             format!(
                 "(() {{ final int __len = {reader}.readI32(); final out = <{key_type_name}, {value_type_name}>{{}}; for (var i = 0; i < __len; i++) {{ final key = {key}; final value = {value}; out[key] = value; }} return out; }})()"
             )
@@ -572,7 +637,7 @@ pub(super) fn render_uniffi_binary_read_expression(
         }
         _ => format!(
             "throw UnsupportedError('UniFFI binary read not implemented for {}')",
-            map_uniffi_type_to_dart(type_)
+            map_uniffi_type_to_dart(type_, custom_types)
         ),
     }
 }

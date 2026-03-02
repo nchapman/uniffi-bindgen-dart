@@ -8,6 +8,8 @@ import 'dart:ffi' as ffi;
 import 'package:ffi/ffi.dart';
 import 'dart:typed_data';
 
+typedef Label = String;
+
 final class _RustBuffer extends ffi.Struct {
   external ffi.Pointer<ffi.Uint8> data;
 

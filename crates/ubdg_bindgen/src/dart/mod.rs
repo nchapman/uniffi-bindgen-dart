@@ -7,6 +7,8 @@ use uniffi_bindgen::interface::{ffi::FfiType, DefaultValue, Literal, Type};
 
 use crate::GenerateArgs;
 
+use config::CustomTypeConfig;
+
 mod async_support;
 mod callback;
 mod codec;
@@ -70,6 +72,7 @@ pub fn generate_bindings(args: &GenerateArgs) -> Result<()> {
         ffi_uniffi_contract_version_symbol: metadata.ffi_uniffi_contract_version_symbol.as_deref(),
         api_checksums: &metadata.api_checksums,
         external_packages: &cfg.external_packages,
+        custom_types: &cfg.custom_types,
         api_overrides: ApiOverrides::new(&cfg.rename, &cfg.exclude),
         functions: &metadata.functions,
         objects: &metadata.objects,
@@ -97,6 +100,7 @@ struct RenderContext<'a> {
     uniffi_contract_version: Option<u32>,
     ffi_uniffi_contract_version_symbol: Option<&'a str>,
     api_checksums: &'a [UdlApiChecksum],
+    custom_types: &'a HashMap<String, CustomTypeConfig>,
     external_packages: &'a HashMap<String, String>,
     api_overrides: ApiOverrides,
     functions: &'a [UdlFunction],
@@ -116,6 +120,7 @@ fn render_dart_scaffold(ctx: &RenderContext<'_>) -> String {
         uniffi_contract_version,
         ffi_uniffi_contract_version_symbol,
         api_checksums,
+        custom_types,
         external_packages,
         ref api_overrides,
         functions,
@@ -368,7 +373,86 @@ fn render_dart_scaffold(ctx: &RenderContext<'_>) -> String {
     for uri in &external_import_uris {
         out.push_str(&format!("import '{uri}';\n"));
     }
+    // Emit extra imports from custom_types config.
+    {
+        let mut extra_imports = std::collections::BTreeSet::new();
+        for cfg in custom_types.values() {
+            if let Some(imports) = &cfg.imports {
+                for imp in imports {
+                    extra_imports.insert(imp.clone());
+                }
+            }
+        }
+        for imp in &extra_imports {
+            out.push_str(&format!("import '{imp}';\n"));
+        }
+    }
     out.push('\n');
+    // Emit typedefs for custom types that appear in the UDL.
+    {
+        let mut customs = std::collections::BTreeMap::new();
+        for f in functions {
+            for a in &f.args {
+                collect_custom_types(&a.type_, custom_types, &mut customs);
+            }
+            if let Some(t) = &f.return_type {
+                collect_custom_types(t, custom_types, &mut customs);
+            }
+        }
+        for o in objects {
+            for c in &o.constructors {
+                for a in &c.args {
+                    collect_custom_types(&a.type_, custom_types, &mut customs);
+                }
+            }
+            for m in &o.methods {
+                for a in &m.args {
+                    collect_custom_types(&a.type_, custom_types, &mut customs);
+                }
+                if let Some(t) = &m.return_type {
+                    collect_custom_types(t, custom_types, &mut customs);
+                }
+            }
+        }
+        for r in records {
+            for field in &r.fields {
+                collect_custom_types(&field.type_, custom_types, &mut customs);
+            }
+            for m in &r.methods {
+                for a in &m.args {
+                    collect_custom_types(&a.type_, custom_types, &mut customs);
+                }
+                if let Some(t) = &m.return_type {
+                    collect_custom_types(t, custom_types, &mut customs);
+                }
+            }
+        }
+        for e in enums {
+            for v in &e.variants {
+                for field in &v.fields {
+                    collect_custom_types(&field.type_, custom_types, &mut customs);
+                }
+            }
+            for m in &e.methods {
+                for a in &m.args {
+                    collect_custom_types(&a.type_, custom_types, &mut customs);
+                }
+                if let Some(t) = &m.return_type {
+                    collect_custom_types(t, custom_types, &mut customs);
+                }
+            }
+        }
+        if !customs.is_empty() {
+            for (name, builtin_dart_type) in &customs {
+                let dart_type = custom_types
+                    .get(name.as_str())
+                    .and_then(|cfg| cfg.type_name.as_deref())
+                    .unwrap_or(builtin_dart_type);
+                out.push_str(&format!("typedef {name} = {dart_type};\n"));
+            }
+            out.push('\n');
+        }
+    }
     if needs_runtime_bytes {
         out.push_str("final class _RustBuffer extends ffi.Struct {\n");
         out.push_str("  external ffi.Pointer<ffi.Uint8> data;\n\n");
@@ -456,17 +540,22 @@ fn render_dart_scaffold(ctx: &RenderContext<'_>) -> String {
         enums,
         callback_interfaces,
         has_runtime_unsupported,
+        custom_types,
     ));
     if needs_binary_helpers {
-        out.push_str(&render_uniffi_binary_helpers(records, enums));
+        out.push_str(&render_uniffi_binary_helpers(records, enums, custom_types));
     }
-    out.push_str(&render_callback_interfaces(callback_interfaces));
+    out.push_str(&render_callback_interfaces(
+        callback_interfaces,
+        custom_types,
+    ));
     out.push_str(&render_callback_bridges(
         functions,
         objects,
         callback_interfaces,
         records,
         enums,
+        custom_types,
     ));
     out.push_str(&format!(
         "class {ffi_class_name} {{\n  {ffi_class_name}({{ffi.DynamicLibrary? dynamicLibrary, String? libraryPath}})\n      : _dynamicLibrary = dynamicLibrary,\n        _libraryPath = libraryPath;\n\n"
@@ -551,6 +640,7 @@ fn render_dart_scaffold(ctx: &RenderContext<'_>) -> String {
         local_module_path,
         records,
         enums,
+        custom_types,
     ));
     out.push_str("}\n");
     out.push_str(&render_object_classes(
@@ -560,6 +650,7 @@ fn render_dart_scaffold(ctx: &RenderContext<'_>) -> String {
         api_overrides,
         records,
         enums,
+        custom_types,
     ));
     out.push_str(&render_function_stubs(
         functions,
@@ -569,6 +660,7 @@ fn render_dart_scaffold(ctx: &RenderContext<'_>) -> String {
         api_overrides,
         records,
         enums,
+        custom_types,
     ));
     out
 }
@@ -1665,7 +1757,7 @@ interface Outcome {
             traits: vec![],
         }];
 
-        let content = render_uniffi_binary_helpers(&[], &enums);
+        let content = render_uniffi_binary_helpers(&[], &enums, &HashMap::new());
         assert!(content.contains("if (value is MethodErrorDivisionByZero) {"));
         assert!(content.contains("value = const MethodErrorDivisionByZero();"));
         assert!(!content.contains("value = MethodError.divisionByZero;"));
@@ -1742,6 +1834,7 @@ interface Outcome {
             uniffi_contract_version: None,
             ffi_uniffi_contract_version_symbol: None,
             api_checksums: &[],
+            custom_types: &HashMap::new(),
             external_packages: &HashMap::new(),
             api_overrides: ApiOverrides::new(&HashMap::new(), &[]),
             functions: &[],
@@ -1796,7 +1889,7 @@ interface Outcome {
             traits: vec![],
         }];
 
-        let content = render_data_models(&[], &enums, &[], false);
+        let content = render_data_models(&[], &enums, &[], false, &HashMap::new());
         assert!(
             content.contains("low(1),"),
             "expected low(1), got:\n{content}"
@@ -1845,7 +1938,7 @@ interface Outcome {
             traits: vec![],
         }];
 
-        let content = render_data_models(&[], &enums, &[], false);
+        let content = render_data_models(&[], &enums, &[], false, &HashMap::new());
         assert!(
             content.contains("  red,\n"),
             "expected plain variant, got:\n{content}"
@@ -1996,6 +2089,7 @@ interface Outcome {
             uniffi_contract_version: None,
             ffi_uniffi_contract_version_symbol: None,
             api_checksums: &[],
+            custom_types: &HashMap::new(),
             external_packages: &HashMap::new(),
             api_overrides: ApiOverrides::new(&HashMap::new(), &[]),
             functions: &[],
@@ -2048,6 +2142,7 @@ interface Outcome {
             uniffi_contract_version: None,
             ffi_uniffi_contract_version_symbol: None,
             api_checksums: &[],
+            custom_types: &HashMap::new(),
             external_packages: &HashMap::new(),
             api_overrides: ApiOverrides::new(&HashMap::new(), &[]),
             functions: &functions,
@@ -2119,6 +2214,7 @@ interface Outcome {
             uniffi_contract_version: None,
             ffi_uniffi_contract_version_symbol: None,
             api_checksums: &[],
+            custom_types: &HashMap::new(),
             external_packages: &HashMap::new(),
             api_overrides: ApiOverrides::new(&HashMap::new(), &[]),
             functions: &functions,
@@ -2160,7 +2256,7 @@ interface Outcome {
                 default: Some(DefaultValue::Literal(Literal::String("world".to_string()))),
             },
         ];
-        let rendered = render_callable_args_signature(&callable_args, &[]);
+        let rendered = render_callable_args_signature(&callable_args, &[], &HashMap::new());
         assert_eq!(
             rendered,
             "{int left = 7, int right = 9, String label = 'world'}"
@@ -2202,5 +2298,121 @@ dictionary Config {
             .contains("enabled: json.containsKey('enabled') ? json['enabled'] as bool : true,"));
         assert!(content
             .contains("label: json.containsKey('label') ? json['label'] as String : 'alpha',"));
+    }
+
+    #[test]
+    fn custom_types_config_applies_lift_lower_and_type_name() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = temp.path().join("demo.udl");
+        let out_dir = temp.path().join("out");
+        let config_path = temp.path().join("uniffi.toml");
+        fs::write(
+            &source,
+            r#"
+[Custom]
+typedef string Url;
+
+namespace demo {
+  Url echo_url(Url input);
+};
+"#,
+        )
+        .expect("write source");
+        fs::write(
+            &config_path,
+            r#"
+[bindings.dart.custom_types.Url]
+type_name = "Uri"
+imports = ["dart:core"]
+lift = "Uri.parse({})"
+lower = "{}.toString()"
+"#,
+        )
+        .expect("write config");
+
+        let args = GenerateArgs {
+            source,
+            out_dir: out_dir.clone(),
+            library: false,
+            config: Some(config_path),
+            crate_name: None,
+            no_format: false,
+        };
+
+        generate_bindings(&args).expect("generate");
+        let content = fs::read_to_string(out_dir.join("demo.dart")).expect("read generated");
+
+        // Type name should be Uri, not String
+        assert!(
+            content.contains("Uri echoUrl(Uri input)"),
+            "expected 'Uri echoUrl(Uri input)' in generated output, got:\n{content}"
+        );
+
+        // Lower template applied to arg in function body
+        assert!(
+            content.contains("input.toString()"),
+            "expected lower template 'input.toString()' in generated output"
+        );
+
+        // Lift template applied to return value
+        assert!(
+            content.contains("Uri.parse("),
+            "expected lift template 'Uri.parse(...)' in generated output"
+        );
+
+        // Configured import should appear
+        assert!(
+            content.contains("import 'dart:core';"),
+            "expected 'import dart:core;' in generated output"
+        );
+
+        // Typedef should map custom name to configured type
+        assert!(
+            content.contains("typedef Url = Uri;"),
+            "expected 'typedef Url = Uri;' in generated output"
+        );
+    }
+
+    #[test]
+    fn custom_types_without_config_is_transparent() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = temp.path().join("demo.udl");
+        let out_dir = temp.path().join("out");
+        fs::write(
+            &source,
+            r#"
+[Custom]
+typedef string Label;
+
+namespace demo {
+  Label echo_label(Label input);
+};
+"#,
+        )
+        .expect("write source");
+
+        let args = GenerateArgs {
+            source,
+            out_dir: out_dir.clone(),
+            library: false,
+            config: None,
+            crate_name: None,
+            no_format: false,
+        };
+
+        generate_bindings(&args).expect("generate");
+        let content = fs::read_to_string(out_dir.join("demo.dart")).expect("read generated");
+
+        // Without config, custom type should pass through as builtin
+        assert!(
+            content.contains("String echoLabel(String input)"),
+            "expected 'String echoLabel(String input)' in generated output, got:\n{content}"
+        );
+
+        // Typedef should map custom name to builtin type
+        assert!(
+            content.contains("typedef Label = String;"),
+            "expected 'typedef Label = String;' in generated output"
+        );
     }
 }

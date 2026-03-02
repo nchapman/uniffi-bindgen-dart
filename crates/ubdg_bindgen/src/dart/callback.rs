@@ -1,8 +1,14 @@
+use std::collections::HashMap;
+
 use uniffi_bindgen::interface::Type;
 
+use super::config::CustomTypeConfig;
 use super::*;
 
-pub(super) fn render_callback_interfaces(callback_interfaces: &[UdlCallbackInterface]) -> String {
+pub(super) fn render_callback_interfaces(
+    callback_interfaces: &[UdlCallbackInterface],
+    custom_types: &HashMap<String, CustomTypeConfig>,
+) -> String {
     if callback_interfaces.is_empty() {
         return String::new();
     }
@@ -18,7 +24,7 @@ pub(super) fn render_callback_interfaces(callback_interfaces: &[UdlCallbackInter
             let value_return_type = method
                 .return_type
                 .as_ref()
-                .map(map_uniffi_type_to_dart)
+                .map(|t| map_uniffi_type_to_dart(t, custom_types))
                 .unwrap_or_else(|| "void".to_string());
             let signature_return_type = if method.is_async {
                 format!("Future<{value_return_type}>")
@@ -31,7 +37,7 @@ pub(super) fn render_callback_interfaces(callback_interfaces: &[UdlCallbackInter
                 .map(|a| {
                     format!(
                         "{} {}",
-                        map_uniffi_type_to_dart(&a.type_),
+                        map_uniffi_type_to_dart(&a.type_, custom_types),
                         safe_dart_identifier(&to_lower_camel(&a.name))
                     )
                 })
@@ -54,6 +60,7 @@ pub(super) fn render_callback_bridges(
     callback_interfaces: &[UdlCallbackInterface],
     records: &[UdlRecord],
     enums: &[UdlEnum],
+    custom_types: &HashMap<String, CustomTypeConfig>,
 ) -> String {
     let used = callback_interfaces_used_for_runtime(
         functions,
@@ -240,7 +247,11 @@ pub(super) fn render_callback_bridges(
                 ffi_args.push(format!("{arg_native} {arg_name}"));
                 dart_args.push(format!("{arg_dart} {arg_name}"));
                 callback_args.push(render_callback_arg_decode_expr(
-                    &arg.type_, &arg_name, records, enums,
+                    &arg.type_,
+                    &arg_name,
+                    records,
+                    enums,
+                    custom_types,
                 ));
             }
             if method.is_async {
@@ -337,8 +348,13 @@ pub(super) fn render_callback_bridges(
                         "        final result = await callback.{method_name}({});\n",
                         callback_args.join(", ")
                     ));
-                    let encoded =
-                        render_callback_return_encode_expr(return_type, "result", records, enums);
+                    let encoded = render_callback_return_encode_expr(
+                        return_type,
+                        "result",
+                        records,
+                        enums,
+                        custom_types,
+                    );
                     out.push_str(&format!("        resultPtr.ref.returnValue = {encoded};\n"));
                 } else {
                     out.push_str(&format!(
@@ -432,8 +448,13 @@ pub(super) fn render_callback_bridges(
                         "      final result = callback.{method_name}({});\n",
                         callback_args.join(", ")
                     ));
-                    let encoded =
-                        render_callback_return_encode_expr(return_type, "result", records, enums);
+                    let encoded = render_callback_return_encode_expr(
+                        return_type,
+                        "result",
+                        records,
+                        enums,
+                        custom_types,
+                    );
                     out.push_str(&format!("      outReturn.value = {encoded};\n"));
                 } else {
                     out.push_str(&format!(
@@ -825,13 +846,14 @@ pub(super) fn callback_async_default_return_expr(
 }
 
 pub(super) fn render_callback_arg_decode_expr(
-    type_: &Type,
+    original_type: &Type,
     arg_name: &str,
     records: &[UdlRecord],
     enums: &[UdlEnum],
+    custom_types: &HashMap<String, CustomTypeConfig>,
 ) -> String {
-    let type_ = runtime_unwrapped_type(type_);
-    match type_ {
+    let type_ = runtime_unwrapped_type(original_type);
+    let builtin_expr = match type_ {
         Type::String => format!(
             "{arg_name} == ffi.nullptr ? (throw StateError('Rust passed null string callback arg')) : {arg_name}.toDartString()"
         ),
@@ -856,7 +878,7 @@ pub(super) fn render_callback_arg_decode_expr(
             )
         }
         Type::Sequence { inner_type } if is_runtime_sequence_json_type(type_) => {
-            let inner_decode = render_json_decode_expr("item", inner_type);
+            let inner_decode = render_json_decode_expr("item", inner_type, custom_types);
             format!(
                 "{arg_name} == ffi.nullptr ? (throw StateError('Rust passed null sequence callback arg')) : (jsonDecode({arg_name}.toDartString()) as List).map((item) => {inner_decode}).toList()"
             )
@@ -885,59 +907,62 @@ pub(super) fn render_callback_arg_decode_expr(
         }
         Type::Duration => format!("Duration(microseconds: {arg_name})"),
         _ => arg_name.to_string(),
-    }
+    };
+    // Apply lift template if the original type is Custom (stripped by runtime_unwrapped_type above).
+    lift_custom_if_needed(&builtin_expr, original_type, custom_types)
 }
 
 pub(super) fn render_callback_return_encode_expr(
-    type_: &Type,
+    original_type: &Type,
     value_expr: &str,
     records: &[UdlRecord],
     enums: &[UdlEnum],
+    custom_types: &HashMap<String, CustomTypeConfig>,
 ) -> String {
-    let type_ = runtime_unwrapped_type(type_);
+    // Apply lower template if the original type is Custom before encoding the builtin.
+    let lowered = lower_custom_if_needed(value_expr, original_type, custom_types);
+    let type_ = runtime_unwrapped_type(original_type);
     match type_ {
-        Type::String => format!("{value_expr}.toNativeUtf8()"),
+        Type::String => format!("{lowered}.toNativeUtf8()"),
         Type::Optional { inner_type } if is_runtime_string_type(inner_type) => {
-            format!("{value_expr} == null ? ffi.nullptr : {value_expr}.toNativeUtf8()")
+            format!("{value_expr} == null ? ffi.nullptr : {lowered}.toNativeUtf8()")
         }
         Type::Record { .. }
             if records
                 .iter()
                 .any(|r| record_name_from_type(type_) == Some(r.name.as_str())) =>
         {
-            format!("jsonEncode({value_expr}.toJson()).toNativeUtf8()")
+            format!("jsonEncode({lowered}.toJson()).toNativeUtf8()")
         }
         Type::Enum { .. } if is_runtime_enum_type(type_, enums) => {
             let enum_name = enum_name_from_type(type_).unwrap_or("Enum");
             format!(
-                "{}FfiCodec.encode({value_expr}).toNativeUtf8()",
+                "{}FfiCodec.encode({lowered}).toNativeUtf8()",
                 to_upper_camel(enum_name)
             )
         }
         Type::Sequence { inner_type } if is_runtime_sequence_json_type(type_) => {
-            let inner_encode = render_json_encode_expr("item", inner_type);
-            format!(
-                "jsonEncode({value_expr}.map((item) => {inner_encode}).toList()).toNativeUtf8()"
-            )
+            let inner_encode = render_json_encode_expr("item", inner_type, custom_types);
+            format!("jsonEncode({lowered}.map((item) => {inner_encode}).toList()).toNativeUtf8()")
         }
         Type::Object { name, .. } => {
-            format!("{}FfiCodec.lower({value_expr})", to_upper_camel(name))
+            format!("{}FfiCodec.lower({lowered})", to_upper_camel(name))
         }
         Type::Optional { inner_type } if is_runtime_object_type(inner_type) => {
             let name = object_name_from_type(inner_type)
                 .expect("is_runtime_object_type guarantees Object inner");
             format!(
-                "{value_expr} == null ? 0 : {}FfiCodec.lower({value_expr})",
+                "{value_expr} == null ? 0 : {}FfiCodec.lower({lowered})",
                 to_upper_camel(name)
             )
         }
         Type::Bytes => {
-            format!("base64Encode({value_expr}).toNativeUtf8()")
+            format!("base64Encode({lowered}).toNativeUtf8()")
         }
-        Type::Timestamp => format!("{value_expr}.toUtc().microsecondsSinceEpoch"),
-        Type::Duration => format!("{value_expr}.inMicroseconds"),
+        Type::Timestamp => format!("{lowered}.toUtc().microsecondsSinceEpoch"),
+        Type::Duration => format!("{lowered}.inMicroseconds"),
         // Result struct field is @ffi.Bool() / external bool — no int conversion needed.
-        Type::Boolean => value_expr.to_string(),
-        _ => value_expr.to_string(),
+        Type::Boolean => lowered,
+        _ => lowered,
     }
 }

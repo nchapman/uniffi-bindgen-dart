@@ -6,6 +6,8 @@ import 'dart:async';
 import 'dart:ffi' as ffi;
 import 'package:ffi/ffi.dart';
 
+typedef Label = String;
+
 final class _RustCallStatus extends ffi.Struct {
   @ffi.Int8()
   external int code;

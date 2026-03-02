@@ -1,5 +1,8 @@
+use std::collections::HashMap;
+
 use uniffi_bindgen::interface::Literal;
 
+use super::config::CustomTypeConfig;
 use super::*;
 
 pub(super) fn render_data_models(
@@ -7,6 +10,7 @@ pub(super) fn render_data_models(
     enums: &[UdlEnum],
     callback_interfaces: &[UdlCallbackInterface],
     emit_uniffi_error_lift_helpers: bool,
+    custom_types: &HashMap<String, CustomTypeConfig>,
 ) -> String {
     let mut out = String::new();
 
@@ -24,7 +28,7 @@ pub(super) fn render_data_models(
                 if let Some(default_expr) = field
                     .default
                     .as_ref()
-                    .and_then(|d| render_default_value_expr(d, &field.type_, enums))
+                    .and_then(|d| render_default_value_expr(d, &field.type_, enums, custom_types))
                 {
                     out.push_str(&format!("    this.{field_name} = {default_expr},\n"));
                 } else {
@@ -38,7 +42,7 @@ pub(super) fn render_data_models(
             let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
             out.push_str(&format!(
                 "  final {} {field_name};\n",
-                map_uniffi_type_to_dart(&field.type_)
+                map_uniffi_type_to_dart(&field.type_, custom_types)
             ));
         }
         out.push('\n');
@@ -46,7 +50,8 @@ pub(super) fn render_data_models(
         out.push_str("    return {\n");
         for field in &record.fields {
             let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
-            let expr = render_json_encode_expr(&format!("this.{field_name}"), &field.type_);
+            let expr =
+                render_json_encode_expr(&format!("this.{field_name}"), &field.type_, custom_types);
             out.push_str(&format!("      '{field_name}': {expr},\n"));
         }
         out.push_str("    };\n");
@@ -57,11 +62,15 @@ pub(super) fn render_data_models(
         out.push_str(&format!("    return {class_name}(\n"));
         for field in &record.fields {
             let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
-            let decode = render_json_decode_expr(&format!("json['{field_name}']"), &field.type_);
+            let decode = render_json_decode_expr(
+                &format!("json['{field_name}']"),
+                &field.type_,
+                custom_types,
+            );
             if let Some(default_expr) = field
                 .default
                 .as_ref()
-                .and_then(|d| render_default_value_expr(d, &field.type_, enums))
+                .and_then(|d| render_default_value_expr(d, &field.type_, enums, custom_types))
             {
                 out.push_str(&format!(
                     "      {field_name}: json.containsKey('{field_name}') ? {decode} : {default_expr},\n"
@@ -77,7 +86,7 @@ pub(super) fn render_data_models(
             out.push_str(&format!("  {class_name} copyWith({{\n"));
             for field in &record.fields {
                 let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
-                let field_type = map_uniffi_type_to_dart(&field.type_);
+                let field_type = map_uniffi_type_to_dart(&field.type_, custom_types);
                 let copy_with_type = if field_type.ends_with('?') {
                     field_type
                 } else {
@@ -106,14 +115,14 @@ pub(super) fn render_data_models(
             let return_type = method
                 .return_type
                 .as_ref()
-                .map(map_uniffi_type_to_dart)
+                .map(|t| map_uniffi_type_to_dart(t, custom_types))
                 .unwrap_or_else(|| "void".to_string());
             let signature_return = if method.is_async {
                 format!("Future<{return_type}>")
             } else {
                 return_type.clone()
             };
-            let args = render_callable_args_signature(&method.args, enums);
+            let args = render_callable_args_signature(&method.args, enums, custom_types);
             let arg_names = render_callable_arg_names(&method.args);
             let invoke_args = if arg_names.is_empty() {
                 "this".to_string()
@@ -207,14 +216,14 @@ pub(super) fn render_data_models(
                     let return_type = method
                         .return_type
                         .as_ref()
-                        .map(map_uniffi_type_to_dart)
+                        .map(|t| map_uniffi_type_to_dart(t, custom_types))
                         .unwrap_or_else(|| "void".to_string());
                     let signature_return = if method.is_async {
                         format!("Future<{return_type}>")
                     } else {
                         return_type.clone()
                     };
-                    let args = render_callable_args_signature(&method.args, enums);
+                    let args = render_callable_args_signature(&method.args, enums, custom_types);
                     let arg_names = render_callable_arg_names(&method.args);
                     let invoke_args = if arg_names.is_empty() {
                         "this".to_string()
@@ -263,14 +272,14 @@ pub(super) fn render_data_models(
             let return_type = method
                 .return_type
                 .as_ref()
-                .map(map_uniffi_type_to_dart)
+                .map(|t| map_uniffi_type_to_dart(t, custom_types))
                 .unwrap_or_else(|| "void".to_string());
             let signature_return = if method.is_async {
                 format!("Future<{return_type}>")
             } else {
                 return_type.clone()
             };
-            let args = render_callable_args_signature(&method.args, enums);
+            let args = render_callable_args_signature(&method.args, enums, custom_types);
             let arg_names = render_callable_arg_names(&method.args);
             let invoke_args = if arg_names.is_empty() {
                 "this".to_string()
@@ -324,7 +333,7 @@ pub(super) fn render_data_models(
                 let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
                 out.push_str(&format!(
                     "  final {} {field_name};\n",
-                    map_uniffi_type_to_dart(&field.type_)
+                    map_uniffi_type_to_dart(&field.type_, custom_types)
                 ));
             }
             out.push_str(&render_sealed_variant_trait_methods(
@@ -379,7 +388,7 @@ pub(super) fn render_data_models(
                     let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
                     out.push_str(&format!(
                         "  final {} {field_name};\n",
-                        map_uniffi_type_to_dart(&field.type_)
+                        map_uniffi_type_to_dart(&field.type_, custom_types)
                     ));
                 }
             }
@@ -483,7 +492,11 @@ pub(super) fn render_data_models(
             out.push_str(&format!("      'tag': '{variant_tag}',\n"));
             for field in &variant.fields {
                 let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
-                let expr = render_json_encode_expr(&format!("value.{field_name}"), &field.type_);
+                let expr = render_json_encode_expr(
+                    &format!("value.{field_name}"),
+                    &field.type_,
+                    custom_types,
+                );
                 out.push_str(&format!("      '{field_name}': {expr},\n"));
             }
             out.push_str("    });\n");
@@ -508,7 +521,11 @@ pub(super) fn render_data_models(
             out.push_str(&format!("      return {variant_class}(\n"));
             for field in &variant.fields {
                 let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
-                let decode = render_json_decode_expr(&format!("map['{field_name}']"), &field.type_);
+                let decode = render_json_decode_expr(
+                    &format!("map['{field_name}']"),
+                    &field.type_,
+                    custom_types,
+                );
                 out.push_str(&format!("        {field_name}: {decode},\n"));
             }
             out.push_str("      );\n");
@@ -545,7 +562,11 @@ pub(super) fn render_data_models(
             out.push_str(&format!("      'tag': '{variant_tag}',\n"));
             for field in &variant.fields {
                 let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
-                let expr = render_json_encode_expr(&format!("value.{field_name}"), &field.type_);
+                let expr = render_json_encode_expr(
+                    &format!("value.{field_name}"),
+                    &field.type_,
+                    custom_types,
+                );
                 out.push_str(&format!("      '{field_name}': {expr},\n"));
             }
             out.push_str("    });\n");
@@ -576,8 +597,11 @@ pub(super) fn render_data_models(
                 out.push_str(&format!("      return {variant_exception}(\n"));
                 for field in &variant.fields {
                     let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
-                    let decode =
-                        render_json_decode_expr(&format!("map['{field_name}']"), &field.type_);
+                    let decode = render_json_decode_expr(
+                        &format!("map['{field_name}']"),
+                        &field.type_,
+                        custom_types,
+                    );
                     out.push_str(&format!("        {field_name}: {decode},\n"));
                 }
                 out.push_str("      );\n");

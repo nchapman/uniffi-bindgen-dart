@@ -1,5 +1,9 @@
 use super::*;
 
+use super::config::CustomTypeConfig;
+use std::collections::HashMap;
+
+#[allow(clippy::too_many_arguments)]
 pub(super) fn render_function_stubs(
     functions: &[UdlFunction],
     objects: &[UdlObject],
@@ -8,6 +12,7 @@ pub(super) fn render_function_stubs(
     api_overrides: &ApiOverrides,
     records: &[UdlRecord],
     enums: &[UdlEnum],
+    custom_types: &HashMap<String, CustomTypeConfig>,
 ) -> String {
     if functions.is_empty()
         && objects.is_empty()
@@ -54,14 +59,14 @@ pub(super) fn render_function_stubs(
         let value_return_type = f
             .return_type
             .as_ref()
-            .map(map_uniffi_type_to_dart)
+            .map(|t| map_uniffi_type_to_dart(t, custom_types))
             .unwrap_or_else(|| "void".to_string());
         let signature_return_type = if f.is_async {
             format!("Future<{value_return_type}>")
         } else {
             value_return_type.clone()
         };
-        let args = render_callable_args_signature(&f.args, enums);
+        let args = render_callable_args_signature(&f.args, enums, custom_types);
         let arg_names = render_callable_arg_names(&f.args);
 
         out.push_str(&render_doc_comment(f.docstring.as_deref(), ""));

@@ -8,6 +8,13 @@ import 'dart:ffi' as ffi;
 import 'package:ffi/ffi.dart';
 import 'dart:typed_data';
 
+typedef Blob = Uint8List;
+typedef Count = int;
+typedef CountBuckets = Map<String, List<int>>;
+typedef CountList = List<int>;
+typedef Label = String;
+typedef MaybeBlobMap = Map<String, Uint8List?>;
+
 final class _RustBuffer extends ffi.Struct {
   external ffi.Pointer<ffi.Uint8> data;
 
