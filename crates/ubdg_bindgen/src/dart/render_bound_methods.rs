@@ -727,7 +727,8 @@ pub(super) fn render_bound_methods(
                         out.push_str("            return Duration(microseconds: resultValue);\n");
                     } else if is_runtime_optional_primitive_type(ret_type) {
                         // Optional primitives are JSON-encoded as Pointer<Utf8>.
-                        let decode = render_json_decode_expr("jsonDecode(payload)", ret_type);
+                        // Decode to a local to avoid double jsonDecode.
+                        let decode = render_json_decode_expr("decoded", ret_type);
                         out.push_str("            if (resultValue == ffi.nullptr) {\n");
                         out.push_str(&format!(
                             "              throw StateError('Rust returned null pointer for {}');\n",
@@ -738,9 +739,12 @@ pub(super) fn render_bound_methods(
                         out.push_str(
                             "              final String payload = resultValue.toDartString();\n",
                         );
+                        out.push_str(
+                            "              final Object? decoded = jsonDecode(payload);\n",
+                        );
                         out.push_str(&format!("              return {decode};\n"));
                         out.push_str("            } finally {\n");
-                        out.push_str("              calloc.free(resultValue);\n");
+                        out.push_str("              _rustStringFree(resultValue);\n");
                         out.push_str("            }\n");
                     } else {
                         let decode = render_plain_ffi_decode_expr(ret_type, "resultValue");
@@ -1720,7 +1724,7 @@ pub(super) fn render_bound_methods(
                     out.push_str("            _rustStringFree(resultPtr);\n");
                     out.push_str("          }\n");
                 } else if is_runtime_optional_primitive_type(ret_type) {
-                    let decode = render_json_decode_expr("jsonDecode(payload)", ret_type);
+                    let decode = render_json_decode_expr("decoded", ret_type);
                     out.push_str("          if (resultPtr == ffi.nullptr) {\n");
                     out.push_str(&format!(
                         "            throw StateError('Rust returned null for {}');\n",
@@ -1729,6 +1733,7 @@ pub(super) fn render_bound_methods(
                     out.push_str("          }\n");
                     out.push_str("          try {\n");
                     out.push_str("            final String payload = resultPtr.toDartString();\n");
+                    out.push_str("            final Object? decoded = jsonDecode(payload);\n");
                     out.push_str(&format!("            return {decode};\n"));
                     out.push_str("          } finally {\n");
                     out.push_str("            _rustStringFree(resultPtr);\n");
@@ -2359,7 +2364,7 @@ pub(super) fn render_bound_methods(
                     out.push_str("      }\n");
                 }
                 Some(type_) if is_runtime_optional_primitive_type(type_) => {
-                    let decode = render_json_decode_expr("jsonDecode(payload)", type_);
+                    let decode = render_json_decode_expr("decoded", type_);
                     out.push_str(&format!(
                         "      final ffi.Pointer<Utf8> resultPtr = {call_expr};\n"
                     ));
@@ -2371,6 +2376,7 @@ pub(super) fn render_bound_methods(
                     out.push_str("      }\n");
                     out.push_str("      try {\n");
                     out.push_str("        final String payload = resultPtr.toDartString();\n");
+                    out.push_str("        final Object? decoded = jsonDecode(payload);\n");
                     out.push_str(&format!("        return {decode};\n"));
                     out.push_str("      } finally {\n");
                     out.push_str("        _rustStringFree(resultPtr);\n");
@@ -3469,7 +3475,7 @@ pub(super) fn render_bound_methods(
                         }
                         Some(ret_type) if is_runtime_optional_primitive_type(ret_type) => {
                             // Optional primitives are JSON-encoded as Pointer<Utf8>.
-                            let decode = render_json_decode_expr("jsonDecode(payload)", ret_type);
+                            let decode = render_json_decode_expr("decoded", ret_type);
                             out.push_str("      final ffi.Pointer<Utf8> resultPtr = (returnBuf + 0).ref.pointer.cast<Utf8>();\n");
                             out.push_str("      if (resultPtr == ffi.nullptr) {\n");
                             out.push_str(&format!(
@@ -3481,9 +3487,10 @@ pub(super) fn render_bound_methods(
                             out.push_str(
                                 "        final String payload = resultPtr.toDartString();\n",
                             );
+                            out.push_str("        final Object? decoded = jsonDecode(payload);\n");
                             out.push_str(&format!("        return {decode};\n"));
                             out.push_str("      } finally {\n");
-                            out.push_str("        calloc.free(resultPtr);\n");
+                            out.push_str("        _rustStringFree(resultPtr);\n");
                             out.push_str("      }\n");
                         }
                         Some(ret_type) => match &ffi_return_type {
@@ -4205,7 +4212,7 @@ pub(super) fn render_bound_methods(
                     let decode = method
                         .return_type
                         .as_ref()
-                        .map(|t| render_json_decode_expr("jsonDecode(payload)", t))
+                        .map(|t| render_json_decode_expr("decoded", t))
                         .unwrap_or_else(|| "null".to_string());
                     out.push_str("          if (resultPtr == ffi.nullptr) {\n");
                     out.push_str(&format!(
@@ -4215,6 +4222,7 @@ pub(super) fn render_bound_methods(
                     out.push_str("          }\n");
                     out.push_str("          try {\n");
                     out.push_str("            final String payload = resultPtr.toDartString();\n");
+                    out.push_str("            final Object? decoded = jsonDecode(payload);\n");
                     out.push_str(&format!("            return {decode};\n"));
                     out.push_str("          } finally {\n");
                     out.push_str("            _rustStringFree(resultPtr);\n");
@@ -4552,7 +4560,7 @@ pub(super) fn render_bound_methods(
                     out.push_str("      _rustStringFree(resultPtr);\n");
                     out.push_str("    }\n");
                 } else if is_runtime_optional_primitive_type(ret) {
-                    let decode = render_json_decode_expr("jsonDecode(payload)", ret);
+                    let decode = render_json_decode_expr("decoded", ret);
                     out.push_str(&format!(
                         "    final ffi.Pointer<Utf8> resultPtr = {call_expr};\n"
                     ));
@@ -4564,6 +4572,7 @@ pub(super) fn render_bound_methods(
                     out.push_str("    }\n");
                     out.push_str("    try {\n");
                     out.push_str("      final String payload = resultPtr.toDartString();\n");
+                    out.push_str("      final Object? decoded = jsonDecode(payload);\n");
                     out.push_str(&format!("      return {decode};\n"));
                     out.push_str("    } finally {\n");
                     out.push_str("      _rustStringFree(resultPtr);\n");

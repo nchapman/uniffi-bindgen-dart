@@ -104,6 +104,11 @@ pub(super) fn async_rust_future_spec(
             complete_native_type: "ffi.Pointer<Utf8>",
             complete_dart_type: "ffi.Pointer<Utf8>",
         }),
+        Some(type_) if is_runtime_optional_primitive_type(type_) => Some(AsyncRustFutureSpec {
+            suffix: "string",
+            complete_native_type: "ffi.Pointer<Utf8>",
+            complete_dart_type: "ffi.Pointer<Utf8>",
+        }),
         Some(Type::Map { key_type, .. }) if is_runtime_string_type(key_type) => {
             Some(AsyncRustFutureSpec {
                 suffix: "string",
