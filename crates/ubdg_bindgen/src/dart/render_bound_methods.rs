@@ -1200,6 +1200,7 @@ pub(super) fn render_bound_methods(
         let has_callback_args =
             has_runtime_callback_args_in_args(&function.args, callback_interfaces, records, enums);
         if !is_runtime_supported && !is_sync_callback_supported && !has_callback_args {
+            emit_function_skip_warning(&mut out, &function.name, &function.args, "  ");
             continue;
         }
         let field_name = format!("_{}", method_name);
@@ -1350,9 +1351,11 @@ pub(super) fn render_bound_methods(
             });
 
         let Some(native_return) = native_return else {
+            emit_function_skip_warning(&mut out, &function.name, &function.args, "  ");
             continue;
         };
         let Some(dart_ffi_return) = dart_ffi_return else {
+            emit_function_skip_warning(&mut out, &function.name, &function.args, "  ");
             continue;
         };
 
@@ -1408,6 +1411,7 @@ pub(super) fn render_bound_methods(
         }
 
         if !signature_compatible {
+            emit_function_skip_warning(&mut out, &function.name, &function.args, "  ");
             continue;
         }
 
@@ -2560,6 +2564,7 @@ pub(super) fn render_bound_methods(
                 .iter()
                 .all(|a| is_runtime_ffi_compatible_type(&a.type_, records, enums))
             {
+                emit_constructor_skip_warning(&mut out, &object_name, &ctor.name, &ctor.args, "  ");
                 continue;
             }
             let ctor_camel = to_upper_camel(&ctor.name);
@@ -2605,6 +2610,7 @@ pub(super) fn render_bound_methods(
                 );
             }
             if !signature_compatible {
+                emit_constructor_skip_warning(&mut out, &object_name, &ctor.name, &ctor.args, "  ");
                 continue;
             }
 
@@ -3317,6 +3323,7 @@ pub(super) fn render_bound_methods(
                 .iter()
                 .all(|a| is_runtime_ffi_compatible_type(&a.type_, records, enums));
             if !has_callback_args && (!supported_return || !supports_runtime_args) {
+                emit_method_skip_warning(&mut out, &object_name, &method.name, &method.args, "  ");
                 continue;
             }
             let method_camel = to_upper_camel(&method.name);
@@ -3402,6 +3409,7 @@ pub(super) fn render_bound_methods(
                 }
             }
             if !signature_compatible {
+                emit_method_skip_warning(&mut out, &object_name, &method.name, &method.args, "  ");
                 continue;
             }
             let return_type = method

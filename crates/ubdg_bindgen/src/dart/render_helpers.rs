@@ -478,3 +478,84 @@ pub(super) fn collect_external_crates_from_type<'a>(
         _ => {}
     }
 }
+
+/// Format a human-readable argument signature for warning messages.
+/// Produces strings like `"int32 x, String name"`.
+pub(super) fn format_args_for_warning(args: &[UdlArg]) -> String {
+    args.iter()
+        .map(|a| format!("{} {}", map_uniffi_type_to_dart(&a.type_), a.name))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// Emit a Dart comment warning that a constructor was skipped during generation,
+/// and print a corresponding warning to stderr.
+pub(super) fn emit_constructor_skip_warning(
+    out: &mut String,
+    object_name: &str,
+    ctor_name: &str,
+    args: &[UdlArg],
+    indent: &str,
+) {
+    let sig = format_args_for_warning(args);
+    let display_name = if ctor_name == "new" {
+        format!("{object_name}({sig})")
+    } else {
+        format!("{object_name}.{ctor_name}({sig})")
+    };
+    out.push_str(&format!(
+        "{indent}// WARNING: Constructor '{display_name}' was omitted because\n"
+    ));
+    out.push_str(&format!(
+        "{indent}// the constructor signature is not yet supported in this FFI binding mode.\n\n"
+    ));
+    eprintln!(
+        "WARNING: Skipping constructor '{}' on '{}' — unsupported argument types",
+        ctor_name, object_name,
+    );
+}
+
+/// Emit a Dart comment warning that a method was skipped during generation,
+/// and print a corresponding warning to stderr.
+pub(super) fn emit_method_skip_warning(
+    out: &mut String,
+    object_name: &str,
+    method_name: &str,
+    args: &[UdlArg],
+    indent: &str,
+) {
+    let sig = format_args_for_warning(args);
+    let display_name = format!("{object_name}.{method_name}({sig})");
+    out.push_str(&format!(
+        "{indent}// WARNING: Method '{display_name}' was omitted because\n"
+    ));
+    out.push_str(&format!(
+        "{indent}// the method signature is not yet supported in this FFI binding mode.\n\n"
+    ));
+    eprintln!(
+        "WARNING: Skipping method '{}' on '{}' — unsupported signature",
+        method_name, object_name,
+    );
+}
+
+/// Emit a Dart comment warning that a top-level function was skipped during generation,
+/// and print a corresponding warning to stderr.
+pub(super) fn emit_function_skip_warning(
+    out: &mut String,
+    function_name: &str,
+    args: &[UdlArg],
+    indent: &str,
+) {
+    let sig = format_args_for_warning(args);
+    let display_name = format!("{function_name}({sig})");
+    out.push_str(&format!(
+        "{indent}// WARNING: Function '{display_name}' was omitted because\n"
+    ));
+    out.push_str(&format!(
+        "{indent}// the function signature is not yet supported in this FFI binding mode.\n\n"
+    ));
+    eprintln!(
+        "WARNING: Skipping function '{}' — unsupported signature",
+        function_name,
+    );
+}

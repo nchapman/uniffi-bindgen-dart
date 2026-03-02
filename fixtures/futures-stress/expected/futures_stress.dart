@@ -157,7 +157,235 @@ class FuturesStressFfi {
     return ffi.DynamicLibrary.open(_libraryPath ?? libraryName);
   }
 
-  late final ffi.DynamicLibrary _lib = open();
+  void _ensureApiIntegrity(ffi.DynamicLibrary lib) {
+    const int bindingsContractVersion = 30;
+    final int scaffoldingContractVersion;
+    try {
+      final int Function() ffiContractVersion = lib.lookupFunction<ffi.Uint32 Function(), int Function()>('ffi_crate_name_uniffi_contract_version');
+      scaffoldingContractVersion = ffiContractVersion();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI contract-version symbol `ffi_crate_name_uniffi_contract_version`: $err');
+    }
+    if (bindingsContractVersion != scaffoldingContractVersion) {
+      throw StateError('UniFFI contract version mismatch: expected $bindingsContractVersion, got $scaffoldingContractVersion');
+    }
+    final int _checksum_uniffi_crate_name_checksum_func_add_async;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_func_add_async');
+      _checksum_uniffi_crate_name_checksum_func_add_async = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_func_add_async`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_func_add_async != 35134) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_add_async`: expected 35134, got $_checksum_uniffi_crate_name_checksum_func_add_async');
+    }
+    final int _checksum_uniffi_crate_name_checksum_func_assert_not_empty_async;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_func_assert_not_empty_async');
+      _checksum_uniffi_crate_name_checksum_func_assert_not_empty_async = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_func_assert_not_empty_async`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_func_assert_not_empty_async != 41241) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_assert_not_empty_async`: expected 41241, got $_checksum_uniffi_crate_name_checksum_func_assert_not_empty_async');
+    }
+    final int _checksum_uniffi_crate_name_checksum_func_checked_add_async;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_func_checked_add_async');
+      _checksum_uniffi_crate_name_checksum_func_checked_add_async = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_func_checked_add_async`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_func_checked_add_async != 22405) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_checked_add_async`: expected 22405, got $_checksum_uniffi_crate_name_checksum_func_checked_add_async');
+    }
+    final int _checksum_uniffi_crate_name_checksum_func_chunks_echo_bytes_async;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_func_chunks_echo_bytes_async');
+      _checksum_uniffi_crate_name_checksum_func_chunks_echo_bytes_async = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_func_chunks_echo_bytes_async`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_func_chunks_echo_bytes_async != 38405) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_chunks_echo_bytes_async`: expected 38405, got $_checksum_uniffi_crate_name_checksum_func_chunks_echo_bytes_async');
+    }
+    final int _checksum_uniffi_crate_name_checksum_func_echo_bytes_async;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_func_echo_bytes_async');
+      _checksum_uniffi_crate_name_checksum_func_echo_bytes_async = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_func_echo_bytes_async`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_func_echo_bytes_async != 20582) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_echo_bytes_async`: expected 20582, got $_checksum_uniffi_crate_name_checksum_func_echo_bytes_async');
+    }
+    final int _checksum_uniffi_crate_name_checksum_func_echo_bytes_checked_async;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_func_echo_bytes_checked_async');
+      _checksum_uniffi_crate_name_checksum_func_echo_bytes_checked_async = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_func_echo_bytes_checked_async`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_func_echo_bytes_checked_async != 13499) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_echo_bytes_checked_async`: expected 13499, got $_checksum_uniffi_crate_name_checksum_func_echo_bytes_checked_async');
+    }
+    final int _checksum_uniffi_crate_name_checksum_func_greet_async;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_func_greet_async');
+      _checksum_uniffi_crate_name_checksum_func_greet_async = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_func_greet_async`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_func_greet_async != 22773) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_greet_async`: expected 22773, got $_checksum_uniffi_crate_name_checksum_func_greet_async');
+    }
+    final int _checksum_uniffi_crate_name_checksum_func_label_echo_async;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_func_label_echo_async');
+      _checksum_uniffi_crate_name_checksum_func_label_echo_async = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_func_label_echo_async`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_func_label_echo_async != 23424) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_label_echo_async`: expected 23424, got $_checksum_uniffi_crate_name_checksum_func_label_echo_async');
+    }
+    final int _checksum_uniffi_crate_name_checksum_func_maybe_echo_bytes_async;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_func_maybe_echo_bytes_async');
+      _checksum_uniffi_crate_name_checksum_func_maybe_echo_bytes_async = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_func_maybe_echo_bytes_async`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_func_maybe_echo_bytes_async != 22136) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_maybe_echo_bytes_async`: expected 22136, got $_checksum_uniffi_crate_name_checksum_func_maybe_echo_bytes_async');
+    }
+    final int _checksum_uniffi_crate_name_checksum_func_summarize_async;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_func_summarize_async');
+      _checksum_uniffi_crate_name_checksum_func_summarize_async = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_func_summarize_async`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_func_summarize_async != 28702) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_summarize_async`: expected 28702, got $_checksum_uniffi_crate_name_checksum_func_summarize_async');
+    }
+    final int _checksum_uniffi_crate_name_checksum_func_tick_async;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_func_tick_async');
+      _checksum_uniffi_crate_name_checksum_func_tick_async = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_func_tick_async`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_func_tick_async != 3600) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_tick_async`: expected 3600, got $_checksum_uniffi_crate_name_checksum_func_tick_async');
+    }
+    final int _checksum_uniffi_crate_name_checksum_func_validate_async;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_func_validate_async');
+      _checksum_uniffi_crate_name_checksum_func_validate_async = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_func_validate_async`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_func_validate_async != 28009) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_validate_async`: expected 28009, got $_checksum_uniffi_crate_name_checksum_func_validate_async');
+    }
+    final int _checksum_uniffi_crate_name_checksum_method_asyncwidget_get_name;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_method_asyncwidget_get_name');
+      _checksum_uniffi_crate_name_checksum_method_asyncwidget_get_name = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_method_asyncwidget_get_name`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_method_asyncwidget_get_name != 644) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_method_asyncwidget_get_name`: expected 644, got $_checksum_uniffi_crate_name_checksum_method_asyncwidget_get_name');
+    }
+    final int _checksum_uniffi_crate_name_checksum_method_worker_async_checked_describe;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_method_worker_async_checked_describe');
+      _checksum_uniffi_crate_name_checksum_method_worker_async_checked_describe = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_method_worker_async_checked_describe`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_method_worker_async_checked_describe != 57098) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_method_worker_async_checked_describe`: expected 57098, got $_checksum_uniffi_crate_name_checksum_method_worker_async_checked_describe');
+    }
+    final int _checksum_uniffi_crate_name_checksum_method_worker_async_counts;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_method_worker_async_counts');
+      _checksum_uniffi_crate_name_checksum_method_worker_async_counts = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_method_worker_async_counts`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_method_worker_async_counts != 6069) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_method_worker_async_counts`: expected 6069, got $_checksum_uniffi_crate_name_checksum_method_worker_async_counts');
+    }
+    final int _checksum_uniffi_crate_name_checksum_method_worker_async_describe;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_method_worker_async_describe');
+      _checksum_uniffi_crate_name_checksum_method_worker_async_describe = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_method_worker_async_describe`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_method_worker_async_describe != 18166) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_method_worker_async_describe`: expected 18166, got $_checksum_uniffi_crate_name_checksum_method_worker_async_describe');
+    }
+    final int _checksum_uniffi_crate_name_checksum_method_worker_async_label_echo;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_method_worker_async_label_echo');
+      _checksum_uniffi_crate_name_checksum_method_worker_async_label_echo = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_method_worker_async_label_echo`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_method_worker_async_label_echo != 38200) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_method_worker_async_label_echo`: expected 38200, got $_checksum_uniffi_crate_name_checksum_method_worker_async_label_echo');
+    }
+    final int _checksum_uniffi_crate_name_checksum_method_worker_async_value;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_method_worker_async_value');
+      _checksum_uniffi_crate_name_checksum_method_worker_async_value = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_method_worker_async_value`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_method_worker_async_value != 50766) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_method_worker_async_value`: expected 50766, got $_checksum_uniffi_crate_name_checksum_method_worker_async_value');
+    }
+    final int _checksum_uniffi_crate_name_checksum_constructor_asyncwidget_new;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_constructor_asyncwidget_new');
+      _checksum_uniffi_crate_name_checksum_constructor_asyncwidget_new = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_constructor_asyncwidget_new`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_constructor_asyncwidget_new != 8710) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_constructor_asyncwidget_new`: expected 8710, got $_checksum_uniffi_crate_name_checksum_constructor_asyncwidget_new');
+    }
+    final int _checksum_uniffi_crate_name_checksum_constructor_asyncwidget_validated_new;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_constructor_asyncwidget_validated_new');
+      _checksum_uniffi_crate_name_checksum_constructor_asyncwidget_validated_new = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_constructor_asyncwidget_validated_new`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_constructor_asyncwidget_validated_new != 65519) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_constructor_asyncwidget_validated_new`: expected 65519, got $_checksum_uniffi_crate_name_checksum_constructor_asyncwidget_validated_new');
+    }
+    final int _checksum_uniffi_crate_name_checksum_constructor_worker_new;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_constructor_worker_new');
+      _checksum_uniffi_crate_name_checksum_constructor_worker_new = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_constructor_worker_new`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_constructor_worker_new != 36963) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_constructor_worker_new`: expected 36963, got $_checksum_uniffi_crate_name_checksum_constructor_worker_new');
+    }
+  }
+
+  late final ffi.DynamicLibrary _lib = (() {
+    final ffi.DynamicLibrary lib = open();
+    _ensureApiIntegrity(lib);
+    return lib;
+  })();
 
   late final void Function(ffi.Pointer<Utf8>) _rustStringFree = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<Utf8>), void Function(ffi.Pointer<Utf8>)>('rust_string_free');
 

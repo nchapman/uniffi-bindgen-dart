@@ -210,7 +210,45 @@ class CallbackCustomAsyncDemoFfi {
     return ffi.DynamicLibrary.open(_libraryPath ?? libraryName);
   }
 
-  late final ffi.DynamicLibrary _lib = open();
+  void _ensureApiIntegrity(ffi.DynamicLibrary lib) {
+    const int bindingsContractVersion = 30;
+    final int scaffoldingContractVersion;
+    try {
+      final int Function() ffiContractVersion = lib.lookupFunction<ffi.Uint32 Function(), int Function()>('ffi_crate_name_uniffi_contract_version');
+      scaffoldingContractVersion = ffiContractVersion();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI contract-version symbol `ffi_crate_name_uniffi_contract_version`: $err');
+    }
+    if (bindingsContractVersion != scaffoldingContractVersion) {
+      throw StateError('UniFFI contract version mismatch: expected $bindingsContractVersion, got $scaffoldingContractVersion');
+    }
+    final int _checksum_uniffi_crate_name_checksum_func_apply_label_async;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_func_apply_label_async');
+      _checksum_uniffi_crate_name_checksum_func_apply_label_async = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_func_apply_label_async`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_func_apply_label_async != 40694) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_apply_label_async`: expected 40694, got $_checksum_uniffi_crate_name_checksum_func_apply_label_async');
+    }
+    final int _checksum_uniffi_crate_name_checksum_method_labeller_label_async;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_method_labeller_label_async');
+      _checksum_uniffi_crate_name_checksum_method_labeller_label_async = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_method_labeller_label_async`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_method_labeller_label_async != 58825) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_method_labeller_label_async`: expected 58825, got $_checksum_uniffi_crate_name_checksum_method_labeller_label_async');
+    }
+  }
+
+  late final ffi.DynamicLibrary _lib = (() {
+    final ffi.DynamicLibrary lib = open();
+    _ensureApiIntegrity(lib);
+    return lib;
+  })();
 
   late final void Function(ffi.Pointer<Utf8>) _rustStringFree = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<Utf8>), void Function(ffi.Pointer<Utf8>)>('rust_string_free');
 

@@ -71,6 +71,7 @@ pub(super) fn render_object_classes(
                 .iter()
                 .all(|a| is_runtime_ffi_compatible_type(&a.type_, records, enums))
             {
+                emit_constructor_skip_warning(&mut out, &object_name, &ctor.name, &ctor.args, "  ");
                 continue;
             }
             let ctor_camel = to_upper_camel(&ctor.name);
@@ -138,6 +139,7 @@ pub(super) fn render_object_classes(
                 .iter()
                 .all(|a| is_runtime_ffi_compatible_type(&a.type_, records, enums));
             if !has_callback_args && (!supported_return || !supports_runtime_args) {
+                emit_method_skip_warning(&mut out, &object_name, &method.name, &method.args, "  ");
                 continue;
             }
             let method_name = safe_dart_identifier(&api_overrides.renamed_or_default(

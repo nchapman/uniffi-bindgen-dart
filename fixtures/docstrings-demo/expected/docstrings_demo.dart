@@ -104,7 +104,65 @@ class DocstringsDemoFfi {
     return ffi.DynamicLibrary.open(_libraryPath ?? libraryName);
   }
 
-  late final ffi.DynamicLibrary _lib = open();
+  void _ensureApiIntegrity(ffi.DynamicLibrary lib) {
+    const int bindingsContractVersion = 30;
+    final int scaffoldingContractVersion;
+    try {
+      final int Function() ffiContractVersion = lib.lookupFunction<ffi.Uint32 Function(), int Function()>('ffi_crate_name_uniffi_contract_version');
+      scaffoldingContractVersion = ffiContractVersion();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI contract-version symbol `ffi_crate_name_uniffi_contract_version`: $err');
+    }
+    if (bindingsContractVersion != scaffoldingContractVersion) {
+      throw StateError('UniFFI contract version mismatch: expected $bindingsContractVersion, got $scaffoldingContractVersion');
+    }
+    final int _checksum_uniffi_crate_name_checksum_func_add_values;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_func_add_values');
+      _checksum_uniffi_crate_name_checksum_func_add_values = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_func_add_values`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_func_add_values != 41739) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_func_add_values`: expected 41739, got $_checksum_uniffi_crate_name_checksum_func_add_values');
+    }
+    final int _checksum_uniffi_crate_name_checksum_method_counter_current_value;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_method_counter_current_value');
+      _checksum_uniffi_crate_name_checksum_method_counter_current_value = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_method_counter_current_value`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_method_counter_current_value != 28266) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_method_counter_current_value`: expected 28266, got $_checksum_uniffi_crate_name_checksum_method_counter_current_value');
+    }
+    final int _checksum_uniffi_crate_name_checksum_constructor_counter_new;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_constructor_counter_new');
+      _checksum_uniffi_crate_name_checksum_constructor_counter_new = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_constructor_counter_new`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_constructor_counter_new != 56665) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_constructor_counter_new`: expected 56665, got $_checksum_uniffi_crate_name_checksum_constructor_counter_new');
+    }
+    final int _checksum_uniffi_crate_name_checksum_method_reporter_report;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_crate_name_checksum_method_reporter_report');
+      _checksum_uniffi_crate_name_checksum_method_reporter_report = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_crate_name_checksum_method_reporter_report`: $err');
+    }
+    if (_checksum_uniffi_crate_name_checksum_method_reporter_report != 65213) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_crate_name_checksum_method_reporter_report`: expected 65213, got $_checksum_uniffi_crate_name_checksum_method_reporter_report');
+    }
+  }
+
+  late final ffi.DynamicLibrary _lib = (() {
+    final ffi.DynamicLibrary lib = open();
+    _ensureApiIntegrity(lib);
+    return lib;
+  })();
 
   late final int Function(int left, int right) _addValues = _lib.lookupFunction<ffi.Uint32 Function(ffi.Uint32 left, ffi.Uint32 right), int Function(int left, int right)>('add_values');
 
