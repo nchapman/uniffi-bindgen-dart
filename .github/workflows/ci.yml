@@ -12,7 +12,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy
+          components: clippy, rustfmt
+      - name: Format check
+        run: cargo fmt --check
       - name: Clippy (deny warnings)
         run: cargo clippy --all-targets -- -D warnings
       - name: Test workspace
@@ -29,8 +31,11 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Build fixture libraries and generated bindings
         run: |
-          FIXTURE_LIB="$(./scripts/build_fixture.sh)"
+          SIMPLE_FNS_LIB="$(./scripts/build_fixture.sh)"
           RECORD_ENUM_METHODS_LIB="$(./scripts/build_record_enum_methods_fixture.sh)"
+          ./scripts/build_compound_demo_fixture.sh
+          ./scripts/build_coverall_demo_fixture.sh
+          ./scripts/build_keywords_demo_fixture.sh
           UBDG_RECORD_ENUM_METHODS_LIB="$RECORD_ENUM_METHODS_LIB" ./scripts/build_bindings.sh
       - name: Upload runtime artifacts
         uses: actions/upload-artifact@v4
@@ -61,18 +66,19 @@ jobs:
           dart analyze
           case "$(uname -s)" in
             Darwin)
-              SIMPLE_LIB="libuniffi_simple_fns.dylib"
-              RECORD_LIB="libuniffi_record_enum_methods.dylib"
+              EXT="dylib"
               ;;
             Linux)
-              SIMPLE_LIB="libuniffi_simple_fns.so"
-              RECORD_LIB="libuniffi_record_enum_methods.so"
+              EXT="so"
               ;;
             *)
               echo "unsupported platform: $(uname -s)" >&2
               exit 1
               ;;
           esac
-          UBDG_SIMPLE_FNS_LIB="$PWD/native/$SIMPLE_LIB" \
-          UBDG_RECORD_ENUM_METHODS_LIB="$PWD/native/$RECORD_LIB" \
+          UBDG_SIMPLE_FNS_LIB="$PWD/native/libuniffi_simple_fns.$EXT" \
+          UBDG_RECORD_ENUM_METHODS_LIB="$PWD/native/libuniffi_record_enum_methods.$EXT" \
+          UBDG_COMPOUND_DEMO_LIB="$PWD/native/libuniffi_compound_demo.$EXT" \
+          UBDG_COVERALL_DEMO_LIB="$PWD/native/libuniffi_coverall_demo.$EXT" \
+          UBDG_KEYWORDS_DEMO_LIB="$PWD/native/libuniffi_keywords_demo.$EXT" \
           dart test
