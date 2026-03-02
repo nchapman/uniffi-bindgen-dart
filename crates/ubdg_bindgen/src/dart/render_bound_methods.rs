@@ -3732,6 +3732,8 @@ pub(super) fn render_bound_methods(
                 }
                 // Check if this is an async method eligible for the rust-future
                 // polling path (same mechanism used for async top-level functions).
+                // Throwing async methods are not yet supported on this path;
+                // they fall through to the UnsupportedError stub below.
                 let async_method_eligible = method.is_async
                     && method.runtime_unsupported.is_some()
                     && method.throws_type.is_none()
@@ -4196,8 +4198,62 @@ pub(super) fn render_bound_methods(
                             }
                         }
                     } else if let Some(ret_type) = method.return_type.as_ref() {
-                        let decode = render_plain_ffi_decode_expr(ret_type, "resultValue");
-                        out.push_str(&format!("            return {decode};\n"));
+                        if is_runtime_object_type(ret_type) {
+                            let lift = render_object_lift_expr_with_objects(
+                                ret_type,
+                                "resultValue",
+                                local_module_path,
+                                "this",
+                                objects,
+                            );
+                            out.push_str(&format!("            return {lift};\n"));
+                        } else if is_runtime_optional_object_type(ret_type) {
+                            let inner = match runtime_unwrapped_type(ret_type) {
+                                Type::Optional { inner_type } => inner_type,
+                                _ => unreachable!(),
+                            };
+                            let lift = render_object_lift_expr_with_objects(
+                                inner,
+                                "resultValue",
+                                local_module_path,
+                                "this",
+                                objects,
+                            );
+                            out.push_str("            if (resultValue == 0) {\n");
+                            out.push_str("              return null;\n");
+                            out.push_str("            }\n");
+                            out.push_str(&format!("            return {lift};\n"));
+                        } else if is_runtime_timestamp_type(ret_type) {
+                            out.push_str(
+                                "            return DateTime.fromMicrosecondsSinceEpoch(resultValue, isUtc: true);\n",
+                            );
+                        } else if is_runtime_duration_type(ret_type) {
+                            out.push_str(
+                                "            return Duration(microseconds: resultValue);\n",
+                            );
+                        } else if is_runtime_optional_primitive_type(ret_type) {
+                            let decode = render_json_decode_expr("decoded", ret_type);
+                            out.push_str("            if (resultValue == ffi.nullptr) {\n");
+                            out.push_str(&format!(
+                                "              throw StateError('Rust returned null pointer for {}');\n",
+                                method.name
+                            ));
+                            out.push_str("            }\n");
+                            out.push_str("            try {\n");
+                            out.push_str(
+                                "              final String payload = resultValue.toDartString();\n",
+                            );
+                            out.push_str(
+                                "              final Object? decoded = jsonDecode(payload);\n",
+                            );
+                            out.push_str(&format!("              return {decode};\n"));
+                            out.push_str("            } finally {\n");
+                            out.push_str("              _rustStringFree(resultValue);\n");
+                            out.push_str("            }\n");
+                        } else {
+                            let decode = render_plain_ffi_decode_expr(ret_type, "resultValue");
+                            out.push_str(&format!("            return {decode};\n"));
+                        }
                     }
                     out.push_str("          }\n");
                     out.push_str(
