@@ -88,7 +88,7 @@ cp /tmp/regen/{namespace}.dart fixtures/{name}/expected/{namespace}.dart
 
 ### UDL Feature Coverage
 
-All planned UDL features are implemented and golden-tested (14 fixtures):
+All planned UDL features are implemented and golden-tested (16 fixtures):
 
 | Feature | Fixture |
 |---------|---------|
@@ -103,7 +103,10 @@ All planned UDL features are implemented and golden-tested (14 fixtures):
 | Reserved word escaping | `keywords-demo` |
 | Large enum/error code-gen scale + all primitives | `type-limits-demo` |
 | Record/enum methods | `record-enum-methods` |
+| Trait attributes on interfaces, records, and enums | `trait-demo` |
 | Regression: custom shadow types, async object lift, callback custom async | `regressions/*` |
+| Regression: optional param defaults, record field defaults | `regressions/defaults-demo` |
+| Regression: forward/mutual interface references | `regressions/forward-refs-demo` |
 
 ### External Type Support
 

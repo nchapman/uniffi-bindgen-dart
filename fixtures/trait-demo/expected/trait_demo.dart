@@ -2,6 +2,7 @@
 // ignore_for_file: unused_element
 library trait_demo;
 
+import 'dart:convert';
 import 'dart:ffi' as ffi;
 import 'package:ffi/ffi.dart';
 
@@ -16,6 +17,75 @@ const int _rustCallStatusSuccess = 0;
 const int _rustCallStatusError = 1;
 const int _rustCallStatusUnexpectedError = 2;
 const int _rustCallStatusCancelled = 3;
+class TraitRecord {
+  const TraitRecord({
+    required this.name,
+    required this.value,
+  });
+
+  final String name;
+  final int value;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'name': this.name,
+      'value': this.value,
+    };
+  }
+
+  static TraitRecord fromJson(Map<String, dynamic> json) {
+    return TraitRecord(
+      name: json['name'] as String,
+      value: (json['value'] as num).toInt(),
+    );
+  }
+
+  TraitRecord copyWith({
+    String? name,
+    int? value,
+  }) {
+    return TraitRecord(
+      name: name ?? this.name,
+      value: value ?? this.value,
+    );
+  }
+}
+
+enum TraitColor {
+  red,
+  green,
+  blue,
+}
+
+String _encodeTraitColor(TraitColor value) {
+  return switch (value) {
+    TraitColor.red => 'red',
+    TraitColor.green => 'green',
+    TraitColor.blue => 'blue',
+  };
+}
+
+TraitColor _decodeTraitColor(String raw) {
+  switch (raw) {
+    case 'red':
+      return TraitColor.red;
+    case 'green':
+      return TraitColor.green;
+    case 'blue':
+      return TraitColor.blue;
+    default:
+      throw StateError('Unknown TraitColor variant: $raw');
+  }
+}
+
+final class TraitColorFfiCodec {
+  const TraitColorFfiCodec._();
+
+  static String encode(TraitColor value) => _encodeTraitColor(value);
+
+  static TraitColor decode(String raw) => _decodeTraitColor(raw);
+}
+
 class TraitDemoFfi {
   TraitDemoFfi({ffi.DynamicLibrary? dynamicLibrary, String? libraryPath})
       : _dynamicLibrary = dynamicLibrary,

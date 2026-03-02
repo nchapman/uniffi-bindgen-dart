@@ -12,3 +12,22 @@ interface Greeter {
   /// Produce a greeting for the given name.
   string greet(string name);
 };
+
+// [Traits=(Display, Eq, Hash)] on records and enums is parsed by the UDL
+// parser but our Dart generator currently only wires trait methods for
+// `interface` types.  The declarations below verify that the generator
+// does NOT crash and still emits correct record/enum code, even though
+// toString/operator==/hashCode are not yet synthesised.
+
+[Traits=(Display, Eq, Hash)]
+dictionary TraitRecord {
+  string name;
+  u32 value;
+};
+
+[Traits=(Display, Eq, Hash)]
+enum TraitColor {
+  "Red",
+  "Green",
+  "Blue",
+};

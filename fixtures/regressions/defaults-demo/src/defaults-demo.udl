@@ -1,0 +1,15 @@
+// Regression fixture exercising optional parameter defaults and record field
+// defaults.  Covers `optional T? arg = null` function syntax and default
+// values on dictionary fields (u32, boolean, optional string).
+
+namespace defaults_demo {
+  string greet(optional string? name = null);
+  u32 add_maybe(u32 a, optional u32? b = null);
+};
+
+dictionary Config {
+  string name;
+  u32 timeout = 30;
+  boolean verbose = false;
+  string? label = null;
+};

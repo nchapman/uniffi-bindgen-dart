@@ -1,0 +1,15 @@
+// Regression fixture exercising forward references between interfaces.
+// NodeA references NodeB before NodeB is declared, verifying that the
+// generator handles mutually-referencing object types correctly.
+
+namespace forward_refs_demo {
+  NodeA create_node_a();
+};
+
+interface NodeA {
+  NodeB? get_partner();
+};
+
+interface NodeB {
+  NodeA? get_partner();
+};

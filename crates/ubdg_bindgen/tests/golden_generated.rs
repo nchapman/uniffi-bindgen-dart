@@ -265,3 +265,30 @@ fn golden_trait_demo() {
     generate(&source, &out_dir, None);
     assert_matches_expected(&out_dir.join("trait_demo.dart"), &expected);
 }
+
+#[test]
+fn golden_regression_defaults_demo() {
+    let root = repo_root();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let out_dir = temp.path().join("out");
+
+    let source = root.join("fixtures/regressions/defaults-demo/src/defaults-demo.udl");
+    let expected = root.join("fixtures/regressions/defaults-demo/expected/defaults_demo.dart");
+
+    generate(&source, &out_dir, None);
+    assert_matches_expected(&out_dir.join("defaults_demo.dart"), &expected);
+}
+
+#[test]
+fn golden_regression_forward_refs_demo() {
+    let root = repo_root();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let out_dir = temp.path().join("out");
+
+    let source = root.join("fixtures/regressions/forward-refs-demo/src/forward-refs-demo.udl");
+    let expected =
+        root.join("fixtures/regressions/forward-refs-demo/expected/forward_refs_demo.dart");
+
+    generate(&source, &out_dir, None);
+    assert_matches_expected(&out_dir.join("forward_refs_demo.dart"), &expected);
+}
