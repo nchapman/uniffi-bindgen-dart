@@ -1432,26 +1432,6 @@ pub(super) fn render_bound_methods(
                     out.push_str("          } finally {\n");
                     out.push_str("            _rustBytesVecFree(resultVec);\n");
                     out.push_str("          }\n");
-                } else if is_runtime_sequence_json_type(ret_type) {
-                    let inner_type = match runtime_unwrapped_type(ret_type) {
-                        Type::Sequence { inner_type } => inner_type,
-                        _ => unreachable!(),
-                    };
-                    let decode = render_json_decode_expr("item", inner_type);
-                    out.push_str("          if (resultPtr == ffi.nullptr) {\n");
-                    out.push_str(&format!(
-                        "            throw StateError('Rust returned null for {}');\n",
-                        function.name
-                    ));
-                    out.push_str("          }\n");
-                    out.push_str("          try {\n");
-                    out.push_str("            final String payload = resultPtr.toDartString();\n");
-                    out.push_str(&format!(
-                        "            return (jsonDecode(payload) as List).map((item) => {decode}).toList();\n"
-                    ));
-                    out.push_str("          } finally {\n");
-                    out.push_str("            _rustStringFree(resultPtr);\n");
-                    out.push_str("          }\n");
                 } else if is_runtime_timestamp_type(ret_type) {
                     out.push_str(
                         "          return DateTime.fromMicrosecondsSinceEpoch(resultValue, isUtc: true);\n",
