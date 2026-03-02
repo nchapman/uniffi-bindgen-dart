@@ -30,7 +30,6 @@ Legend:
 | Skip warnings | Implemented | unsupported constructs emit warning comments in generated code and stderr messages during generation |
 
 ## Known Limitations
-- **`[ByRef]` / `[Self=ByArc]`**: These Rust calling-convention attributes are not reflected in generated Dart code. All values are copied across the FFI boundary.
 - **Error interface methods**: Error types generated from `[Error]` enums do not support methods.
 
 ## Notes
