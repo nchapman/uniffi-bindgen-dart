@@ -58,7 +58,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: runtime-artifacts-${{ matrix.os }}
-          path: .
+          path: binding_tests
       - name: Dart analyze and runtime tests
         run: |
           cd binding_tests
