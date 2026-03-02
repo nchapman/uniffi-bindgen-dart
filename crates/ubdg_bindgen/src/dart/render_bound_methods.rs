@@ -703,12 +703,45 @@ pub(super) fn render_bound_methods(
                             objects,
                         );
                         out.push_str(&format!("            return {lift};\n"));
+                    } else if is_runtime_optional_object_type(ret_type) {
+                        let inner = match runtime_unwrapped_type(ret_type) {
+                            Type::Optional { inner_type } => inner_type,
+                            _ => unreachable!(),
+                        };
+                        let lift = render_object_lift_expr_with_objects(
+                            inner,
+                            "resultValue",
+                            local_module_path,
+                            "this",
+                            objects,
+                        );
+                        out.push_str("            if (resultValue == 0) {\n");
+                        out.push_str("              return null;\n");
+                        out.push_str("            }\n");
+                        out.push_str(&format!("            return {lift};\n"));
                     } else if is_runtime_timestamp_type(ret_type) {
                         out.push_str(
                             "            return DateTime.fromMicrosecondsSinceEpoch(resultValue, isUtc: true);\n",
                         );
                     } else if is_runtime_duration_type(ret_type) {
                         out.push_str("            return Duration(microseconds: resultValue);\n");
+                    } else if is_runtime_optional_primitive_type(ret_type) {
+                        // Optional primitives are JSON-encoded as Pointer<Utf8>.
+                        let decode = render_json_decode_expr("jsonDecode(payload)", ret_type);
+                        out.push_str("            if (resultValue == ffi.nullptr) {\n");
+                        out.push_str(&format!(
+                            "              throw StateError('Rust returned null pointer for {}');\n",
+                            function.name
+                        ));
+                        out.push_str("            }\n");
+                        out.push_str("            try {\n");
+                        out.push_str(
+                            "              final String payload = resultValue.toDartString();\n",
+                        );
+                        out.push_str(&format!("              return {decode};\n"));
+                        out.push_str("            } finally {\n");
+                        out.push_str("              calloc.free(resultValue);\n");
+                        out.push_str("            }\n");
                     } else {
                         let decode = render_plain_ffi_decode_expr(ret_type, "resultValue");
                         out.push_str(&format!("            return {decode};\n"));
@@ -1634,6 +1667,36 @@ pub(super) fn render_bound_methods(
                         objects,
                     );
                     out.push_str(&format!("          return {lift};\n"));
+                } else if is_runtime_optional_object_type(ret_type) {
+                    let inner = match runtime_unwrapped_type(ret_type) {
+                        Type::Optional { inner_type } => inner_type,
+                        _ => unreachable!(),
+                    };
+                    let lift = render_object_lift_expr_with_objects(
+                        inner,
+                        "resultValue",
+                        local_module_path,
+                        "this",
+                        objects,
+                    );
+                    out.push_str("          if (resultValue == 0) {\n");
+                    out.push_str("            return null;\n");
+                    out.push_str("          }\n");
+                    out.push_str(&format!("          return {lift};\n"));
+                } else if is_runtime_optional_primitive_type(ret_type) {
+                    let decode = render_json_decode_expr("jsonDecode(payload)", ret_type);
+                    out.push_str("          if (resultPtr == ffi.nullptr) {\n");
+                    out.push_str(&format!(
+                        "            throw StateError('Rust returned null for {}');\n",
+                        function.name
+                    ));
+                    out.push_str("          }\n");
+                    out.push_str("          try {\n");
+                    out.push_str("            final String payload = resultPtr.toDartString();\n");
+                    out.push_str(&format!("            return {decode};\n"));
+                    out.push_str("          } finally {\n");
+                    out.push_str("            _rustStringFree(resultPtr);\n");
+                    out.push_str("          }\n");
                 } else if is_runtime_sequence_json_type(ret_type) {
                     let inner_type = match runtime_unwrapped_type(ret_type) {
                         Type::Sequence { inner_type } => inner_type,
@@ -2196,6 +2259,42 @@ pub(super) fn render_bound_methods(
                         objects,
                     );
                     out.push_str(&format!("      return {lift};\n"));
+                }
+                Some(type_) if is_runtime_optional_object_type(type_) => {
+                    let inner = match runtime_unwrapped_type(type_) {
+                        Type::Optional { inner_type } => inner_type,
+                        _ => unreachable!(),
+                    };
+                    out.push_str(&format!("      final int resultHandle = {call_expr};\n"));
+                    out.push_str("      if (resultHandle == 0) {\n");
+                    out.push_str("        return null;\n");
+                    out.push_str("      }\n");
+                    let lift = render_object_lift_expr_with_objects(
+                        inner,
+                        "resultHandle",
+                        local_module_path,
+                        "this",
+                        objects,
+                    );
+                    out.push_str(&format!("      return {lift};\n"));
+                }
+                Some(type_) if is_runtime_optional_primitive_type(type_) => {
+                    let decode = render_json_decode_expr("jsonDecode(payload)", type_);
+                    out.push_str(&format!(
+                        "      final ffi.Pointer<Utf8> resultPtr = {call_expr};\n"
+                    ));
+                    out.push_str("      if (resultPtr == ffi.nullptr) {\n");
+                    out.push_str(&format!(
+                        "        throw StateError('Rust returned null for {}');\n",
+                        function.name
+                    ));
+                    out.push_str("      }\n");
+                    out.push_str("      try {\n");
+                    out.push_str("        final String payload = resultPtr.toDartString();\n");
+                    out.push_str(&format!("        return {decode};\n"));
+                    out.push_str("      } finally {\n");
+                    out.push_str("        _rustStringFree(resultPtr);\n");
+                    out.push_str("      }\n");
                 }
                 Some(type_) if is_runtime_sequence_json_type(type_) => {
                     let inner_type = match runtime_unwrapped_type(type_) {
@@ -3268,6 +3367,45 @@ pub(super) fn render_bound_methods(
                             );
                             out.push_str(&format!("      return {lift};\n"));
                         }
+                        Some(ret_type) if is_runtime_optional_object_type(ret_type) => {
+                            let inner = match runtime_unwrapped_type(ret_type) {
+                                Type::Optional { inner_type } => inner_type,
+                                _ => unreachable!(),
+                            };
+                            out.push_str(
+                                "      final int resultHandle = (returnBuf + 0).ref.u64;\n",
+                            );
+                            out.push_str("      if (resultHandle == 0) {\n");
+                            out.push_str("        return null;\n");
+                            out.push_str("      }\n");
+                            let lift = render_object_lift_expr_with_objects(
+                                inner,
+                                "resultHandle",
+                                local_module_path,
+                                "this",
+                                objects,
+                            );
+                            out.push_str(&format!("      return {lift};\n"));
+                        }
+                        Some(ret_type) if is_runtime_optional_primitive_type(ret_type) => {
+                            // Optional primitives are JSON-encoded as Pointer<Utf8>.
+                            let decode = render_json_decode_expr("jsonDecode(payload)", ret_type);
+                            out.push_str("      final ffi.Pointer<Utf8> resultPtr = (returnBuf + 0).ref.pointer.cast<Utf8>();\n");
+                            out.push_str("      if (resultPtr == ffi.nullptr) {\n");
+                            out.push_str(&format!(
+                                "        throw StateError('Rust returned null pointer for {}');\n",
+                                method.name
+                            ));
+                            out.push_str("      }\n");
+                            out.push_str("      try {\n");
+                            out.push_str(
+                                "        final String payload = resultPtr.toDartString();\n",
+                            );
+                            out.push_str(&format!("        return {decode};\n"));
+                            out.push_str("      } finally {\n");
+                            out.push_str("        calloc.free(resultPtr);\n");
+                            out.push_str("      }\n");
+                        }
                         Some(ret_type) => match &ffi_return_type {
                             FfiType::RustBuffer(_) => {
                                 let is_map_type =
@@ -3906,6 +4044,52 @@ pub(super) fn render_bound_methods(
                 } else if method
                     .return_type
                     .as_ref()
+                    .is_some_and(is_runtime_optional_object_type)
+                {
+                    let inner = method
+                        .return_type
+                        .as_ref()
+                        .and_then(|t| match runtime_unwrapped_type(t) {
+                            Type::Optional { inner_type } => Some(inner_type.as_ref()),
+                            _ => None,
+                        })
+                        .expect("validated optional object type");
+                    let lift = render_object_lift_expr_with_objects(
+                        inner,
+                        "resultValue",
+                        local_module_path,
+                        "this",
+                        objects,
+                    );
+                    out.push_str("          if (resultValue == 0) {\n");
+                    out.push_str("            return null;\n");
+                    out.push_str("          }\n");
+                    out.push_str(&format!("          return {lift};\n"));
+                } else if method
+                    .return_type
+                    .as_ref()
+                    .is_some_and(is_runtime_optional_primitive_type)
+                {
+                    let decode = method
+                        .return_type
+                        .as_ref()
+                        .map(|t| render_json_decode_expr("jsonDecode(payload)", t))
+                        .unwrap_or_else(|| "null".to_string());
+                    out.push_str("          if (resultPtr == ffi.nullptr) {\n");
+                    out.push_str(&format!(
+                        "            throw StateError('Rust returned null for {}');\n",
+                        method_symbol
+                    ));
+                    out.push_str("          }\n");
+                    out.push_str("          try {\n");
+                    out.push_str("            final String payload = resultPtr.toDartString();\n");
+                    out.push_str(&format!("            return {decode};\n"));
+                    out.push_str("          } finally {\n");
+                    out.push_str("            _rustStringFree(resultPtr);\n");
+                    out.push_str("          }\n");
+                } else if method
+                    .return_type
+                    .as_ref()
                     .is_some_and(is_runtime_timestamp_type)
                 {
                     out.push_str(
@@ -4168,11 +4352,48 @@ pub(super) fn render_bound_methods(
                     out.push_str("      _rustStringFree(resultPtr);\n");
                     out.push_str("    }\n");
                 } else if is_runtime_object_type(ret) {
-                    let object_name = object_name_from_type(ret).unwrap_or("Object");
+                    let lift = render_object_lift_expr_with_objects(
+                        ret,
+                        &call_expr,
+                        local_module_path,
+                        "_bindings()",
+                        objects,
+                    );
+                    out.push_str(&format!("    return {lift};\n"));
+                } else if is_runtime_optional_object_type(ret) {
+                    let inner = match runtime_unwrapped_type(ret) {
+                        Type::Optional { inner_type } => inner_type,
+                        _ => unreachable!(),
+                    };
+                    let lift = render_object_lift_expr_with_objects(
+                        inner,
+                        "resultHandle",
+                        local_module_path,
+                        "_bindings()",
+                        objects,
+                    );
+                    out.push_str(&format!("    final int resultHandle = {call_expr};\n"));
+                    out.push_str("    if (resultHandle == 0) {\n");
+                    out.push_str("      return null;\n");
+                    out.push_str("    }\n");
+                    out.push_str(&format!("    return {lift};\n"));
+                } else if is_runtime_optional_primitive_type(ret) {
+                    let decode = render_json_decode_expr("jsonDecode(payload)", ret);
                     out.push_str(&format!(
-                        "    return {}FfiCodec.lift({call_expr});\n",
-                        to_upper_camel(object_name)
+                        "    final ffi.Pointer<Utf8> resultPtr = {call_expr};\n"
                     ));
+                    out.push_str("    if (resultPtr == ffi.nullptr) {\n");
+                    out.push_str(&format!(
+                        "      throw StateError('Rust returned null for {}');\n",
+                        method_symbol
+                    ));
+                    out.push_str("    }\n");
+                    out.push_str("    try {\n");
+                    out.push_str("      final String payload = resultPtr.toDartString();\n");
+                    out.push_str(&format!("      return {decode};\n"));
+                    out.push_str("    } finally {\n");
+                    out.push_str("      _rustStringFree(resultPtr);\n");
+                    out.push_str("    }\n");
                 } else if is_runtime_sequence_json_type(ret) {
                     let inner_type = match runtime_unwrapped_type(ret) {
                         Type::Sequence { inner_type } => inner_type,

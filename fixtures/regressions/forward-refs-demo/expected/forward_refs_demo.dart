@@ -80,14 +80,28 @@ class ForwardRefsDemoFfi {
   }
 
   late final void Function(int handle) _nodeAFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('nodea_free');
-  // WARNING: Method 'NodeA.get_partner()' was omitted because
-  // the method signature is not yet supported in this FFI binding mode.
 
+  late final int Function(int handle) _nodeAGetPartner = _lib.lookupFunction<ffi.Uint64 Function(ffi.Uint64 handle), int Function(int handle)>('nodea_get_partner');
+
+  NodeB? nodeAInvokeGetPartner(int handle) {
+    final int resultHandle = _nodeAGetPartner(handle);
+    if (resultHandle == 0) {
+      return null;
+    }
+    return NodeB._(_bindings(), resultHandle);
+  }
 
   late final void Function(int handle) _nodeBFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('nodeb_free');
-  // WARNING: Method 'NodeB.get_partner()' was omitted because
-  // the method signature is not yet supported in this FFI binding mode.
 
+  late final int Function(int handle) _nodeBGetPartner = _lib.lookupFunction<ffi.Uint64 Function(ffi.Uint64 handle), int Function(int handle)>('nodeb_get_partner');
+
+  NodeA? nodeBInvokeGetPartner(int handle) {
+    final int resultHandle = _nodeBGetPartner(handle);
+    if (resultHandle == 0) {
+      return null;
+    }
+    return NodeA._(_bindings(), resultHandle);
+  }
 }
 
 final class _NodeAFinalizerToken {
@@ -126,8 +140,10 @@ final class NodeA {
     }
   }
 
-  // WARNING: Method 'NodeA.get_partner()' was omitted because
-  // the method signature is not yet supported in this FFI binding mode.
+  NodeB? getPartner() {
+    _ensureOpen();
+    return _ffi.nodeAInvokeGetPartner(_handle);
+  }
 
 }
 
@@ -175,8 +191,10 @@ final class NodeB {
     }
   }
 
-  // WARNING: Method 'NodeB.get_partner()' was omitted because
-  // the method signature is not yet supported in this FFI binding mode.
+  NodeA? getPartner() {
+    _ensureOpen();
+    return _ffi.nodeBInvokeGetPartner(_handle);
+  }
 
 }
 

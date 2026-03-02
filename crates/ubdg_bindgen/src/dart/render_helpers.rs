@@ -386,6 +386,29 @@ pub(super) fn append_runtime_arg_marshalling(
             to_upper_camel(object_name)
         ));
         call_args.push(handle_name);
+    } else if is_runtime_optional_object_type(type_) {
+        let handle_name = format!("{arg_name}Handle");
+        let inner = match runtime_unwrapped_type(type_) {
+            Type::Optional { inner_type } => inner_type,
+            _ => unreachable!(),
+        };
+        let object_name = object_name_from_type(inner).unwrap_or("Object");
+        pre_call.push(format!(
+            "    final int {handle_name} = {arg_name} == null ? 0 : {}FfiCodec.lower({arg_name});\n",
+            to_upper_camel(object_name)
+        ));
+        call_args.push(handle_name);
+    } else if is_runtime_optional_primitive_type(type_) {
+        let native_name = format!("{arg_name}Native");
+        let json_name = format!("{native_name}Json");
+        pre_call.push(format!(
+            "    final String {json_name} = jsonEncode({arg_name});\n"
+        ));
+        pre_call.push(format!(
+            "    final ffi.Pointer<Utf8> {native_name} = {json_name}.toNativeUtf8();\n"
+        ));
+        post_call.push(format!("    calloc.free({native_name});\n"));
+        call_args.push(native_name);
     } else {
         call_args.push(arg_name.to_string());
     }

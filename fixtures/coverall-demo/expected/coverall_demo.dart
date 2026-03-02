@@ -1327,7 +1327,7 @@ class CoverallDemoFfi {
   late final int Function(int handle) _coverallsCloneMe = _lib.lookupFunction<ffi.Uint64 Function(ffi.Uint64 handle), int Function(int handle)>('coveralls_clone_me');
 
   Coveralls coverallsInvokeCloneMe(int handle) {
-    return CoverallsFfiCodec.lift(_coverallsCloneMe(handle));
+    return Coveralls._(_bindings(), _coverallsCloneMe(handle));
   }
 
   late final ffi.Pointer<Utf8> Function(int handle) _coverallsGetMetadata = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle), ffi.Pointer<Utf8> Function(int handle)>('coveralls_get_metadata');
@@ -1358,9 +1358,16 @@ class CoverallDemoFfi {
       _rustStringFree(resultPtr);
     }
   }
-  // WARNING: Method 'Coveralls.get_other()' was omitted because
-  // the method signature is not yet supported in this FFI binding mode.
 
+  late final int Function(int handle) _coverallsGetOther = _lib.lookupFunction<ffi.Uint64 Function(ffi.Uint64 handle), int Function(int handle)>('coveralls_get_other');
+
+  Coveralls? coverallsInvokeGetOther(int handle) {
+    final int resultHandle = _coverallsGetOther(handle);
+    if (resultHandle == 0) {
+      return null;
+    }
+    return Coveralls._(_bindings(), resultHandle);
+  }
 
   late final ffi.Pointer<Utf8> Function(int handle) _coverallsGetTags = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle), ffi.Pointer<Utf8> Function(int handle)>('coveralls_get_tags');
 
@@ -1470,9 +1477,13 @@ class CoverallDemoFfi {
   int coverallsInvokeStrongCount(int handle) {
     return _coverallsStrongCount(handle);
   }
-  // WARNING: Method 'Coveralls.take_other(Coveralls? other)' was omitted because
-  // the method signature is not yet supported in this FFI binding mode.
 
+  late final void Function(int handle, int other) _coverallsTakeOther = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Uint64 other), void Function(int handle, int other)>('coveralls_take_other');
+
+  void coverallsInvokeTakeOther(int handle, Coveralls? other) {
+    final int otherHandle = other == null ? 0 : CoverallsFfiCodec.lower(other);
+    _coverallsTakeOther(handle, otherHandle);
+  }
 
   late final void Function(int handle) _falliblePatchFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('falliblepatch_free');
 
@@ -1634,8 +1645,10 @@ final class Coveralls {
     return _ffi.coverallsInvokeGetName(_handle);
   }
 
-  // WARNING: Method 'Coveralls.get_other()' was omitted because
-  // the method signature is not yet supported in this FFI binding mode.
+  Coveralls? getOther() {
+    _ensureOpen();
+    return _ffi.coverallsInvokeGetOther(_handle);
+  }
 
   /// Return a sequence of optional strings.
   List<String?> getTags() {
@@ -1672,8 +1685,11 @@ final class Coveralls {
     return _ffi.coverallsInvokeStrongCount(_handle);
   }
 
-  // WARNING: Method 'Coveralls.take_other(Coveralls? other)' was omitted because
-  // the method signature is not yet supported in this FFI binding mode.
+  /// Take another Coveralls, creating a reference chain.
+  void takeOther(Coveralls? other) {
+    _ensureOpen();
+    _ffi.coverallsInvokeTakeOther(_handle, other);
+  }
 
 }
 

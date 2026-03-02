@@ -111,9 +111,18 @@ class DefaultsDemoFfi {
   })();
 
   late final void Function(ffi.Pointer<Utf8>) _rustStringFree = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<Utf8>), void Function(ffi.Pointer<Utf8>)>('rust_string_free');
-  // WARNING: Function 'add_maybe(int a, int? b)' was omitted because
-  // the function signature is not yet supported in this FFI binding mode.
 
+  late final int Function(int a, ffi.Pointer<Utf8> b) _addMaybe = _lib.lookupFunction<ffi.Uint32 Function(ffi.Uint32 a, ffi.Pointer<Utf8> b), int Function(int a, ffi.Pointer<Utf8> b)>('add_maybe');
+
+  int addMaybe(int a, int? b) {
+    final String bNativeJson = jsonEncode(b);
+    final ffi.Pointer<Utf8> bNative = bNativeJson.toNativeUtf8();
+    try {
+      return _addMaybe(a, bNative);
+    } finally {
+    calloc.free(bNative);
+    }
+  }
 
   late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> name) _greet = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> name), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> name)>('greet');
 
@@ -148,7 +157,7 @@ void resetDefaultBindings() {
 }
 
 int addMaybe({required int a, int? b = null}) {
-  throw UnimplementedError('TODO: bind to Rust FFI');
+  return _bindings().addMaybe(a, b);
 }
 
 String greet({String? name = null}) {

@@ -120,6 +120,32 @@ pub(super) fn is_runtime_optional_string_type(type_: &Type) -> bool {
     matches!(runtime_unwrapped_type(type_), Type::Optional { inner_type } if is_runtime_string_type(inner_type))
 }
 
+pub(super) fn is_runtime_optional_object_type(type_: &Type) -> bool {
+    matches!(runtime_unwrapped_type(type_), Type::Optional { inner_type } if is_runtime_object_type(inner_type))
+}
+
+pub(super) fn is_runtime_optional_primitive_type(type_: &Type) -> bool {
+    match runtime_unwrapped_type(type_) {
+        Type::Optional { inner_type } => matches!(
+            runtime_unwrapped_type(inner_type),
+            Type::UInt8
+                | Type::Int8
+                | Type::UInt16
+                | Type::Int16
+                | Type::UInt32
+                | Type::Int32
+                | Type::UInt64
+                | Type::Int64
+                | Type::Float32
+                | Type::Float64
+                | Type::Boolean
+                | Type::Timestamp
+                | Type::Duration
+        ),
+        _ => false,
+    }
+}
+
 pub(super) fn is_runtime_string_like_type(type_: &Type) -> bool {
     is_runtime_string_type(type_) || is_runtime_optional_string_type(type_)
 }
@@ -170,9 +196,11 @@ pub(super) fn uniffi_type_uses_json(type_: &Type) -> bool {
     match type_ {
         Type::Record { .. } | Type::Enum { .. } => true,
         Type::Map { key_type, .. } if is_runtime_string_type(key_type) => true,
-        Type::Optional { inner_type } | Type::Sequence { inner_type } => {
-            uniffi_type_uses_json(inner_type)
+        Type::Optional { inner_type } => {
+            // Optional primitives are JSON-encoded at the FFI boundary
+            is_runtime_optional_primitive_type(type_) || uniffi_type_uses_json(inner_type)
         }
+        Type::Sequence { inner_type } => uniffi_type_uses_json(inner_type),
         Type::Custom { builtin, .. } => uniffi_type_uses_json(builtin),
         _ => false,
     }
@@ -351,6 +379,10 @@ pub(super) fn map_runtime_native_ffi_type(
         Type::Optional { inner_type } if is_runtime_string_type(inner_type) => {
             Some("ffi.Pointer<Utf8>")
         }
+        Type::Optional { inner_type } if is_runtime_object_type(inner_type) => Some("ffi.Uint64"),
+        Type::Optional { .. } if is_runtime_optional_primitive_type(type_) => {
+            Some("ffi.Pointer<Utf8>")
+        }
         Type::Record { .. } => Some("ffi.Pointer<Utf8>"),
         Type::Enum { .. } => Some("ffi.Pointer<Utf8>"),
         Type::Object { .. } => Some("ffi.Uint64"),
@@ -404,6 +436,10 @@ pub(super) fn map_runtime_dart_ffi_type(
         Type::Map { key_type, .. } if is_runtime_string_type(key_type) => Some("ffi.Pointer<Utf8>"),
         Type::Map { .. } => Some("_RustBuffer"),
         Type::Optional { inner_type } if is_runtime_string_type(inner_type) => {
+            Some("ffi.Pointer<Utf8>")
+        }
+        Type::Optional { inner_type } if is_runtime_object_type(inner_type) => Some("int"),
+        Type::Optional { .. } if is_runtime_optional_primitive_type(type_) => {
             Some("ffi.Pointer<Utf8>")
         }
         Type::Record { .. } => Some("ffi.Pointer<Utf8>"),
