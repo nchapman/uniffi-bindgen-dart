@@ -1605,6 +1605,7 @@ interface Outcome {
             name: "MethodError".to_string(),
             docstring: None,
             is_error: true,
+            is_non_exhaustive: false,
             variants: vec![
                 UdlEnumVariant {
                     name: "division_by_zero".to_string(),
@@ -1660,6 +1661,7 @@ interface Outcome {
             name: "State".to_string(),
             docstring: None,
             is_error: false,
+            is_non_exhaustive: false,
             variants: vec![
                 UdlEnumVariant {
                     name: "on".to_string(),

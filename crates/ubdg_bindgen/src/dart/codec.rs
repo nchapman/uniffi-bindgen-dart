@@ -251,6 +251,11 @@ pub(super) fn render_uniffi_binary_helpers(records: &[UdlRecord], enums: &[UdlEn
                     idx + 1
                 ));
             }
+            if enum_.is_non_exhaustive {
+                out.push_str(&format!(
+                    "    {type_name}.unknown => throw StateError('Cannot encode unknown {type_name} variant'),\n"
+                ));
+            }
             out.push_str("  };\n");
             out.push_str("  writer.writeI32(tag);\n");
         } else {
@@ -316,9 +321,19 @@ pub(super) fn render_uniffi_binary_helpers(records: &[UdlRecord], enums: &[UdlEn
             out.push_str("      break;\n");
         }
         out.push_str("    default:\n");
-        out.push_str(&format!(
-            "      throw StateError('Unknown {type_name} variant tag: $tag');\n"
-        ));
+        if enum_.is_non_exhaustive {
+            if is_flat_enum {
+                out.push_str(&format!("      value = {type_name}.unknown;\n"));
+            } else {
+                let unknown_class = format!("{type_name}Unknown");
+                out.push_str(&format!("      value = const {unknown_class}();\n"));
+            }
+            out.push_str("      return value;\n");
+        } else {
+            out.push_str(&format!(
+                "      throw StateError('Unknown {type_name} variant tag: $tag');\n"
+            ));
+        }
         out.push_str("  }\n");
         out.push_str("  if (!reader.isDone) {\n");
         out.push_str(&format!(

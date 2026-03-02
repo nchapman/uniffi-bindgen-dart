@@ -217,6 +217,7 @@ pub(super) fn component_interface_to_metadata(
             name: enum_.name().to_string(),
             docstring: enum_.docstring().map(ToString::to_string),
             is_error: ci.is_name_used_as_error(enum_.name()),
+            is_non_exhaustive: enum_.is_non_exhaustive(),
             variants: enum_
                 .variants()
                 .iter()

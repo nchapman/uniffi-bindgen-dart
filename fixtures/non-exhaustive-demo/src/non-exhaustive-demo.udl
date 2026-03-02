@@ -1,0 +1,13 @@
+namespace non_exhaustive_demo {};
+
+[NonExhaustive]
+enum Status {
+  "Active",
+  "Inactive",
+};
+
+[Error, NonExhaustive]
+enum AppError {
+  "NotFound",
+  "PermissionDenied",
+};

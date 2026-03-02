@@ -225,3 +225,16 @@ fn golden_coverall_demo() {
     generate(&source, &out_dir, None);
     assert_matches_expected(&out_dir.join("coverall_demo.dart"), &expected);
 }
+
+#[test]
+fn golden_non_exhaustive_demo() {
+    let root = repo_root();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let out_dir = temp.path().join("out");
+
+    let source = root.join("fixtures/non-exhaustive-demo/src/non-exhaustive-demo.udl");
+    let expected = root.join("fixtures/non-exhaustive-demo/expected/non_exhaustive_demo.dart");
+
+    generate(&source, &out_dir, None);
+    assert_matches_expected(&out_dir.join("non_exhaustive_demo.dart"), &expected);
+}

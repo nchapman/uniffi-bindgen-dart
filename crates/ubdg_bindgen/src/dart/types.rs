@@ -103,6 +103,7 @@ pub(super) struct UdlEnum {
     pub(super) name: String,
     pub(super) docstring: Option<String>,
     pub(super) is_error: bool,
+    pub(super) is_non_exhaustive: bool,
     pub(super) variants: Vec<UdlEnumVariant>,
     pub(super) methods: Vec<UdlObjectMethod>,
 }

@@ -154,6 +154,12 @@ pub(super) fn render_data_models(
                     safe_dart_identifier(&to_lower_camel(&variant.name))
                 ));
             }
+            if enum_.is_non_exhaustive {
+                out.push_str(
+                    "  /// Unknown variant for forward-compatibility with non-exhaustive enums.\n",
+                );
+                out.push_str("  unknown,\n");
+            }
             out.push_str("}\n\n");
             if !enum_.methods.is_empty() {
                 let extension_name = format!("{enum_name}Methods");
@@ -290,6 +296,17 @@ pub(super) fn render_data_models(
             }
             out.push_str("}\n\n");
         }
+        if enum_.is_non_exhaustive {
+            let unknown_class = format!("{enum_name}Unknown");
+            out.push_str(
+                "/// Unknown variant for forward-compatibility with non-exhaustive enums.\n",
+            );
+            out.push_str(&format!(
+                "final class {unknown_class} extends {enum_name} {{\n"
+            ));
+            out.push_str(&format!("  const {unknown_class}();\n"));
+            out.push_str("}\n\n");
+        }
     }
 
     for enum_ in enums {
@@ -330,6 +347,17 @@ pub(super) fn render_data_models(
             }
             out.push_str("}\n\n");
         }
+        if enum_.is_non_exhaustive {
+            let unknown_exception = format!("{exception_name}Unknown");
+            out.push_str(
+                "/// Unknown variant for forward-compatibility with non-exhaustive error enums.\n",
+            );
+            out.push_str(&format!(
+                "final class {unknown_exception} extends {exception_name} {{\n"
+            ));
+            out.push_str(&format!("  const {unknown_exception}();\n"));
+            out.push_str("}\n\n");
+        }
         if emit_uniffi_error_lift_helpers {
             out.push_str(&format!(
                 "{exception_name} _uniffiLift{exception_name}(Uint8List bytes) {{\n"
@@ -356,9 +384,14 @@ pub(super) fn render_data_models(
                     out.push_str("  }\n");
                 }
             }
-            out.push_str(&format!(
-                "  throw StateError('Unknown {enum_name} error variant while lifting exception: $value');\n"
-            ));
+            if enum_.is_non_exhaustive {
+                let unknown_exception = format!("{exception_name}Unknown");
+                out.push_str(&format!("  return const {unknown_exception}();\n"));
+            } else {
+                out.push_str(&format!(
+                    "  throw StateError('Unknown {enum_name} error variant while lifting exception: $value');\n"
+                ));
+            }
             out.push_str("}\n\n");
         }
     }
@@ -377,6 +410,9 @@ pub(super) fn render_data_models(
                     "    {enum_name}.{variant_name} => '{variant_name}',\n"
                 ));
             }
+            if enum_.is_non_exhaustive {
+                out.push_str(&format!("    {enum_name}.unknown => 'unknown',\n"));
+            }
             out.push_str("  };\n");
             out.push_str("}\n\n");
 
@@ -388,10 +424,14 @@ pub(super) fn render_data_models(
                 out.push_str(&format!("      return {enum_name}.{variant_name};\n"));
             }
             out.push_str("    default:\n");
-            out.push_str(&format!(
-                "      throw StateError('Unknown {} variant: $raw');\n",
-                enum_name
-            ));
+            if enum_.is_non_exhaustive {
+                out.push_str(&format!("      return {enum_name}.unknown;\n"));
+            } else {
+                out.push_str(&format!(
+                    "      throw StateError('Unknown {} variant: $raw');\n",
+                    enum_name
+                ));
+            }
             out.push_str("  }\n");
             out.push_str("}\n\n");
             continue;
@@ -436,10 +476,15 @@ pub(super) fn render_data_models(
             out.push_str("      );\n");
         }
         out.push_str("    default:\n");
-        out.push_str(&format!(
-            "      throw StateError('Unknown {} variant tag: $tag');\n",
-            enum_name
-        ));
+        if enum_.is_non_exhaustive {
+            let unknown_class = format!("{enum_name}Unknown");
+            out.push_str(&format!("      return const {unknown_class}();\n"));
+        } else {
+            out.push_str(&format!(
+                "      throw StateError('Unknown {} variant tag: $tag');\n",
+                enum_name
+            ));
+        }
         out.push_str("  }\n");
         out.push_str("}\n\n");
     }
@@ -501,10 +546,15 @@ pub(super) fn render_data_models(
             }
         }
         out.push_str("    default:\n");
-        out.push_str(&format!(
-            "      throw StateError('Unknown {} exception tag: $tag');\n",
-            exception_name
-        ));
+        if enum_.is_non_exhaustive {
+            let unknown_exception = format!("{exception_name}Unknown");
+            out.push_str(&format!("      return const {unknown_exception}();\n"));
+        } else {
+            out.push_str(&format!(
+                "      throw StateError('Unknown {} exception tag: $tag');\n",
+                exception_name
+            ));
+        }
         out.push_str("  }\n");
         out.push_str("}\n\n");
     }
