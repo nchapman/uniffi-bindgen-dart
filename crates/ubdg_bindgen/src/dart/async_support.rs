@@ -113,6 +113,11 @@ pub(super) fn async_rust_future_spec(
                 complete_dart_type: "_RustBufferVec",
             })
         }
+        Some(type_) if is_runtime_sequence_json_type(type_) => Some(AsyncRustFutureSpec {
+            suffix: "string",
+            complete_native_type: "ffi.Pointer<Utf8>",
+            complete_dart_type: "ffi.Pointer<Utf8>",
+        }),
         Some(Type::Object { .. }) => Some(AsyncRustFutureSpec {
             suffix: "u64",
             complete_native_type: "ffi.Uint64",

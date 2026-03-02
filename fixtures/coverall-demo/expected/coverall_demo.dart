@@ -14,6 +14,17 @@ final class _RustBuffer extends ffi.Struct {
   external int len;
 }
 
+final class _RustCallStatus extends ffi.Struct {
+  @ffi.Int8()
+  external int code;
+
+  external ffi.Pointer<Utf8> errorBuf;
+}
+
+const int _rustCallStatusSuccess = 0;
+const int _rustCallStatusError = 1;
+const int _rustCallStatusUnexpectedError = 2;
+const int _rustCallStatusCancelled = 3;
 /// Primary test record with a rich set of field types.
 class SimpleDict {
   const SimpleDict({
@@ -418,6 +429,201 @@ abstract interface class NodeTrait {
   NodeTrait? getParent();
 }
 
+final class _GettersVTable extends ffi.Struct {
+  external ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 handle)>> uniffiFree;
+
+  external ffi.Pointer<ffi.NativeFunction<ffi.Uint64 Function(ffi.Uint64 handle)>> uniffiClone;
+
+  external ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Bool v, ffi.Bool arg2, ffi.Pointer<ffi.Bool> outReturn, ffi.Pointer<_RustCallStatus> outStatus)>> getBool;
+
+  external ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<Utf8> v, ffi.Bool arg2, ffi.Pointer<ffi.Pointer<Utf8>> outReturn, ffi.Pointer<_RustCallStatus> outStatus)>> getString;
+
+  external ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<Utf8> v, ffi.Bool arg2, ffi.Pointer<ffi.Pointer<Utf8>> outReturn, ffi.Pointer<_RustCallStatus> outStatus)>> getOption;
+
+  external ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<Utf8> v, ffi.Bool arg2, ffi.Pointer<ffi.Pointer<Utf8>> outReturn, ffi.Pointer<_RustCallStatus> outStatus)>> getList;
+
+  external ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<Utf8> v, ffi.Pointer<ffi.Void> outReturn, ffi.Pointer<_RustCallStatus> outStatus)>> getNothing;
+
+}
+
+final class _GettersCallbackBridge {
+  _GettersCallbackBridge._();
+  static final _GettersCallbackBridge instance = _GettersCallbackBridge._();
+
+  final Map<int, Getters> _callbacks = <int, Getters>{};
+  final Map<int, int> _refCounts = <int, int>{};
+  int _nextHandle = 1;
+
+  int register(Getters callback) {
+    final int handle = _nextHandle++;
+    _callbacks[handle] = callback;
+    _refCounts[handle] = 1;
+    return handle;
+  }
+
+  void release(int handle) {
+    final int? refs = _refCounts[handle];
+    if (refs == null) {
+      return;
+    }
+    if (refs <= 1) {
+      _refCounts.remove(handle);
+      _callbacks.remove(handle);
+      return;
+    }
+    _refCounts[handle] = refs - 1;
+  }
+
+  int cloneHandle(int handle) {
+    final int? refs = _refCounts[handle];
+    if (refs == null) {
+      throw StateError('Invalid callback handle: $handle');
+    }
+    _refCounts[handle] = refs + 1;
+    return handle;
+  }
+
+  Getters? lookup(int handle) => _callbacks[handle];
+
+  static final ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle)> _freeNative = ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle)>.isolateLocal((int handle) {
+    instance.release(handle);
+  });
+
+  static final ffi.NativeCallable<ffi.Uint64 Function(ffi.Uint64 handle)> _cloneNative = ffi.NativeCallable<ffi.Uint64 Function(ffi.Uint64 handle)>.isolateLocal((int handle) {
+    return instance.cloneHandle(handle);
+  }, exceptionalReturn: 0);
+
+  static final ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle, ffi.Bool v, ffi.Bool arg2, ffi.Pointer<ffi.Bool> outReturn, ffi.Pointer<_RustCallStatus> outStatus)> _getBoolNative = ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle, ffi.Bool v, ffi.Bool arg2, ffi.Pointer<ffi.Bool> outReturn, ffi.Pointer<_RustCallStatus> outStatus)>.isolateLocal((int handle, bool v, bool arg2, ffi.Pointer<ffi.Bool> outReturn, ffi.Pointer<_RustCallStatus> outStatus) {
+    final Getters? callback = instance.lookup(handle);
+    if (callback == null) {
+      outStatus.ref
+        ..code = _rustCallStatusUnexpectedError
+        ..errorBuf = 'Invalid callback handle'.toNativeUtf8();
+      return;
+    }
+    try {
+      final result = callback.getBool(v, arg2);
+      outReturn.value = result ? 1 : 0;
+      outStatus.ref
+        ..code = _rustCallStatusSuccess
+        ..errorBuf = ffi.nullptr;
+    } catch (err) {
+      outStatus.ref
+        ..code = _rustCallStatusUnexpectedError
+        ..errorBuf = err.toString().toNativeUtf8();
+    }
+  });
+
+  static final ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<Utf8> v, ffi.Bool arg2, ffi.Pointer<ffi.Pointer<Utf8>> outReturn, ffi.Pointer<_RustCallStatus> outStatus)> _getStringNative = ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<Utf8> v, ffi.Bool arg2, ffi.Pointer<ffi.Pointer<Utf8>> outReturn, ffi.Pointer<_RustCallStatus> outStatus)>.isolateLocal((int handle, ffi.Pointer<Utf8> v, bool arg2, ffi.Pointer<ffi.Pointer<Utf8>> outReturn, ffi.Pointer<_RustCallStatus> outStatus) {
+    final Getters? callback = instance.lookup(handle);
+    if (callback == null) {
+      outStatus.ref
+        ..code = _rustCallStatusUnexpectedError
+        ..errorBuf = 'Invalid callback handle'.toNativeUtf8();
+      return;
+    }
+    try {
+      final result = callback.getString(v == ffi.nullptr ? (throw StateError('Rust passed null string callback arg')) : v.toDartString(), arg2);
+      outReturn.value = result.toNativeUtf8();
+      outStatus.ref
+        ..code = _rustCallStatusSuccess
+        ..errorBuf = ffi.nullptr;
+    } catch (err) {
+      if (err is CoverallErrorException) {
+        outStatus.ref
+          ..code = _rustCallStatusError
+          ..errorBuf = CoverallErrorExceptionFfiCodec.encode(err).toNativeUtf8();
+      } else {
+        outStatus.ref
+          ..code = _rustCallStatusUnexpectedError
+          ..errorBuf = err.toString().toNativeUtf8();
+      }
+    }
+  });
+
+  static final ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<Utf8> v, ffi.Bool arg2, ffi.Pointer<ffi.Pointer<Utf8>> outReturn, ffi.Pointer<_RustCallStatus> outStatus)> _getOptionNative = ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<Utf8> v, ffi.Bool arg2, ffi.Pointer<ffi.Pointer<Utf8>> outReturn, ffi.Pointer<_RustCallStatus> outStatus)>.isolateLocal((int handle, ffi.Pointer<Utf8> v, bool arg2, ffi.Pointer<ffi.Pointer<Utf8>> outReturn, ffi.Pointer<_RustCallStatus> outStatus) {
+    final Getters? callback = instance.lookup(handle);
+    if (callback == null) {
+      outStatus.ref
+        ..code = _rustCallStatusUnexpectedError
+        ..errorBuf = 'Invalid callback handle'.toNativeUtf8();
+      return;
+    }
+    try {
+      final result = callback.getOption(v == ffi.nullptr ? (throw StateError('Rust passed null string callback arg')) : v.toDartString(), arg2);
+      outReturn.value = result == null ? ffi.nullptr : result.toNativeUtf8();
+      outStatus.ref
+        ..code = _rustCallStatusSuccess
+        ..errorBuf = ffi.nullptr;
+    } catch (err) {
+      if (err is ComplexErrorException) {
+        outStatus.ref
+          ..code = _rustCallStatusError
+          ..errorBuf = ComplexErrorExceptionFfiCodec.encode(err).toNativeUtf8();
+      } else {
+        outStatus.ref
+          ..code = _rustCallStatusUnexpectedError
+          ..errorBuf = err.toString().toNativeUtf8();
+      }
+    }
+  });
+
+  static final ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<Utf8> v, ffi.Bool arg2, ffi.Pointer<ffi.Pointer<Utf8>> outReturn, ffi.Pointer<_RustCallStatus> outStatus)> _getListNative = ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<Utf8> v, ffi.Bool arg2, ffi.Pointer<ffi.Pointer<Utf8>> outReturn, ffi.Pointer<_RustCallStatus> outStatus)>.isolateLocal((int handle, ffi.Pointer<Utf8> v, bool arg2, ffi.Pointer<ffi.Pointer<Utf8>> outReturn, ffi.Pointer<_RustCallStatus> outStatus) {
+    final Getters? callback = instance.lookup(handle);
+    if (callback == null) {
+      outStatus.ref
+        ..code = _rustCallStatusUnexpectedError
+        ..errorBuf = 'Invalid callback handle'.toNativeUtf8();
+      return;
+    }
+    try {
+      final result = callback.getList(v == ffi.nullptr ? (throw StateError('Rust passed null sequence callback arg')) : (jsonDecode(v.toDartString()) as List).map((item) => (item as num).toInt()).toList(), arg2);
+      outReturn.value = jsonEncode(result.map((item) => item).toList()).toNativeUtf8();
+      outStatus.ref
+        ..code = _rustCallStatusSuccess
+        ..errorBuf = ffi.nullptr;
+    } catch (err) {
+      outStatus.ref
+        ..code = _rustCallStatusUnexpectedError
+        ..errorBuf = err.toString().toNativeUtf8();
+    }
+  });
+
+  static final ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<Utf8> v, ffi.Pointer<ffi.Void> outReturn, ffi.Pointer<_RustCallStatus> outStatus)> _getNothingNative = ffi.NativeCallable<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<Utf8> v, ffi.Pointer<ffi.Void> outReturn, ffi.Pointer<_RustCallStatus> outStatus)>.isolateLocal((int handle, ffi.Pointer<Utf8> v, ffi.Pointer<ffi.Void> outReturn, ffi.Pointer<_RustCallStatus> outStatus) {
+    final Getters? callback = instance.lookup(handle);
+    if (callback == null) {
+      outStatus.ref
+        ..code = _rustCallStatusUnexpectedError
+        ..errorBuf = 'Invalid callback handle'.toNativeUtf8();
+      return;
+    }
+    try {
+      callback.getNothing(v == ffi.nullptr ? (throw StateError('Rust passed null string callback arg')) : v.toDartString());
+      outStatus.ref
+        ..code = _rustCallStatusSuccess
+        ..errorBuf = ffi.nullptr;
+    } catch (err) {
+      outStatus.ref
+        ..code = _rustCallStatusUnexpectedError
+        ..errorBuf = err.toString().toNativeUtf8();
+    }
+  });
+
+  static ffi.Pointer<_GettersVTable> createVTable() {
+    final ffi.Pointer<_GettersVTable> vtablePtr = calloc<_GettersVTable>();
+    vtablePtr.ref
+      ..uniffiFree = _freeNative.nativeFunction
+      ..uniffiClone = _cloneNative.nativeFunction
+      ..getBool = _getBoolNative.nativeFunction
+      ..getString = _getStringNative.nativeFunction
+      ..getOption = _getOptionNative.nativeFunction
+      ..getList = _getListNative.nativeFunction
+      ..getNothing = _getNothingNative.nativeFunction
+    ;
+    return vtablePtr;
+  }
+}
+
 class CoverallDemoFfi {
   CoverallDemoFfi({ffi.DynamicLibrary? dynamicLibrary, String? libraryPath})
       : _dynamicLibrary = dynamicLibrary,
@@ -441,6 +647,13 @@ class CoverallDemoFfi {
   late final void Function(ffi.Pointer<Utf8>) _rustStringFree = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<Utf8>), void Function(ffi.Pointer<Utf8>)>('rust_string_free');
 
   late final void Function(_RustBuffer) _rustBytesFree = _lib.lookupFunction<ffi.Void Function(_RustBuffer), void Function(_RustBuffer)>('rust_bytes_free');
+
+  late final void Function(ffi.Pointer<_GettersVTable>) _gettersCallbackInit = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<_GettersVTable>), void Function(ffi.Pointer<_GettersVTable>)>('getters_callback_init');
+  late final ffi.Pointer<_GettersVTable> _gettersCallbackVTable = _GettersCallbackBridge.createVTable();
+  late final bool _gettersCallbackInitDone = (() {
+    _gettersCallbackInit(_gettersCallbackVTable);
+    return true;
+  })();
 
   late final ffi.Pointer<Utf8> Function() _createNoneDict = _lib.lookupFunction<ffi.Pointer<Utf8> Function(), ffi.Pointer<Utf8> Function()>('create_none_dict');
 
@@ -618,6 +831,33 @@ class CoverallDemoFfi {
     }
   }
 
+  late final ffi.Pointer<Utf8> Function(int getters) _testGetters = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 getters), ffi.Pointer<Utf8> Function(int getters)>('test_getters');
+
+  void testGetters(Getters getters) {
+    _gettersCallbackInitDone;
+    final int gettersHandle = _GettersCallbackBridge.instance.register(getters);
+    try {
+      final ffi.Pointer<Utf8> resultPtr = _testGetters(gettersHandle);
+      if (resultPtr == ffi.nullptr) {
+        throw StateError('Rust returned null for test_getters');
+      }
+      final String payload;
+      try {
+        payload = resultPtr.toDartString();
+      } finally {
+        _rustStringFree(resultPtr);
+      }
+      final Map<String, dynamic> envelope = jsonDecode(payload) as Map<String, dynamic>;
+      final Object? errRaw = envelope['err'];
+      if (errRaw != null) {
+        throw CoverallErrorExceptionFfiCodec.decode(errRaw);
+      }
+      return;
+    } finally {
+    _GettersCallbackBridge.instance.release(gettersHandle);
+    }
+  }
+
   late final void Function(int handle) _coverallsFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('coveralls_free');
 
   late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> name, bool shouldFail) _coverallsCtorFallibleNew = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> name, ffi.Bool shouldFail), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> name, bool shouldFail)>('coveralls_fallible_new');
@@ -690,6 +930,21 @@ class CoverallDemoFfi {
     }
     try {
       return resultPtr.toDartString();
+    } finally {
+      _rustStringFree(resultPtr);
+    }
+  }
+
+  late final ffi.Pointer<Utf8> Function(int handle) _coverallsGetTags = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle), ffi.Pointer<Utf8> Function(int handle)>('coveralls_get_tags');
+
+  List<String?> coverallsInvokeGetTags(int handle) {
+    final ffi.Pointer<Utf8> resultPtr = _coverallsGetTags(handle);
+    if (resultPtr == ffi.nullptr) {
+      throw StateError('Rust returned null for coveralls_get_tags');
+    }
+    try {
+      final String payload = resultPtr.toDartString();
+      return (jsonDecode(payload) as List).map((item) => item == null ? null : (() { final __tmp = item; return __tmp as String; })()).toList();
     } finally {
       _rustStringFree(resultPtr);
     }
@@ -947,6 +1202,12 @@ final class Coveralls {
   String getName() {
     _ensureOpen();
     return _ffi.coverallsInvokeGetName(_handle);
+  }
+
+  /// Return a sequence of optional strings.
+  List<String?> getTags() {
+    _ensureOpen();
+    return _ffi.coverallsInvokeGetTags(_handle);
   }
 
   /// Method that always throws a simple error.
@@ -1230,6 +1491,6 @@ Uint8List reverseBytes(Uint8List input) {
 
 /// Exercise a foreign-implemented Getters.
 void testGetters(Getters getters) {
-  throw UnimplementedError('TODO: bind to Rust FFI');
+  _bindings().testGetters(getters);
 }
 

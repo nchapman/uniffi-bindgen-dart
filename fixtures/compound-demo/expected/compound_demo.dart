@@ -135,6 +135,27 @@ class CompoundDemoFfi {
     }
   }
 
+  late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> values) _listify = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> values), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> values)>('listify');
+
+  List<int> listify(List<int> values) {
+    final String valuesNativeJson = jsonEncode(values.map((item) => item).toList());
+    final ffi.Pointer<Utf8> valuesNative = valuesNativeJson.toNativeUtf8();
+    try {
+      final ffi.Pointer<Utf8> resultPtr = _listify(valuesNative);
+      if (resultPtr == ffi.nullptr) {
+        throw StateError('Rust returned null for listify');
+      }
+      try {
+        final String payload = resultPtr.toDartString();
+        return (jsonDecode(payload) as List).map((item) => (item as num).toInt()).toList();
+      } finally {
+        _rustStringFree(resultPtr);
+      }
+    } finally {
+    calloc.free(valuesNative);
+    }
+  }
+
   late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> value) _maybeName = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> value), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> value)>('maybe_name');
 
   String? maybeName(String? value) {
@@ -176,7 +197,7 @@ Map<String, int> counts(Map<String, int> items) {
 }
 
 List<int> listify(List<int> values) {
-  throw UnimplementedError('TODO: bind to Rust FFI');
+  return _bindings().listify(values);
 }
 
 String? maybeName(String? value) {

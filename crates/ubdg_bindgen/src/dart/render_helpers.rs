@@ -195,7 +195,7 @@ pub(super) fn append_runtime_arg_marshalling(
             "    if ({native_name} != ffi.nullptr) calloc.free({native_name});\n"
         ));
         call_args.push(native_name);
-    } else if is_runtime_map_with_string_key_type(type_) {
+    } else if is_runtime_sequence_json_type(type_) || is_runtime_map_with_string_key_type(type_) {
         let native_name = format!("{arg_name}Native");
         let json_name = format!("{native_name}Json");
         let payload_expr = render_json_encode_expr(arg_name, type_);

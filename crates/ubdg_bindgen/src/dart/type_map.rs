@@ -30,10 +30,24 @@ pub(super) fn is_runtime_object_type(type_: &Type) -> bool {
     matches!(runtime_unwrapped_type(type_), Type::Object { .. })
 }
 
-/// Returns true for any enum type that can be used as a throws type.
-/// UniFFI allows both `[Error]`-flagged and plain enums as throws types.
-pub(super) fn is_runtime_throws_enum_type(type_: &Type, _enums: &[UdlEnum]) -> bool {
-    matches!(runtime_unwrapped_type(type_), Type::Enum { .. })
+/// Returns true for any enum type that can be used as a throws type,
+/// but only if the enum exists in the known enums list (local) or is
+/// an external enum (not locally defined, but imported via external packages).
+/// This prevents generating references to undefined `*ExceptionFfiCodec` symbols
+/// for truly unknown types while still supporting external enum throws.
+pub(super) fn is_runtime_throws_enum_type(type_: &Type, enums: &[UdlEnum]) -> bool {
+    match runtime_unwrapped_type(type_) {
+        Type::Enum { name, module_path } => {
+            // Accept local enums that exist in our definitions.
+            let is_local = enums.iter().any(|e| e.name == *name);
+            // Accept external enums (non-empty module_path means the UDL parser
+            // validated this type; if it's not local, it must be external with
+            // an imported codec).
+            let is_external = !is_local && !module_path.is_empty();
+            is_local || is_external
+        }
+        _ => false,
+    }
 }
 
 pub(super) fn is_runtime_record_or_enum_string_type(type_: &Type, enums: &[UdlEnum]) -> bool {
@@ -315,6 +329,7 @@ pub(super) fn map_runtime_native_ffi_type(
         Type::Sequence { inner_type } if is_runtime_bytes_type(inner_type) => {
             Some("_RustBufferVec")
         }
+        Type::Sequence { .. } => Some("ffi.Pointer<Utf8>"),
         Type::Map { key_type, .. } if is_runtime_string_type(key_type) => Some("ffi.Pointer<Utf8>"),
         Type::Map { .. } => Some("_RustBuffer"),
         Type::Optional { inner_type } if is_runtime_string_type(inner_type) => {
@@ -324,6 +339,19 @@ pub(super) fn map_runtime_native_ffi_type(
         Type::Enum { .. } => Some("ffi.Pointer<Utf8>"),
         Type::Object { .. } => Some("ffi.Uint64"),
         _ => None,
+    }
+}
+
+pub(super) fn is_runtime_sequence_json_type(type_: &Type) -> bool {
+    match runtime_unwrapped_type(type_) {
+        Type::Sequence { inner_type } => {
+            !is_runtime_bytes_type(inner_type)
+                && !matches!(
+                    runtime_unwrapped_type(inner_type),
+                    Type::Object { .. } | Type::CallbackInterface { .. }
+                )
+        }
+        _ => false,
     }
 }
 
@@ -356,6 +384,7 @@ pub(super) fn map_runtime_dart_ffi_type(
         Type::Sequence { inner_type } if is_runtime_bytes_type(inner_type) => {
             Some("_RustBufferVec")
         }
+        Type::Sequence { .. } => Some("ffi.Pointer<Utf8>"),
         Type::Map { key_type, .. } if is_runtime_string_type(key_type) => Some("ffi.Pointer<Utf8>"),
         Type::Map { .. } => Some("_RustBuffer"),
         Type::Optional { inner_type } if is_runtime_string_type(inner_type) => {

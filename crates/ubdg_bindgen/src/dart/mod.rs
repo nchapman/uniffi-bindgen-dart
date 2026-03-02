@@ -1287,7 +1287,7 @@ namespace simple {
         assert!(content.contains("SimpleFfi? _defaultBindings;"));
         assert!(content.contains("void configureDefaultBindings("));
         assert!(content.contains("return _bindings().add(left, right);"));
-        assert!(content.contains("throw UnimplementedError('TODO: bind to Rust FFI');"));
+        assert!(content.contains("return _bindings().notSupported(value);"));
     }
 
     #[test]

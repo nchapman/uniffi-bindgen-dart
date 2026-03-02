@@ -702,6 +702,8 @@ pub(super) fn is_runtime_callback_method_type_compatible(
             .iter()
             .any(|r| record_name_from_type(type_) == Some(r.name.as_str()))
         || is_runtime_enum_type(type_, enums)
+        || is_runtime_sequence_json_type(type_)
+        || is_runtime_bytes_type(type_)
 }
 
 pub(super) fn is_runtime_callback_async_return_type_compatible(
@@ -782,6 +784,10 @@ pub(super) fn render_callback_async_result_return_field(
         Type::Enum { .. } if is_runtime_enum_type(type_, enums) => {
             Some("  external ffi.Pointer<Utf8> returnValue;\n\n".to_string())
         }
+        Type::Sequence { .. } if is_runtime_sequence_json_type(type_) => {
+            Some("  external ffi.Pointer<Utf8> returnValue;\n\n".to_string())
+        }
+        Type::Bytes => Some("  external ffi.Pointer<Utf8> returnValue;\n\n".to_string()),
         _ => None,
     }
 }
@@ -804,6 +810,8 @@ pub(super) fn callback_async_default_return_expr(
             "ffi.nullptr"
         }
         Type::Enum { .. } if is_runtime_enum_type(type_, enums) => "ffi.nullptr",
+        Type::Sequence { .. } if is_runtime_sequence_json_type(type_) => "ffi.nullptr",
+        Type::Bytes => "ffi.nullptr",
         _ => "0",
     }
 }
@@ -839,6 +847,17 @@ pub(super) fn render_callback_arg_decode_expr(
                 to_upper_camel(enum_name)
             )
         }
+        Type::Sequence { inner_type } if is_runtime_sequence_json_type(type_) => {
+            let inner_decode = render_json_decode_expr("item", inner_type);
+            format!(
+                "{arg_name} == ffi.nullptr ? (throw StateError('Rust passed null sequence callback arg')) : (jsonDecode({arg_name}.toDartString()) as List).map((item) => {inner_decode}).toList()"
+            )
+        }
+        Type::Bytes => {
+            format!(
+                "{arg_name} == ffi.nullptr ? (throw StateError('Rust passed null bytes callback arg')) : base64Decode({arg_name}.toDartString())"
+            )
+        }
         Type::Timestamp => {
             format!("DateTime.fromMicrosecondsSinceEpoch({arg_name}, isUtc: true)")
         }
@@ -872,6 +891,15 @@ pub(super) fn render_callback_return_encode_expr(
                 "{}FfiCodec.encode({value_expr}).toNativeUtf8()",
                 to_upper_camel(enum_name)
             )
+        }
+        Type::Sequence { inner_type } if is_runtime_sequence_json_type(type_) => {
+            let inner_encode = render_json_encode_expr("item", inner_type);
+            format!(
+                "jsonEncode({value_expr}.map((item) => {inner_encode}).toList()).toNativeUtf8()"
+            )
+        }
+        Type::Bytes => {
+            format!("base64Encode({value_expr}).toNativeUtf8()")
         }
         Type::Timestamp => format!("{value_expr}.toUtc().microsecondsSinceEpoch"),
         Type::Duration => format!("{value_expr}.inMicroseconds"),

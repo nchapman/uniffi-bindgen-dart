@@ -1599,6 +1599,26 @@ pub(super) fn render_bound_methods(
                     let lift =
                         render_object_lift_expr(ret_type, "resultValue", local_module_path, "this");
                     out.push_str(&format!("          return {lift};\n"));
+                } else if is_runtime_sequence_json_type(ret_type) {
+                    let inner_type = match runtime_unwrapped_type(ret_type) {
+                        Type::Sequence { inner_type } => inner_type,
+                        _ => unreachable!(),
+                    };
+                    let decode = render_json_decode_expr("item", inner_type);
+                    out.push_str("          if (resultPtr == ffi.nullptr) {\n");
+                    out.push_str(&format!(
+                        "            throw StateError('Rust returned null for {}');\n",
+                        function.name
+                    ));
+                    out.push_str("          }\n");
+                    out.push_str("          try {\n");
+                    out.push_str("            final String payload = resultPtr.toDartString();\n");
+                    out.push_str(&format!(
+                        "            return (jsonDecode(payload) as List).map((item) => {decode}).toList();\n"
+                    ));
+                    out.push_str("          } finally {\n");
+                    out.push_str("            _rustStringFree(resultPtr);\n");
+                    out.push_str("          }\n");
                 } else if is_runtime_map_with_string_key_type(ret_type) {
                     let decode = render_json_decode_expr("jsonDecode(payload)", ret_type);
                     out.push_str("          if (resultPtr == ffi.nullptr) {\n");
@@ -1732,6 +1752,26 @@ pub(super) fn render_bound_methods(
                     out.push_str("          } finally {\n");
                     out.push_str("            _rustBytesVecFree(resultVec);\n");
                     out.push_str("          }\n");
+                } else if is_runtime_sequence_json_type(ret_type) {
+                    let inner_type = match runtime_unwrapped_type(ret_type) {
+                        Type::Sequence { inner_type } => inner_type,
+                        _ => unreachable!(),
+                    };
+                    let decode = render_json_decode_expr("item", inner_type);
+                    out.push_str("          if (resultPtr == ffi.nullptr) {\n");
+                    out.push_str(&format!(
+                        "            throw StateError('Rust returned null for {}');\n",
+                        function.name
+                    ));
+                    out.push_str("          }\n");
+                    out.push_str("          try {\n");
+                    out.push_str("            final String payload = resultPtr.toDartString();\n");
+                    out.push_str(&format!(
+                        "            return (jsonDecode(payload) as List).map((item) => {decode}).toList();\n"
+                    ));
+                    out.push_str("          } finally {\n");
+                    out.push_str("            _rustStringFree(resultPtr);\n");
+                    out.push_str("          }\n");
                 } else if is_runtime_timestamp_type(ret_type) {
                     out.push_str(
                         "          return DateTime.fromMicrosecondsSinceEpoch(resultValue, isUtc: true);\n",
@@ -1759,7 +1799,7 @@ pub(super) fn render_bound_methods(
             {
                 // Free any bytes-like result buffer on the error path to prevent leaks.
                 if let Some(ret_type) = function.return_type.as_ref() {
-                    if is_runtime_bytes_type(ret_type) || is_runtime_map_type(ret_type) {
+                    if is_runtime_bytes_type(ret_type) || is_runtime_non_string_map_type(ret_type) {
                         out.push_str("        {\n");
                         out.push_str("          final _RustBuffer buf = resultValue;\n");
                         out.push_str("          if (buf.len > 0 && buf.data != ffi.nullptr) {\n");
@@ -1782,6 +1822,13 @@ pub(super) fn render_bound_methods(
                         out.push_str("          if (vec.len > 0 && vec.data != ffi.nullptr) {\n");
                         out.push_str("            _rustBytesVecFree(vec);\n");
                         out.push_str("          }\n");
+                        out.push_str("        }\n");
+                    } else if is_runtime_sequence_json_type(ret_type)
+                        || is_runtime_map_with_string_key_type(ret_type)
+                    {
+                        out.push_str("        {\n");
+                        out.push_str("          final ffi.Pointer<Utf8> ptr = resultPtr;\n");
+                        out.push_str("          if (ptr != ffi.nullptr) _rustStringFree(ptr);\n");
                         out.push_str("        }\n");
                     }
                 }
@@ -2101,6 +2148,30 @@ pub(super) fn render_bound_methods(
                     let lift =
                         render_object_lift_expr(type_, &call_expr, local_module_path, "this");
                     out.push_str(&format!("      return {lift};\n"));
+                }
+                Some(type_) if is_runtime_sequence_json_type(type_) => {
+                    let inner_type = match runtime_unwrapped_type(type_) {
+                        Type::Sequence { inner_type } => inner_type,
+                        _ => unreachable!(),
+                    };
+                    let decode = render_json_decode_expr("item", inner_type);
+                    out.push_str(&format!(
+                        "      final ffi.Pointer<Utf8> resultPtr = {call_expr};\n"
+                    ));
+                    out.push_str("      if (resultPtr == ffi.nullptr) {\n");
+                    out.push_str(&format!(
+                        "        throw StateError('Rust returned null for {}');\n",
+                        function.name
+                    ));
+                    out.push_str("      }\n");
+                    out.push_str("      try {\n");
+                    out.push_str("        final String payload = resultPtr.toDartString();\n");
+                    out.push_str(&format!(
+                        "        return (jsonDecode(payload) as List).map((item) => {decode}).toList();\n"
+                    ));
+                    out.push_str("      } finally {\n");
+                    out.push_str("        _rustStringFree(resultPtr);\n");
+                    out.push_str("      }\n");
                 }
                 Some(type_) if is_runtime_map_with_string_key_type(type_) => {
                     let decode = render_json_decode_expr("jsonDecode(payload)", type_);
@@ -3396,6 +3467,34 @@ pub(super) fn render_bound_methods(
                 } else if method
                     .return_type
                     .as_ref()
+                    .is_some_and(is_runtime_sequence_json_type)
+                {
+                    let inner_type = method
+                        .return_type
+                        .as_ref()
+                        .and_then(|t| match runtime_unwrapped_type(t) {
+                            Type::Sequence { inner_type } => Some(inner_type.as_ref()),
+                            _ => None,
+                        })
+                        .expect("validated sequence type");
+                    let decode = render_json_decode_expr("item", inner_type);
+                    out.push_str("          if (resultPtr == ffi.nullptr) {\n");
+                    out.push_str(&format!(
+                        "            throw StateError('Rust returned null for {}');\n",
+                        method_symbol
+                    ));
+                    out.push_str("          }\n");
+                    out.push_str("          try {\n");
+                    out.push_str("            final String payload = resultPtr.toDartString();\n");
+                    out.push_str(&format!(
+                        "            return (jsonDecode(payload) as List).map((item) => {decode}).toList();\n"
+                    ));
+                    out.push_str("          } finally {\n");
+                    out.push_str("            _rustStringFree(resultPtr);\n");
+                    out.push_str("          }\n");
+                } else if method
+                    .return_type
+                    .as_ref()
                     .is_some_and(is_runtime_map_with_string_key_type)
                 {
                     let decode = method
@@ -3582,7 +3681,9 @@ pub(super) fn render_bound_methods(
                 {
                     // Free any bytes-like result buffer on the error path to prevent leaks.
                     if let Some(ret_type) = method.return_type.as_ref() {
-                        if is_runtime_bytes_type(ret_type) || is_runtime_map_type(ret_type) {
+                        if is_runtime_bytes_type(ret_type)
+                            || is_runtime_non_string_map_type(ret_type)
+                        {
                             out.push_str("        {\n");
                             out.push_str("          final _RustBuffer buf = resultValue;\n");
                             out.push_str(
@@ -3611,6 +3712,15 @@ pub(super) fn render_bound_methods(
                             );
                             out.push_str("            _rustBytesVecFree(vec);\n");
                             out.push_str("          }\n");
+                            out.push_str("        }\n");
+                        } else if is_runtime_sequence_json_type(ret_type)
+                            || is_runtime_map_with_string_key_type(ret_type)
+                        {
+                            out.push_str("        {\n");
+                            out.push_str("          final ffi.Pointer<Utf8> ptr = resultPtr;\n");
+                            out.push_str(
+                                "          if (ptr != ffi.nullptr) _rustStringFree(ptr);\n",
+                            );
                             out.push_str("        }\n");
                         }
                     }
@@ -3807,6 +3917,29 @@ pub(super) fn render_bound_methods(
                         "    return {}FfiCodec.lift({call_expr});\n",
                         to_upper_camel(object_name)
                     ));
+                } else if is_runtime_sequence_json_type(ret) {
+                    let inner_type = match runtime_unwrapped_type(ret) {
+                        Type::Sequence { inner_type } => inner_type,
+                        _ => unreachable!(),
+                    };
+                    let decode = render_json_decode_expr("item", inner_type);
+                    out.push_str(&format!(
+                        "    final ffi.Pointer<Utf8> resultPtr = {call_expr};\n"
+                    ));
+                    out.push_str("    if (resultPtr == ffi.nullptr) {\n");
+                    out.push_str(&format!(
+                        "      throw StateError('Rust returned null for {}');\n",
+                        method_symbol
+                    ));
+                    out.push_str("    }\n");
+                    out.push_str("    try {\n");
+                    out.push_str("      final String payload = resultPtr.toDartString();\n");
+                    out.push_str(&format!(
+                        "      return (jsonDecode(payload) as List).map((item) => {decode}).toList();\n"
+                    ));
+                    out.push_str("    } finally {\n");
+                    out.push_str("      _rustStringFree(resultPtr);\n");
+                    out.push_str("    }\n");
                 } else if is_runtime_map_with_string_key_type(ret) {
                     let decode = render_json_decode_expr("jsonDecode(payload)", ret);
                     out.push_str(&format!(
