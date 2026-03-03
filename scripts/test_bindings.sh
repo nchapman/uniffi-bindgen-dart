@@ -2,6 +2,7 @@
 set -euo pipefail
 
 cargo test --workspace
+./scripts/analyze_golden.sh
 FIXTURE_LIB="$(./scripts/build_fixture.sh)"
 RECORD_ENUM_METHODS_LIB="$(./scripts/build_record_enum_methods_fixture.sh)"
 COMPOUND_DEMO_LIB="$(./scripts/build_compound_demo_fixture.sh)"

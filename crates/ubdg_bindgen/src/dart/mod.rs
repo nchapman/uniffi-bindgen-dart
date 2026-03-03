@@ -353,7 +353,7 @@ fn render_dart_scaffold(ctx: &RenderContext<'_>) -> String {
     if has_runtime_unsupported {
         out.push_str("// ignore_for_file: unused_element, unused_import, unused_field, unnecessary_non_null_assertion, dead_code\n");
     } else {
-        out.push_str("// ignore_for_file: unused_element, unnecessary_non_null_assertion\n");
+        out.push_str("// ignore_for_file: unused_element, unused_import, unused_field, unnecessary_non_null_assertion\n");
     }
     out.push_str(&render_doc_comment(namespace_docstring, ""));
     out.push_str(&format!("library {module_name};\n\n"));
@@ -641,6 +641,7 @@ fn render_dart_scaffold(ctx: &RenderContext<'_>) -> String {
         records,
         enums,
         custom_types,
+        api_overrides,
     ));
     out.push_str("}\n");
     out.push_str(&render_object_classes(
@@ -959,7 +960,7 @@ interface Counter {
         let content =
             fs::read_to_string(out_dir.join("docstrings_demo.dart")).expect("read generated");
         assert!(content.contains(
-            "// ignore_for_file: unused_element, unnecessary_non_null_assertion\n/// Namespace docs.\nlibrary docstrings_demo;"
+            "// ignore_for_file: unused_element, unused_import, unused_field, unnecessary_non_null_assertion\n/// Namespace docs.\nlibrary docstrings_demo;"
         ));
         assert!(content.contains("/// Adds two values.\nint addValues(int left, int right) {"));
         assert!(content.contains("/// 2D point value.\nclass Point {"));

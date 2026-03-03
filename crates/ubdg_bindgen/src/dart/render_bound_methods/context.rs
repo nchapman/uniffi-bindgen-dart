@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use super::super::config::CustomTypeConfig;
+use super::super::types::ApiOverrides;
 use super::super::*;
 
 /// Shared context threaded through all render_bound_methods sub-functions.
@@ -15,4 +16,5 @@ pub(super) struct RenderMethodContext<'a> {
     pub(super) enums: &'a [UdlEnum],
     pub(super) callback_interfaces: &'a [UdlCallbackInterface],
     pub(super) custom_types: &'a HashMap<String, CustomTypeConfig>,
+    pub(super) api_overrides: &'a ApiOverrides,
 }

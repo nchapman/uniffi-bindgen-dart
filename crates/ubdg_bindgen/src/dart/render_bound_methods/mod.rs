@@ -1,4 +1,5 @@
 use super::config::CustomTypeConfig;
+use super::types::ApiOverrides;
 use super::*;
 use std::collections::HashMap;
 
@@ -17,6 +18,7 @@ pub(super) fn render_bound_methods(
     records: &[UdlRecord],
     enums: &[UdlEnum],
     custom_types: &HashMap<String, CustomTypeConfig>,
+    api_overrides: &ApiOverrides,
 ) -> String {
     let mut out = String::new();
     let runtime_functions =
@@ -68,6 +70,7 @@ pub(super) fn render_bound_methods(
         enums,
         callback_interfaces,
         custom_types,
+        api_overrides,
     };
 
     functions::render_toplevel_functions(&mut out, &runtime_functions, &ctx);

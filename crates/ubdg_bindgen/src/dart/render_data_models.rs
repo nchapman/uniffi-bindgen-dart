@@ -711,6 +711,11 @@ fn render_record_trait_methods(class_name: &str, fields: &[UdlArg], traits: &[St
             .collect();
         if field_names.is_empty() {
             out.push_str("  int get hashCode => runtimeType.hashCode;\n");
+        } else if field_names.len() == 1 {
+            out.push_str(&format!(
+                "  int get hashCode => {}.hashCode;\n",
+                field_names[0]
+            ));
         } else if field_names.len() <= 20 {
             out.push_str(&format!(
                 "  int get hashCode => Object.hash({});\n",

@@ -1,5 +1,6 @@
 use uniffi_bindgen::interface::{ffi::FfiType, Type};
 
+use super::super::types::ApiOverrides;
 use super::super::*;
 use super::context::RenderMethodContext;
 
@@ -12,8 +13,12 @@ pub(super) fn render_object_members(out: &mut String, ctx: &RenderMethodContext)
     let enums = ctx.enums;
     let custom_types = ctx.custom_types;
     let callback_interfaces = ctx.callback_interfaces;
+    let api_overrides = ctx.api_overrides;
     for object in objects {
-        let object_name = to_upper_camel(&object.name);
+        let object_name = api_overrides
+            .renamed_or_default(&ApiOverrides::object_key(&object.name), || {
+                to_upper_camel(&object.name)
+            });
         // For [Trait, WithForeign] objects, use the _Impl class for handle-based construction
         let object_construct_name = if object.has_callback_interface {
             format!("_{}Impl", object_name)
@@ -1933,6 +1938,19 @@ pub(super) fn render_object_members(out: &mut String, ctx: &RenderMethodContext)
                     .is_some_and(is_runtime_duration_type)
                 {
                     out.push_str("          return Duration(microseconds: resultValue);\n");
+                } else if let Some(ret_type) = method
+                    .return_type
+                    .as_ref()
+                    .filter(|t| is_runtime_object_type(t))
+                {
+                    let lift = render_object_lift_expr_with_objects(
+                        ret_type,
+                        "resultValue",
+                        local_module_path,
+                        "this",
+                        objects,
+                    );
+                    out.push_str(&format!("          return {lift};\n"));
                 } else if let Some(ret_type) = method.return_type.as_ref() {
                     let decode =
                         render_plain_ffi_decode_expr(ret_type, "resultValue", custom_types);

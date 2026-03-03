@@ -29,6 +29,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: EmbarkStudios/cargo-deny-action@v2
 
+  analyze-golden:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+      - name: Analyze golden files
+        run: ./scripts/analyze_golden.sh
+
   build-runtime-artifacts:
     needs: lint-and-unit
     strategy:
