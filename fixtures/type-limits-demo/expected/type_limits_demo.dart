@@ -73,122 +73,512 @@ sealed class LargeError {
 
 final class LargeErrorCase1 extends LargeError {
   const LargeErrorCase1();
+
+  @override
+  String toString() {
+    return 'LargeErrorCase1()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LargeErrorCase1;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class LargeErrorCase2 extends LargeError {
   const LargeErrorCase2();
+
+  @override
+  String toString() {
+    return 'LargeErrorCase2()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LargeErrorCase2;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class LargeErrorCase3 extends LargeError {
   const LargeErrorCase3();
+
+  @override
+  String toString() {
+    return 'LargeErrorCase3()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LargeErrorCase3;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class LargeErrorCase4 extends LargeError {
   const LargeErrorCase4();
+
+  @override
+  String toString() {
+    return 'LargeErrorCase4()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LargeErrorCase4;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class LargeErrorCase5 extends LargeError {
   const LargeErrorCase5();
+
+  @override
+  String toString() {
+    return 'LargeErrorCase5()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LargeErrorCase5;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class LargeErrorCase6 extends LargeError {
   const LargeErrorCase6();
+
+  @override
+  String toString() {
+    return 'LargeErrorCase6()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LargeErrorCase6;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class LargeErrorCase7 extends LargeError {
   const LargeErrorCase7();
+
+  @override
+  String toString() {
+    return 'LargeErrorCase7()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LargeErrorCase7;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class LargeErrorCase8 extends LargeError {
   const LargeErrorCase8();
+
+  @override
+  String toString() {
+    return 'LargeErrorCase8()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LargeErrorCase8;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class LargeErrorCase9 extends LargeError {
   const LargeErrorCase9();
+
+  @override
+  String toString() {
+    return 'LargeErrorCase9()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LargeErrorCase9;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class LargeErrorCase10 extends LargeError {
   const LargeErrorCase10();
+
+  @override
+  String toString() {
+    return 'LargeErrorCase10()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LargeErrorCase10;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class LargeErrorCase11 extends LargeError {
   const LargeErrorCase11();
+
+  @override
+  String toString() {
+    return 'LargeErrorCase11()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LargeErrorCase11;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class LargeErrorCase12 extends LargeError {
   const LargeErrorCase12();
+
+  @override
+  String toString() {
+    return 'LargeErrorCase12()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LargeErrorCase12;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class LargeErrorCase13 extends LargeError {
   const LargeErrorCase13();
+
+  @override
+  String toString() {
+    return 'LargeErrorCase13()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LargeErrorCase13;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class LargeErrorCase14 extends LargeError {
   const LargeErrorCase14();
+
+  @override
+  String toString() {
+    return 'LargeErrorCase14()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LargeErrorCase14;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class LargeErrorCase15 extends LargeError {
   const LargeErrorCase15();
+
+  @override
+  String toString() {
+    return 'LargeErrorCase15()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LargeErrorCase15;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class LargeErrorCase16 extends LargeError {
   const LargeErrorCase16();
+
+  @override
+  String toString() {
+    return 'LargeErrorCase16()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LargeErrorCase16;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class LargeErrorCase17 extends LargeError {
   const LargeErrorCase17();
+
+  @override
+  String toString() {
+    return 'LargeErrorCase17()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LargeErrorCase17;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class LargeErrorCase18 extends LargeError {
   const LargeErrorCase18();
+
+  @override
+  String toString() {
+    return 'LargeErrorCase18()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LargeErrorCase18;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class LargeErrorCase19 extends LargeError {
   const LargeErrorCase19();
+
+  @override
+  String toString() {
+    return 'LargeErrorCase19()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LargeErrorCase19;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class LargeErrorCase20 extends LargeError {
   const LargeErrorCase20();
+
+  @override
+  String toString() {
+    return 'LargeErrorCase20()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LargeErrorCase20;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class LargeErrorCase21 extends LargeError {
   const LargeErrorCase21();
+
+  @override
+  String toString() {
+    return 'LargeErrorCase21()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LargeErrorCase21;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class LargeErrorCase22 extends LargeError {
   const LargeErrorCase22();
+
+  @override
+  String toString() {
+    return 'LargeErrorCase22()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LargeErrorCase22;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class LargeErrorCase23 extends LargeError {
   const LargeErrorCase23();
+
+  @override
+  String toString() {
+    return 'LargeErrorCase23()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LargeErrorCase23;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class LargeErrorCase24 extends LargeError {
   const LargeErrorCase24();
+
+  @override
+  String toString() {
+    return 'LargeErrorCase24()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LargeErrorCase24;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class LargeErrorCase25 extends LargeError {
   const LargeErrorCase25();
+
+  @override
+  String toString() {
+    return 'LargeErrorCase25()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LargeErrorCase25;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class LargeErrorCase26 extends LargeError {
   const LargeErrorCase26();
+
+  @override
+  String toString() {
+    return 'LargeErrorCase26()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LargeErrorCase26;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class LargeErrorCase27 extends LargeError {
   const LargeErrorCase27();
+
+  @override
+  String toString() {
+    return 'LargeErrorCase27()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LargeErrorCase27;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class LargeErrorCase28 extends LargeError {
   const LargeErrorCase28();
+
+  @override
+  String toString() {
+    return 'LargeErrorCase28()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LargeErrorCase28;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class LargeErrorCase29 extends LargeError {
   const LargeErrorCase29();
+
+  @override
+  String toString() {
+    return 'LargeErrorCase29()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LargeErrorCase29;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class LargeErrorCase30 extends LargeError {
   const LargeErrorCase30();
+
+  @override
+  String toString() {
+    return 'LargeErrorCase30()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LargeErrorCase30;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 sealed class LargeErrorException implements Exception {
@@ -197,122 +587,272 @@ sealed class LargeErrorException implements Exception {
 
 final class LargeErrorExceptionCase1 extends LargeErrorException {
   const LargeErrorExceptionCase1();
+
+  @override
+  String toString() {
+    return 'LargeErrorExceptionCase1()';
+  }
 }
 
 final class LargeErrorExceptionCase2 extends LargeErrorException {
   const LargeErrorExceptionCase2();
+
+  @override
+  String toString() {
+    return 'LargeErrorExceptionCase2()';
+  }
 }
 
 final class LargeErrorExceptionCase3 extends LargeErrorException {
   const LargeErrorExceptionCase3();
+
+  @override
+  String toString() {
+    return 'LargeErrorExceptionCase3()';
+  }
 }
 
 final class LargeErrorExceptionCase4 extends LargeErrorException {
   const LargeErrorExceptionCase4();
+
+  @override
+  String toString() {
+    return 'LargeErrorExceptionCase4()';
+  }
 }
 
 final class LargeErrorExceptionCase5 extends LargeErrorException {
   const LargeErrorExceptionCase5();
+
+  @override
+  String toString() {
+    return 'LargeErrorExceptionCase5()';
+  }
 }
 
 final class LargeErrorExceptionCase6 extends LargeErrorException {
   const LargeErrorExceptionCase6();
+
+  @override
+  String toString() {
+    return 'LargeErrorExceptionCase6()';
+  }
 }
 
 final class LargeErrorExceptionCase7 extends LargeErrorException {
   const LargeErrorExceptionCase7();
+
+  @override
+  String toString() {
+    return 'LargeErrorExceptionCase7()';
+  }
 }
 
 final class LargeErrorExceptionCase8 extends LargeErrorException {
   const LargeErrorExceptionCase8();
+
+  @override
+  String toString() {
+    return 'LargeErrorExceptionCase8()';
+  }
 }
 
 final class LargeErrorExceptionCase9 extends LargeErrorException {
   const LargeErrorExceptionCase9();
+
+  @override
+  String toString() {
+    return 'LargeErrorExceptionCase9()';
+  }
 }
 
 final class LargeErrorExceptionCase10 extends LargeErrorException {
   const LargeErrorExceptionCase10();
+
+  @override
+  String toString() {
+    return 'LargeErrorExceptionCase10()';
+  }
 }
 
 final class LargeErrorExceptionCase11 extends LargeErrorException {
   const LargeErrorExceptionCase11();
+
+  @override
+  String toString() {
+    return 'LargeErrorExceptionCase11()';
+  }
 }
 
 final class LargeErrorExceptionCase12 extends LargeErrorException {
   const LargeErrorExceptionCase12();
+
+  @override
+  String toString() {
+    return 'LargeErrorExceptionCase12()';
+  }
 }
 
 final class LargeErrorExceptionCase13 extends LargeErrorException {
   const LargeErrorExceptionCase13();
+
+  @override
+  String toString() {
+    return 'LargeErrorExceptionCase13()';
+  }
 }
 
 final class LargeErrorExceptionCase14 extends LargeErrorException {
   const LargeErrorExceptionCase14();
+
+  @override
+  String toString() {
+    return 'LargeErrorExceptionCase14()';
+  }
 }
 
 final class LargeErrorExceptionCase15 extends LargeErrorException {
   const LargeErrorExceptionCase15();
+
+  @override
+  String toString() {
+    return 'LargeErrorExceptionCase15()';
+  }
 }
 
 final class LargeErrorExceptionCase16 extends LargeErrorException {
   const LargeErrorExceptionCase16();
+
+  @override
+  String toString() {
+    return 'LargeErrorExceptionCase16()';
+  }
 }
 
 final class LargeErrorExceptionCase17 extends LargeErrorException {
   const LargeErrorExceptionCase17();
+
+  @override
+  String toString() {
+    return 'LargeErrorExceptionCase17()';
+  }
 }
 
 final class LargeErrorExceptionCase18 extends LargeErrorException {
   const LargeErrorExceptionCase18();
+
+  @override
+  String toString() {
+    return 'LargeErrorExceptionCase18()';
+  }
 }
 
 final class LargeErrorExceptionCase19 extends LargeErrorException {
   const LargeErrorExceptionCase19();
+
+  @override
+  String toString() {
+    return 'LargeErrorExceptionCase19()';
+  }
 }
 
 final class LargeErrorExceptionCase20 extends LargeErrorException {
   const LargeErrorExceptionCase20();
+
+  @override
+  String toString() {
+    return 'LargeErrorExceptionCase20()';
+  }
 }
 
 final class LargeErrorExceptionCase21 extends LargeErrorException {
   const LargeErrorExceptionCase21();
+
+  @override
+  String toString() {
+    return 'LargeErrorExceptionCase21()';
+  }
 }
 
 final class LargeErrorExceptionCase22 extends LargeErrorException {
   const LargeErrorExceptionCase22();
+
+  @override
+  String toString() {
+    return 'LargeErrorExceptionCase22()';
+  }
 }
 
 final class LargeErrorExceptionCase23 extends LargeErrorException {
   const LargeErrorExceptionCase23();
+
+  @override
+  String toString() {
+    return 'LargeErrorExceptionCase23()';
+  }
 }
 
 final class LargeErrorExceptionCase24 extends LargeErrorException {
   const LargeErrorExceptionCase24();
+
+  @override
+  String toString() {
+    return 'LargeErrorExceptionCase24()';
+  }
 }
 
 final class LargeErrorExceptionCase25 extends LargeErrorException {
   const LargeErrorExceptionCase25();
+
+  @override
+  String toString() {
+    return 'LargeErrorExceptionCase25()';
+  }
 }
 
 final class LargeErrorExceptionCase26 extends LargeErrorException {
   const LargeErrorExceptionCase26();
+
+  @override
+  String toString() {
+    return 'LargeErrorExceptionCase26()';
+  }
 }
 
 final class LargeErrorExceptionCase27 extends LargeErrorException {
   const LargeErrorExceptionCase27();
+
+  @override
+  String toString() {
+    return 'LargeErrorExceptionCase27()';
+  }
 }
 
 final class LargeErrorExceptionCase28 extends LargeErrorException {
   const LargeErrorExceptionCase28();
+
+  @override
+  String toString() {
+    return 'LargeErrorExceptionCase28()';
+  }
 }
 
 final class LargeErrorExceptionCase29 extends LargeErrorException {
   const LargeErrorExceptionCase29();
+
+  @override
+  String toString() {
+    return 'LargeErrorExceptionCase29()';
+  }
 }
 
 final class LargeErrorExceptionCase30 extends LargeErrorException {
   const LargeErrorExceptionCase30();
+
+  @override
+  String toString() {
+    return 'LargeErrorExceptionCase30()';
+  }
 }
 
 String _encodeLargeEnum(LargeEnum value) {
@@ -371,110 +911,59 @@ String _encodeLargeEnum(LargeEnum value) {
 }
 
 LargeEnum _decodeLargeEnum(String raw) {
-  switch (raw) {
-    case 'variant1':
-      return LargeEnum.variant1;
-    case 'variant2':
-      return LargeEnum.variant2;
-    case 'variant3':
-      return LargeEnum.variant3;
-    case 'variant4':
-      return LargeEnum.variant4;
-    case 'variant5':
-      return LargeEnum.variant5;
-    case 'variant6':
-      return LargeEnum.variant6;
-    case 'variant7':
-      return LargeEnum.variant7;
-    case 'variant8':
-      return LargeEnum.variant8;
-    case 'variant9':
-      return LargeEnum.variant9;
-    case 'variant10':
-      return LargeEnum.variant10;
-    case 'variant11':
-      return LargeEnum.variant11;
-    case 'variant12':
-      return LargeEnum.variant12;
-    case 'variant13':
-      return LargeEnum.variant13;
-    case 'variant14':
-      return LargeEnum.variant14;
-    case 'variant15':
-      return LargeEnum.variant15;
-    case 'variant16':
-      return LargeEnum.variant16;
-    case 'variant17':
-      return LargeEnum.variant17;
-    case 'variant18':
-      return LargeEnum.variant18;
-    case 'variant19':
-      return LargeEnum.variant19;
-    case 'variant20':
-      return LargeEnum.variant20;
-    case 'variant21':
-      return LargeEnum.variant21;
-    case 'variant22':
-      return LargeEnum.variant22;
-    case 'variant23':
-      return LargeEnum.variant23;
-    case 'variant24':
-      return LargeEnum.variant24;
-    case 'variant25':
-      return LargeEnum.variant25;
-    case 'variant26':
-      return LargeEnum.variant26;
-    case 'variant27':
-      return LargeEnum.variant27;
-    case 'variant28':
-      return LargeEnum.variant28;
-    case 'variant29':
-      return LargeEnum.variant29;
-    case 'variant30':
-      return LargeEnum.variant30;
-    case 'variant31':
-      return LargeEnum.variant31;
-    case 'variant32':
-      return LargeEnum.variant32;
-    case 'variant33':
-      return LargeEnum.variant33;
-    case 'variant34':
-      return LargeEnum.variant34;
-    case 'variant35':
-      return LargeEnum.variant35;
-    case 'variant36':
-      return LargeEnum.variant36;
-    case 'variant37':
-      return LargeEnum.variant37;
-    case 'variant38':
-      return LargeEnum.variant38;
-    case 'variant39':
-      return LargeEnum.variant39;
-    case 'variant40':
-      return LargeEnum.variant40;
-    case 'variant41':
-      return LargeEnum.variant41;
-    case 'variant42':
-      return LargeEnum.variant42;
-    case 'variant43':
-      return LargeEnum.variant43;
-    case 'variant44':
-      return LargeEnum.variant44;
-    case 'variant45':
-      return LargeEnum.variant45;
-    case 'variant46':
-      return LargeEnum.variant46;
-    case 'variant47':
-      return LargeEnum.variant47;
-    case 'variant48':
-      return LargeEnum.variant48;
-    case 'variant49':
-      return LargeEnum.variant49;
-    case 'variant50':
-      return LargeEnum.variant50;
-    default:
-      throw StateError('Unknown LargeEnum variant: $raw');
-  }
+  return switch (raw) {
+    'variant1' => LargeEnum.variant1,
+    'variant2' => LargeEnum.variant2,
+    'variant3' => LargeEnum.variant3,
+    'variant4' => LargeEnum.variant4,
+    'variant5' => LargeEnum.variant5,
+    'variant6' => LargeEnum.variant6,
+    'variant7' => LargeEnum.variant7,
+    'variant8' => LargeEnum.variant8,
+    'variant9' => LargeEnum.variant9,
+    'variant10' => LargeEnum.variant10,
+    'variant11' => LargeEnum.variant11,
+    'variant12' => LargeEnum.variant12,
+    'variant13' => LargeEnum.variant13,
+    'variant14' => LargeEnum.variant14,
+    'variant15' => LargeEnum.variant15,
+    'variant16' => LargeEnum.variant16,
+    'variant17' => LargeEnum.variant17,
+    'variant18' => LargeEnum.variant18,
+    'variant19' => LargeEnum.variant19,
+    'variant20' => LargeEnum.variant20,
+    'variant21' => LargeEnum.variant21,
+    'variant22' => LargeEnum.variant22,
+    'variant23' => LargeEnum.variant23,
+    'variant24' => LargeEnum.variant24,
+    'variant25' => LargeEnum.variant25,
+    'variant26' => LargeEnum.variant26,
+    'variant27' => LargeEnum.variant27,
+    'variant28' => LargeEnum.variant28,
+    'variant29' => LargeEnum.variant29,
+    'variant30' => LargeEnum.variant30,
+    'variant31' => LargeEnum.variant31,
+    'variant32' => LargeEnum.variant32,
+    'variant33' => LargeEnum.variant33,
+    'variant34' => LargeEnum.variant34,
+    'variant35' => LargeEnum.variant35,
+    'variant36' => LargeEnum.variant36,
+    'variant37' => LargeEnum.variant37,
+    'variant38' => LargeEnum.variant38,
+    'variant39' => LargeEnum.variant39,
+    'variant40' => LargeEnum.variant40,
+    'variant41' => LargeEnum.variant41,
+    'variant42' => LargeEnum.variant42,
+    'variant43' => LargeEnum.variant43,
+    'variant44' => LargeEnum.variant44,
+    'variant45' => LargeEnum.variant45,
+    'variant46' => LargeEnum.variant46,
+    'variant47' => LargeEnum.variant47,
+    'variant48' => LargeEnum.variant48,
+    'variant49' => LargeEnum.variant49,
+    'variant50' => LargeEnum.variant50,
+    _ => throw StateError('Unknown LargeEnum variant: $raw'),
+  };
 }
 
 String _encodeLargeError(LargeError value) {

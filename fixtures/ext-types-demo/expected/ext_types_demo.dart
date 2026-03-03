@@ -38,7 +38,7 @@ class WrapperRecord {
     };
   }
 
-  static WrapperRecord fromJson(Map<String, dynamic> json) {
+  factory WrapperRecord.fromJson(Map<String, dynamic> json) {
     return WrapperRecord(
       inner: RemoteThing.fromJson(json['inner'] as Map<String, dynamic>),
       label: json['label'] as String,
@@ -54,6 +54,19 @@ class WrapperRecord {
       label: label ?? this.label,
     );
   }
+
+  @override
+  String toString() {
+    return 'WrapperRecord(inner: $inner, label: $label)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is WrapperRecord && inner == other.inner && label == other.label;
+
+  @override
+  int get hashCode => Object.hash(inner, label);
 }
 
 class ExtTypesDemoFfi {

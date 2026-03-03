@@ -65,7 +65,7 @@ class Person {
     };
   }
 
-  static Person fromJson(Map<String, dynamic> json) {
+  factory Person.fromJson(Map<String, dynamic> json) {
     return Person(
       name: json['name'] as String,
       age: (json['age'] as num).toInt(),
@@ -81,6 +81,19 @@ class Person {
       age: age ?? this.age,
     );
   }
+
+  @override
+  String toString() {
+    return 'Person(name: $name, age: $age)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Person && name == other.name && age == other.age;
+
+  @override
+  int get hashCode => Object.hash(name, age);
 }
 
 enum Color {
@@ -95,6 +108,19 @@ sealed class MathError {
 
 final class MathErrorDivisionByZero extends MathError {
   const MathErrorDivisionByZero();
+
+  @override
+  String toString() {
+    return 'MathErrorDivisionByZero()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MathErrorDivisionByZero;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class MathErrorNegativeInput extends MathError {
@@ -102,6 +128,19 @@ final class MathErrorNegativeInput extends MathError {
     required this.value,
   });
   final int value;
+
+  @override
+  String toString() {
+    return 'MathErrorNegativeInput(value: $value)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MathErrorNegativeInput && value == other.value;
+
+  @override
+  int get hashCode => value.hashCode;
 }
 
 sealed class Outcome {
@@ -113,6 +152,19 @@ final class OutcomeSuccess extends Outcome {
     required this.message,
   });
   final String message;
+
+  @override
+  String toString() {
+    return 'OutcomeSuccess(message: $message)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is OutcomeSuccess && message == other.message;
+
+  @override
+  int get hashCode => message.hashCode;
 }
 
 final class OutcomeFailure extends Outcome {
@@ -122,6 +174,19 @@ final class OutcomeFailure extends Outcome {
   });
   final int code;
   final String reason;
+
+  @override
+  String toString() {
+    return 'OutcomeFailure(code: $code, reason: $reason)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is OutcomeFailure && code == other.code && reason == other.reason;
+
+  @override
+  int get hashCode => Object.hash(code, reason);
 }
 
 sealed class MathErrorException implements Exception {
@@ -130,6 +195,11 @@ sealed class MathErrorException implements Exception {
 
 final class MathErrorExceptionDivisionByZero extends MathErrorException {
   const MathErrorExceptionDivisionByZero();
+
+  @override
+  String toString() {
+    return 'MathErrorExceptionDivisionByZero()';
+  }
 }
 
 final class MathErrorExceptionNegativeInput extends MathErrorException {
@@ -137,6 +207,11 @@ final class MathErrorExceptionNegativeInput extends MathErrorException {
     required this.value,
   });
   final int value;
+
+  @override
+  String toString() {
+    return 'MathErrorExceptionNegativeInput(value: $value)';
+  }
 }
 
 String _encodeColor(Color value) {
@@ -148,16 +223,12 @@ String _encodeColor(Color value) {
 }
 
 Color _decodeColor(String raw) {
-  switch (raw) {
-    case 'red':
-      return Color.red;
-    case 'green':
-      return Color.green;
-    case 'blue':
-      return Color.blue;
-    default:
-      throw StateError('Unknown Color variant: $raw');
-  }
+  return switch (raw) {
+    'red' => Color.red,
+    'green' => Color.green,
+    'blue' => Color.blue,
+    _ => throw StateError('Unknown Color variant: $raw'),
+  };
 }
 
 String _encodeMathError(MathError value) {
@@ -1972,7 +2043,7 @@ class SimpleFnsBindings {
   late final void Function(int handle) _asyncCountBucketsEchoRustFutureFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_free_string');
 
   Future<Map<String, List<int>>> asyncCountBucketsEcho(Map<String, List<int>> input) async {
-    final String inputNativeJson = jsonEncode(input.map((key, value) => MapEntry(key, value.map((item) => item).toList())));
+    final String inputNativeJson = jsonEncode(input.map((key, value) => MapEntry(key, value)));
     final ffi.Pointer<Utf8> inputNative = inputNativeJson.toNativeUtf8();
     final int futureHandle;
     try {
@@ -2044,7 +2115,7 @@ class SimpleFnsBindings {
   late final void Function(int handle) _asyncCountMapEchoRustFutureFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_free_string');
 
   Future<Map<String, int>> asyncCountMapEcho(Map<String, int> items) async {
-    final String itemsNativeJson = jsonEncode(items.map((key, value) => MapEntry(key, value)));
+    final String itemsNativeJson = jsonEncode(items);
     final ffi.Pointer<Utf8> itemsNative = itemsNativeJson.toNativeUtf8();
     final int futureHandle;
     try {
@@ -2174,7 +2245,7 @@ class SimpleFnsBindings {
   late final void Function(int handle) _asyncCountsRustFutureFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_free_string');
 
   Future<Map<String, int>> asyncCounts(Map<String, int> items) async {
-    final String itemsNativeJson = jsonEncode(items.map((key, value) => MapEntry(key, value)));
+    final String itemsNativeJson = jsonEncode(items);
     final ffi.Pointer<Utf8> itemsNative = itemsNativeJson.toNativeUtf8();
     final int futureHandle;
     try {
@@ -2955,7 +3026,7 @@ class SimpleFnsBindings {
   late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> input) _countBucketsEcho = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> input), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> input)>('count_buckets_echo');
 
   Map<String, List<int>> countBucketsEcho(Map<String, List<int>> input) {
-    final String inputNativeJson = jsonEncode(input.map((key, value) => MapEntry(key, value.map((item) => item).toList())));
+    final String inputNativeJson = jsonEncode(input.map((key, value) => MapEntry(key, value)));
     final ffi.Pointer<Utf8> inputNative = inputNativeJson.toNativeUtf8();
     try {
       final ffi.Pointer<Utf8> resultPtr = _countBucketsEcho(inputNative);
@@ -2976,7 +3047,7 @@ class SimpleFnsBindings {
   late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> items) _countMapEcho = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> items), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> items)>('count_map_echo');
 
   Map<String, int> countMapEcho(Map<String, int> items) {
-    final String itemsNativeJson = jsonEncode(items.map((key, value) => MapEntry(key, value)));
+    final String itemsNativeJson = jsonEncode(items);
     final ffi.Pointer<Utf8> itemsNative = itemsNativeJson.toNativeUtf8();
     try {
       final ffi.Pointer<Utf8> resultPtr = _countMapEcho(itemsNative);
@@ -3486,7 +3557,7 @@ class SimpleFnsBindings {
   late final void Function(int handle) _counterAsyncCountBucketsEchoRustFutureFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_free_string');
 
   Future<Map<String, List<int>>> counterInvokeAsyncCountBucketsEcho(int handle, Map<String, List<int>> input) async {
-    final String inputNativeJson = jsonEncode(input.map((key, value) => MapEntry(key, value.map((item) => item).toList())));
+    final String inputNativeJson = jsonEncode(input.map((key, value) => MapEntry(key, value)));
     final ffi.Pointer<Utf8> inputNative = inputNativeJson.toNativeUtf8();
     final int futureHandle;
     try {
@@ -3558,7 +3629,7 @@ class SimpleFnsBindings {
   late final void Function(int handle) _counterAsyncCountMapEchoRustFutureFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_free_string');
 
   Future<Map<String, int>> counterInvokeAsyncCountMapEcho(int handle, Map<String, int> items) async {
-    final String itemsNativeJson = jsonEncode(items.map((key, value) => MapEntry(key, value)));
+    final String itemsNativeJson = jsonEncode(items);
     final ffi.Pointer<Utf8> itemsNative = itemsNativeJson.toNativeUtf8();
     final int futureHandle;
     try {
@@ -3688,7 +3759,7 @@ class SimpleFnsBindings {
   late final void Function(int handle) _counterAsyncCountsRustFutureFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_free_string');
 
   Future<Map<String, int>> counterInvokeAsyncCounts(int handle, Map<String, int> items) async {
-    final String itemsNativeJson = jsonEncode(items.map((key, value) => MapEntry(key, value)));
+    final String itemsNativeJson = jsonEncode(items);
     final ffi.Pointer<Utf8> itemsNative = itemsNativeJson.toNativeUtf8();
     final int futureHandle;
     try {
@@ -4251,7 +4322,7 @@ class SimpleFnsBindings {
   late final ffi.Pointer<Utf8> Function(int handle, ffi.Pointer<Utf8> input) _counterCountBucketsEcho = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle, ffi.Pointer<Utf8> input), ffi.Pointer<Utf8> Function(int handle, ffi.Pointer<Utf8> input)>('counter_count_buckets_echo');
 
   Map<String, List<int>> counterInvokeCountBucketsEcho(int handle, Map<String, List<int>> input) {
-    final String inputNativeJson = jsonEncode(input.map((key, value) => MapEntry(key, value.map((item) => item).toList())));
+    final String inputNativeJson = jsonEncode(input.map((key, value) => MapEntry(key, value)));
     final ffi.Pointer<Utf8> inputNative = inputNativeJson.toNativeUtf8();
     try {
     final ffi.Pointer<Utf8> resultPtr = _counterCountBucketsEcho(handle, inputNative);
@@ -4272,7 +4343,7 @@ class SimpleFnsBindings {
   late final ffi.Pointer<Utf8> Function(int handle, ffi.Pointer<Utf8> items) _counterCountMapEcho = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle, ffi.Pointer<Utf8> items), ffi.Pointer<Utf8> Function(int handle, ffi.Pointer<Utf8> items)>('counter_count_map_echo');
 
   Map<String, int> counterInvokeCountMapEcho(int handle, Map<String, int> items) {
-    final String itemsNativeJson = jsonEncode(items.map((key, value) => MapEntry(key, value)));
+    final String itemsNativeJson = jsonEncode(items);
     final ffi.Pointer<Utf8> itemsNative = itemsNativeJson.toNativeUtf8();
     try {
     final ffi.Pointer<Utf8> resultPtr = _counterCountMapEcho(handle, itemsNative);

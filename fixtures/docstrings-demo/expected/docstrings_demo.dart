@@ -28,7 +28,7 @@ class Point {
     };
   }
 
-  static Point fromJson(Map<String, dynamic> json) {
+  factory Point.fromJson(Map<String, dynamic> json) {
     return Point(
       x: (json['x'] as num).toInt(),
       y: (json['y'] as num).toInt(),
@@ -44,6 +44,19 @@ class Point {
       y: y ?? this.y,
     );
   }
+
+  @override
+  String toString() {
+    return 'Point(x: $x, y: $y)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Point && x == other.x && y == other.y;
+
+  @override
+  int get hashCode => Object.hash(x, y);
 }
 
 /// Mood state.
@@ -62,14 +75,11 @@ String _encodeMood(Mood value) {
 }
 
 Mood _decodeMood(String raw) {
-  switch (raw) {
-    case 'happy':
-      return Mood.happy;
-    case 'sad':
-      return Mood.sad;
-    default:
-      throw StateError('Unknown Mood variant: $raw');
-  }
+  return switch (raw) {
+    'happy' => Mood.happy,
+    'sad' => Mood.sad,
+    _ => throw StateError('Unknown Mood variant: $raw'),
+  };
 }
 
 final class MoodFfiCodec {

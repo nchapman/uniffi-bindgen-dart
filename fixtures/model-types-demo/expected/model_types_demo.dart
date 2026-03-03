@@ -5,6 +5,8 @@ library model_types_demo;
 import 'dart:convert';
 import 'dart:ffi' as ffi;
 
+const _sentinel = Object();
+
 class Person {
   const Person({
     required this.name,
@@ -20,29 +22,42 @@ class Person {
     return {
       'name': this.name,
       'age': this.age,
-      'nickname': this.nickname == null ? null : (() { final __tmp = this.nickname!; return __tmp; })(),
+      'nickname': this.nickname,
     };
   }
 
-  static Person fromJson(Map<String, dynamic> json) {
+  factory Person.fromJson(Map<String, dynamic> json) {
     return Person(
       name: json['name'] as String,
       age: (json['age'] as num).toInt(),
-      nickname: json['nickname'] == null ? null : (() { final __tmp = json['nickname']; return __tmp as String; })(),
+      nickname: json['nickname'] == null ? null : json['nickname'] as String,
     );
   }
 
   Person copyWith({
     String? name,
     int? age,
-    String? nickname,
+    Object? nickname = _sentinel,
   }) {
     return Person(
       name: name ?? this.name,
       age: age ?? this.age,
-      nickname: nickname ?? this.nickname,
+      nickname: nickname == _sentinel ? this.nickname : nickname as String?,
     );
   }
+
+  @override
+  String toString() {
+    return 'Person(name: $name, age: $age, nickname: $nickname)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Person && name == other.name && age == other.age && nickname == other.nickname;
+
+  @override
+  int get hashCode => Object.hash(name, age, nickname);
 }
 
 enum Color {
@@ -60,6 +75,19 @@ final class OutcomeSuccess extends Outcome {
     required this.message,
   });
   final String message;
+
+  @override
+  String toString() {
+    return 'OutcomeSuccess(message: $message)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is OutcomeSuccess && message == other.message;
+
+  @override
+  int get hashCode => message.hashCode;
 }
 
 final class OutcomeFailure extends Outcome {
@@ -69,6 +97,19 @@ final class OutcomeFailure extends Outcome {
   });
   final int code;
   final String reason;
+
+  @override
+  String toString() {
+    return 'OutcomeFailure(code: $code, reason: $reason)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is OutcomeFailure && code == other.code && reason == other.reason;
+
+  @override
+  int get hashCode => Object.hash(code, reason);
 }
 
 String _encodeColor(Color value) {
@@ -80,16 +121,12 @@ String _encodeColor(Color value) {
 }
 
 Color _decodeColor(String raw) {
-  switch (raw) {
-    case 'red':
-      return Color.red;
-    case 'green':
-      return Color.green;
-    case 'blue':
-      return Color.blue;
-    default:
-      throw StateError('Unknown Color variant: $raw');
-  }
+  return switch (raw) {
+    'red' => Color.red,
+    'green' => Color.green,
+    'blue' => Color.blue,
+    _ => throw StateError('Unknown Color variant: $raw'),
+  };
 }
 
 String _encodeOutcome(Outcome value) {

@@ -25,7 +25,7 @@ class Break {
     };
   }
 
-  static Break fromJson(Map<String, dynamic> json) {
+  factory Break.fromJson(Map<String, dynamic> json) {
     return Break(
       class_: json['class_'] as String,
       return_: (json['return_'] as num).toInt(),
@@ -44,6 +44,19 @@ class Break {
       is_: is_ ?? this.is_,
     );
   }
+
+  @override
+  String toString() {
+    return 'Break(class_: $class_, return_: $return_, is_: $is_)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Break && class_ == other.class_ && return_ == other.return_ && is_ == other.is_;
+
+  @override
+  int get hashCode => Object.hash(class_, return_, is_);
 }
 
 enum Async {
@@ -58,10 +71,36 @@ sealed class Throw {
 
 final class ThrowCatch extends Throw {
   const ThrowCatch();
+
+  @override
+  String toString() {
+    return 'ThrowCatch()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ThrowCatch;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class ThrowRethrow extends Throw {
   const ThrowRethrow();
+
+  @override
+  String toString() {
+    return 'ThrowRethrow()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ThrowRethrow;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 sealed class ThrowException implements Exception {
@@ -70,10 +109,20 @@ sealed class ThrowException implements Exception {
 
 final class ThrowExceptionCatch extends ThrowException {
   const ThrowExceptionCatch();
+
+  @override
+  String toString() {
+    return 'ThrowExceptionCatch()';
+  }
 }
 
 final class ThrowExceptionRethrow extends ThrowException {
   const ThrowExceptionRethrow();
+
+  @override
+  String toString() {
+    return 'ThrowExceptionRethrow()';
+  }
 }
 
 String _encodeAsync(Async value) {
@@ -85,16 +134,12 @@ String _encodeAsync(Async value) {
 }
 
 Async _decodeAsync(String raw) {
-  switch (raw) {
-    case 'void_':
-      return Async.void_;
-    case 'yield_':
-      return Async.yield_;
-    case 'await_':
-      return Async.await_;
-    default:
-      throw StateError('Unknown Async variant: $raw');
-  }
+  return switch (raw) {
+    'void_' => Async.void_,
+    'yield_' => Async.yield_,
+    'await_' => Async.await_,
+    _ => throw StateError('Unknown Async variant: $raw'),
+  };
 }
 
 String _encodeThrow(Throw value) {

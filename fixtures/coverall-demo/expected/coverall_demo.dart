@@ -25,6 +25,8 @@ const int _rustCallStatusSuccess = 0;
 const int _rustCallStatusError = 1;
 const int _rustCallStatusUnexpectedError = 2;
 const int _rustCallStatusCancelled = 3;
+const _sentinel = Object();
+
 /// Record with default values — tests default field generation.
 class DictWithDefaults {
   const DictWithDefaults({
@@ -44,17 +46,17 @@ class DictWithDefaults {
   Map<String, dynamic> toJson() {
     return {
       'name': this.name,
-      'category': this.category == null ? null : (() { final __tmp = this.category!; return __tmp; })(),
+      'category': this.category,
       'integer': this.integer,
-      'itemList': this.itemList.map((item) => item).toList(),
-      'itemMap': this.itemMap.map((key, value) => MapEntry(key, value)),
+      'itemList': this.itemList,
+      'itemMap': this.itemMap,
     };
   }
 
-  static DictWithDefaults fromJson(Map<String, dynamic> json) {
+  factory DictWithDefaults.fromJson(Map<String, dynamic> json) {
     return DictWithDefaults(
       name: json.containsKey('name') ? json['name'] as String : 'default-value',
-      category: json.containsKey('category') ? json['category'] == null ? null : (() { final __tmp = json['category']; return __tmp as String; })() : null,
+      category: json.containsKey('category') ? json['category'] == null ? null : json['category'] as String : null,
       integer: json.containsKey('integer') ? (json['integer'] as num).toInt() : 31,
       itemList: json.containsKey('itemList') ? (json['itemList'] as List).map((item) => item as String).toList() : const [],
       itemMap: json.containsKey('itemMap') ? (json['itemMap'] as Map<String, dynamic>).map((key, value) => MapEntry(key, value as String)) : const {},
@@ -63,19 +65,32 @@ class DictWithDefaults {
 
   DictWithDefaults copyWith({
     String? name,
-    String? category,
+    Object? category = _sentinel,
     int? integer,
     List<String>? itemList,
     Map<String, String>? itemMap,
   }) {
     return DictWithDefaults(
       name: name ?? this.name,
-      category: category ?? this.category,
+      category: category == _sentinel ? this.category : category as String?,
       integer: integer ?? this.integer,
       itemList: itemList ?? this.itemList,
       itemMap: itemMap ?? this.itemMap,
     );
   }
+
+  @override
+  String toString() {
+    return 'DictWithDefaults(name: $name, category: $category, integer: $integer, itemList: $itemList, itemMap: $itemMap)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DictWithDefaults && name == other.name && category == other.category && integer == other.integer && itemList == other.itemList && itemMap == other.itemMap;
+
+  @override
+  int get hashCode => Object.hash(name, category, integer, itemList, itemMap);
 }
 
 /// Empty record — tests zero-field record generation.
@@ -88,10 +103,23 @@ class EmptyStruct {
     };
   }
 
-  static EmptyStruct fromJson(Map<String, dynamic> json) {
+  factory EmptyStruct.fromJson(Map<String, dynamic> json) {
     return EmptyStruct(
     );
   }
+
+  @override
+  String toString() {
+    return 'EmptyStruct()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is EmptyStruct;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 /// Record with an object field — tests object-in-record via JSON codec.
@@ -111,7 +139,7 @@ class Repair {
     };
   }
 
-  static Repair fromJson(Map<String, dynamic> json) {
+  factory Repair.fromJson(Map<String, dynamic> json) {
     return Repair(
       when_: DateTime.fromMicrosecondsSinceEpoch((json['when_'] as num).toInt(), isUtc: true),
       patch: PatchFfiCodec.lift((json['patch'] as num).toInt()),
@@ -127,6 +155,19 @@ class Repair {
       patch: patch ?? this.patch,
     );
   }
+
+  @override
+  String toString() {
+    return 'Repair(when_: $when_, patch: $patch)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Repair && when_ == other.when_ && patch == other.patch;
+
+  @override
+  int get hashCode => Object.hash(when_, patch);
 }
 
 /// Return-only record type with an error enum as a field.
@@ -143,7 +184,7 @@ class ReturnOnlyDict {
     };
   }
 
-  static ReturnOnlyDict fromJson(Map<String, dynamic> json) {
+  factory ReturnOnlyDict.fromJson(Map<String, dynamic> json) {
     return ReturnOnlyDict(
       e: CoverallFlatErrorFfiCodec.decode(json['e'] as String),
     );
@@ -156,6 +197,19 @@ class ReturnOnlyDict {
       e: e ?? this.e,
     );
   }
+
+  @override
+  String toString() {
+    return 'ReturnOnlyDict(e: $e)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ReturnOnlyDict && e == other.e;
+
+  @override
+  int get hashCode => e.hashCode;
 }
 
 /// Primary test record with a rich set of field types.
@@ -208,25 +262,25 @@ class SimpleDict {
       'maybeCount': this.maybeCount,
       'flag': this.flag,
       'color': ColorFfiCodec.encode(this.color),
-      'tags': this.tags.map((item) => item).toList(),
-      'counts': this.counts.map((key, value) => MapEntry(key, value)),
-      'maybeText': this.maybeText == null ? null : (() { final __tmp = this.maybeText!; return __tmp; })(),
+      'tags': this.tags,
+      'counts': this.counts,
+      'maybeText': this.maybeText,
       'maybePatch': this.maybePatch == null ? null : (() { final __tmp = this.maybePatch!; return PatchFfiCodec.lower(__tmp); })(),
-      'maybeU8': this.maybeU8 == null ? null : (() { final __tmp = this.maybeU8!; return __tmp; })(),
-      'maybeU16': this.maybeU16 == null ? null : (() { final __tmp = this.maybeU16!; return __tmp; })(),
-      'maybeU64': this.maybeU64 == null ? null : (() { final __tmp = this.maybeU64!; return __tmp; })(),
-      'maybeI8': this.maybeI8 == null ? null : (() { final __tmp = this.maybeI8!; return __tmp; })(),
-      'maybeI64': this.maybeI64 == null ? null : (() { final __tmp = this.maybeI64!; return __tmp; })(),
-      'maybeF32': this.maybeF32 == null ? null : (() { final __tmp = this.maybeF32!; return __tmp; })(),
-      'maybeF64': this.maybeF64 == null ? null : (() { final __tmp = this.maybeF64!; return __tmp; })(),
-      'maybeBool': this.maybeBool == null ? null : (() { final __tmp = this.maybeBool!; return __tmp; })(),
+      'maybeU8': this.maybeU8,
+      'maybeU16': this.maybeU16,
+      'maybeU64': this.maybeU64,
+      'maybeI8': this.maybeI8,
+      'maybeI64': this.maybeI64,
+      'maybeF32': this.maybeF32,
+      'maybeF64': this.maybeF64,
+      'maybeBool': this.maybeBool,
       'maybeBytes': this.maybeBytes == null ? null : (() { final __tmp = this.maybeBytes!; return base64Encode(__tmp); })(),
       'someBytes': base64Encode(this.someBytes),
       'coveralls': this.coveralls == null ? null : (() { final __tmp = this.coveralls!; return CoverallsFfiCodec.lower(__tmp); })(),
     };
   }
 
-  static SimpleDict fromJson(Map<String, dynamic> json) {
+  factory SimpleDict.fromJson(Map<String, dynamic> json) {
     return SimpleDict(
       text: json['text'] as String,
       maybeCount: (json['maybeCount'] as num).toInt(),
@@ -234,16 +288,16 @@ class SimpleDict {
       color: ColorFfiCodec.decode(json['color'] as String),
       tags: (json['tags'] as List).map((item) => item as String).toList(),
       counts: (json['counts'] as Map<String, dynamic>).map((key, value) => MapEntry(key, (value as num).toInt())),
-      maybeText: json['maybeText'] == null ? null : (() { final __tmp = json['maybeText']; return __tmp as String; })(),
+      maybeText: json['maybeText'] == null ? null : json['maybeText'] as String,
       maybePatch: json['maybePatch'] == null ? null : (() { final __tmp = json['maybePatch']; return PatchFfiCodec.lift((__tmp as num).toInt()); })(),
-      maybeU8: json['maybeU8'] == null ? null : (() { final __tmp = json['maybeU8']; return (__tmp as num).toInt(); })(),
-      maybeU16: json['maybeU16'] == null ? null : (() { final __tmp = json['maybeU16']; return (__tmp as num).toInt(); })(),
-      maybeU64: json['maybeU64'] == null ? null : (() { final __tmp = json['maybeU64']; return (__tmp as num).toInt(); })(),
-      maybeI8: json['maybeI8'] == null ? null : (() { final __tmp = json['maybeI8']; return (__tmp as num).toInt(); })(),
-      maybeI64: json['maybeI64'] == null ? null : (() { final __tmp = json['maybeI64']; return (__tmp as num).toInt(); })(),
-      maybeF32: json['maybeF32'] == null ? null : (() { final __tmp = json['maybeF32']; return (__tmp as num).toDouble(); })(),
-      maybeF64: json['maybeF64'] == null ? null : (() { final __tmp = json['maybeF64']; return (__tmp as num).toDouble(); })(),
-      maybeBool: json['maybeBool'] == null ? null : (() { final __tmp = json['maybeBool']; return __tmp as bool; })(),
+      maybeU8: json['maybeU8'] == null ? null : (json['maybeU8'] as num).toInt(),
+      maybeU16: json['maybeU16'] == null ? null : (json['maybeU16'] as num).toInt(),
+      maybeU64: json['maybeU64'] == null ? null : (json['maybeU64'] as num).toInt(),
+      maybeI8: json['maybeI8'] == null ? null : (json['maybeI8'] as num).toInt(),
+      maybeI64: json['maybeI64'] == null ? null : (json['maybeI64'] as num).toInt(),
+      maybeF32: json['maybeF32'] == null ? null : (json['maybeF32'] as num).toDouble(),
+      maybeF64: json['maybeF64'] == null ? null : (json['maybeF64'] as num).toDouble(),
+      maybeBool: json['maybeBool'] == null ? null : json['maybeBool'] as bool,
       maybeBytes: json['maybeBytes'] == null ? null : (() { final __tmp = json['maybeBytes']; return base64Decode(__tmp as String); })(),
       someBytes: base64Decode(json['someBytes'] as String),
       coveralls: json['coveralls'] == null ? null : (() { final __tmp = json['coveralls']; return CoverallsFfiCodec.lift((__tmp as num).toInt()); })(),
@@ -257,19 +311,19 @@ class SimpleDict {
     Color? color,
     List<String>? tags,
     Map<String, int>? counts,
-    String? maybeText,
-    Patch? maybePatch,
-    int? maybeU8,
-    int? maybeU16,
-    int? maybeU64,
-    int? maybeI8,
-    int? maybeI64,
-    double? maybeF32,
-    double? maybeF64,
-    bool? maybeBool,
-    Uint8List? maybeBytes,
+    Object? maybeText = _sentinel,
+    Object? maybePatch = _sentinel,
+    Object? maybeU8 = _sentinel,
+    Object? maybeU16 = _sentinel,
+    Object? maybeU64 = _sentinel,
+    Object? maybeI8 = _sentinel,
+    Object? maybeI64 = _sentinel,
+    Object? maybeF32 = _sentinel,
+    Object? maybeF64 = _sentinel,
+    Object? maybeBool = _sentinel,
+    Object? maybeBytes = _sentinel,
     Uint8List? someBytes,
-    Coveralls? coveralls,
+    Object? coveralls = _sentinel,
   }) {
     return SimpleDict(
       text: text ?? this.text,
@@ -278,21 +332,34 @@ class SimpleDict {
       color: color ?? this.color,
       tags: tags ?? this.tags,
       counts: counts ?? this.counts,
-      maybeText: maybeText ?? this.maybeText,
-      maybePatch: maybePatch ?? this.maybePatch,
-      maybeU8: maybeU8 ?? this.maybeU8,
-      maybeU16: maybeU16 ?? this.maybeU16,
-      maybeU64: maybeU64 ?? this.maybeU64,
-      maybeI8: maybeI8 ?? this.maybeI8,
-      maybeI64: maybeI64 ?? this.maybeI64,
-      maybeF32: maybeF32 ?? this.maybeF32,
-      maybeF64: maybeF64 ?? this.maybeF64,
-      maybeBool: maybeBool ?? this.maybeBool,
-      maybeBytes: maybeBytes ?? this.maybeBytes,
+      maybeText: maybeText == _sentinel ? this.maybeText : maybeText as String?,
+      maybePatch: maybePatch == _sentinel ? this.maybePatch : maybePatch as Patch?,
+      maybeU8: maybeU8 == _sentinel ? this.maybeU8 : maybeU8 as int?,
+      maybeU16: maybeU16 == _sentinel ? this.maybeU16 : maybeU16 as int?,
+      maybeU64: maybeU64 == _sentinel ? this.maybeU64 : maybeU64 as int?,
+      maybeI8: maybeI8 == _sentinel ? this.maybeI8 : maybeI8 as int?,
+      maybeI64: maybeI64 == _sentinel ? this.maybeI64 : maybeI64 as int?,
+      maybeF32: maybeF32 == _sentinel ? this.maybeF32 : maybeF32 as double?,
+      maybeF64: maybeF64 == _sentinel ? this.maybeF64 : maybeF64 as double?,
+      maybeBool: maybeBool == _sentinel ? this.maybeBool : maybeBool as bool?,
+      maybeBytes: maybeBytes == _sentinel ? this.maybeBytes : maybeBytes as Uint8List?,
       someBytes: someBytes ?? this.someBytes,
-      coveralls: coveralls ?? this.coveralls,
+      coveralls: coveralls == _sentinel ? this.coveralls : coveralls as Coveralls?,
     );
   }
+
+  @override
+  String toString() {
+    return 'SimpleDict(text: $text, maybeCount: $maybeCount, flag: $flag, color: $color, tags: $tags, counts: $counts, maybeText: $maybeText, maybePatch: $maybePatch, maybeU8: $maybeU8, maybeU16: $maybeU16, maybeU64: $maybeU64, maybeI8: $maybeI8, maybeI64: $maybeI64, maybeF32: $maybeF32, maybeF64: $maybeF64, maybeBool: $maybeBool, maybeBytes: $maybeBytes, someBytes: $someBytes, coveralls: $coveralls)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SimpleDict && text == other.text && maybeCount == other.maybeCount && flag == other.flag && color == other.color && tags == other.tags && counts == other.counts && maybeText == other.maybeText && maybePatch == other.maybePatch && maybeU8 == other.maybeU8 && maybeU16 == other.maybeU16 && maybeU64 == other.maybeU64 && maybeI8 == other.maybeI8 && maybeI64 == other.maybeI64 && maybeF32 == other.maybeF32 && maybeF64 == other.maybeF64 && maybeBool == other.maybeBool && maybeBytes == other.maybeBytes && someBytes == other.someBytes && coveralls == other.coveralls;
+
+  @override
+  int get hashCode => Object.hash(text, maybeCount, flag, color, tags, counts, maybeText, maybePatch, maybeU8, maybeU16, maybeU64, maybeI8, maybeI64, maybeF32, maybeF64, maybeBool, maybeBytes, someBytes, coveralls);
 }
 
 /// Simple three-variant flat enum.
@@ -314,6 +381,19 @@ final class ComplexErrorOsError extends ComplexError {
   });
   final int code;
   final int extendedCode;
+
+  @override
+  String toString() {
+    return 'ComplexErrorOsError(code: $code, extendedCode: $extendedCode)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ComplexErrorOsError && code == other.code && extendedCode == other.extendedCode;
+
+  @override
+  int get hashCode => Object.hash(code, extendedCode);
 }
 
 final class ComplexErrorPermissionDenied extends ComplexError {
@@ -321,10 +401,36 @@ final class ComplexErrorPermissionDenied extends ComplexError {
     required this.reason,
   });
   final String reason;
+
+  @override
+  String toString() {
+    return 'ComplexErrorPermissionDenied(reason: $reason)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ComplexErrorPermissionDenied && reason == other.reason;
+
+  @override
+  int get hashCode => reason.hashCode;
 }
 
 final class ComplexErrorUnknownError extends ComplexError {
   const ComplexErrorUnknownError();
+
+  @override
+  String toString() {
+    return 'ComplexErrorUnknownError()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ComplexErrorUnknownError;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 /// Simple flat error (single tag discriminator).
@@ -334,6 +440,19 @@ sealed class CoverallError {
 
 final class CoverallErrorTooManyHoles extends CoverallError {
   const CoverallErrorTooManyHoles();
+
+  @override
+  String toString() {
+    return 'CoverallErrorTooManyHoles()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CoverallErrorTooManyHoles;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 /// Flat error with case-testing variant names.
@@ -343,6 +462,19 @@ sealed class CoverallFlatError {
 
 final class CoverallFlatErrorTooManyVariants extends CoverallFlatError {
   const CoverallFlatErrorTooManyVariants();
+
+  @override
+  String toString() {
+    return 'CoverallFlatErrorTooManyVariants()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CoverallFlatErrorTooManyVariants;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 /// Flat error with non-standard casing.
@@ -352,6 +484,19 @@ sealed class HTMLError {
 
 final class HTMLErrorInvalidHTML extends HTMLError {
   const HTMLErrorInvalidHTML();
+
+  @override
+  String toString() {
+    return 'HTMLErrorInvalidHTML()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is HTMLErrorInvalidHTML;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 /// Enum wrapping an object — tests object in data enum variant.
@@ -364,10 +509,36 @@ final class MaybeObjectObj extends MaybeObject {
     required this.p,
   });
   final Patch p;
+
+  @override
+  String toString() {
+    return 'MaybeObjectObj(p: $p)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MaybeObjectObj && p == other.p;
+
+  @override
+  int get hashCode => p.hashCode;
 }
 
 final class MaybeObjectNah extends MaybeObject {
   const MaybeObjectNah();
+
+  @override
+  String toString() {
+    return 'MaybeObjectNah()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MaybeObjectNah;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 /// Enum wrapping a record — tests enum-with-associated-data.
@@ -380,10 +551,36 @@ final class MaybeSimpleDictYeah extends MaybeSimpleDict {
     required this.value,
   });
   final SimpleDict value;
+
+  @override
+  String toString() {
+    return 'MaybeSimpleDictYeah(value: $value)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MaybeSimpleDictYeah && value == other.value;
+
+  @override
+  int get hashCode => value.hashCode;
 }
 
 final class MaybeSimpleDictNah extends MaybeSimpleDict {
   const MaybeSimpleDictNah();
+
+  @override
+  String toString() {
+    return 'MaybeSimpleDictNah()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MaybeSimpleDictNah;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 /// Return-only enum with nested error and record types.
@@ -396,6 +593,19 @@ final class ReturnOnlyEnumOne extends ReturnOnlyEnum {
     required this.e,
   });
   final CoverallFlatError e;
+
+  @override
+  String toString() {
+    return 'ReturnOnlyEnumOne(e: $e)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ReturnOnlyEnumOne && e == other.e;
+
+  @override
+  int get hashCode => e.hashCode;
 }
 
 final class ReturnOnlyEnumTwo extends ReturnOnlyEnum {
@@ -403,6 +613,19 @@ final class ReturnOnlyEnumTwo extends ReturnOnlyEnum {
     required this.d,
   });
   final ReturnOnlyDict d;
+
+  @override
+  String toString() {
+    return 'ReturnOnlyEnumTwo(d: $d)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ReturnOnlyEnumTwo && d == other.d;
+
+  @override
+  int get hashCode => d.hashCode;
 }
 
 final class ReturnOnlyEnumThree extends ReturnOnlyEnum {
@@ -410,6 +633,19 @@ final class ReturnOnlyEnumThree extends ReturnOnlyEnum {
     required this.l,
   });
   final List<CoverallFlatError> l;
+
+  @override
+  String toString() {
+    return 'ReturnOnlyEnumThree(l: $l)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ReturnOnlyEnumThree && l == other.l;
+
+  @override
+  int get hashCode => l.hashCode;
 }
 
 final class ReturnOnlyEnumFour extends ReturnOnlyEnum {
@@ -417,6 +653,19 @@ final class ReturnOnlyEnumFour extends ReturnOnlyEnum {
     required this.m,
   });
   final Map<String, CoverallFlatError> m;
+
+  @override
+  String toString() {
+    return 'ReturnOnlyEnumFour(m: $m)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ReturnOnlyEnumFour && m == other.m;
+
+  @override
+  int get hashCode => m.hashCode;
 }
 
 /// Rich error with structured variant data.
@@ -431,6 +680,11 @@ final class ComplexErrorExceptionOsError extends ComplexErrorException {
   });
   final int code;
   final int extendedCode;
+
+  @override
+  String toString() {
+    return 'ComplexErrorExceptionOsError(code: $code, extendedCode: $extendedCode)';
+  }
 }
 
 final class ComplexErrorExceptionPermissionDenied extends ComplexErrorException {
@@ -438,10 +692,20 @@ final class ComplexErrorExceptionPermissionDenied extends ComplexErrorException 
     required this.reason,
   });
   final String reason;
+
+  @override
+  String toString() {
+    return 'ComplexErrorExceptionPermissionDenied(reason: $reason)';
+  }
 }
 
 final class ComplexErrorExceptionUnknownError extends ComplexErrorException {
   const ComplexErrorExceptionUnknownError();
+
+  @override
+  String toString() {
+    return 'ComplexErrorExceptionUnknownError()';
+  }
 }
 
 /// Simple flat error (single tag discriminator).
@@ -451,6 +715,11 @@ sealed class CoverallErrorException implements Exception {
 
 final class CoverallErrorExceptionTooManyHoles extends CoverallErrorException {
   const CoverallErrorExceptionTooManyHoles();
+
+  @override
+  String toString() {
+    return 'CoverallErrorExceptionTooManyHoles()';
+  }
 }
 
 /// Flat error with case-testing variant names.
@@ -460,6 +729,11 @@ sealed class CoverallFlatErrorException implements Exception {
 
 final class CoverallFlatErrorExceptionTooManyVariants extends CoverallFlatErrorException {
   const CoverallFlatErrorExceptionTooManyVariants();
+
+  @override
+  String toString() {
+    return 'CoverallFlatErrorExceptionTooManyVariants()';
+  }
 }
 
 /// Flat error with non-standard casing.
@@ -469,6 +743,11 @@ sealed class HTMLErrorException implements Exception {
 
 final class HTMLErrorExceptionInvalidHTML extends HTMLErrorException {
   const HTMLErrorExceptionInvalidHTML();
+
+  @override
+  String toString() {
+    return 'HTMLErrorExceptionInvalidHTML()';
+  }
 }
 
 String _encodeColor(Color value) {
@@ -480,16 +759,12 @@ String _encodeColor(Color value) {
 }
 
 Color _decodeColor(String raw) {
-  switch (raw) {
-    case 'red':
-      return Color.red;
-    case 'blue':
-      return Color.blue;
-    case 'green':
-      return Color.green;
-    default:
-      throw StateError('Unknown Color variant: $raw');
-  }
+  return switch (raw) {
+    'red' => Color.red,
+    'blue' => Color.blue,
+    'green' => Color.green,
+    _ => throw StateError('Unknown Color variant: $raw'),
+  };
 }
 
 String _encodeComplexError(ComplexError value) {
@@ -1806,7 +2081,7 @@ class CoverallDemoFfi {
       try {
         final String payload = resultPtr.toDartString();
         final Object? decoded = jsonDecode(payload);
-        return decoded == null ? null : (() { final __tmp = decoded; return (__tmp as num).toInt(); })();
+        return decoded == null ? null : (decoded as num).toInt();
       } finally {
         _rustStringFree(resultPtr);
       }
@@ -1837,7 +2112,7 @@ class CoverallDemoFfi {
       try {
         final String payload = resultPtr.toDartString();
         final Object? decoded = jsonDecode(payload);
-        return decoded == null ? null : (() { final __tmp = decoded; return __tmp as bool; })();
+        return decoded == null ? null : decoded as bool;
       } finally {
         _rustStringFree(resultPtr);
       }
@@ -2150,7 +2425,7 @@ class CoverallDemoFfi {
     }
     try {
       final String payload = resultPtr.toDartString();
-      return (jsonDecode(payload) as Map<String, dynamic>).map((key, value) => MapEntry(key, value == null ? null : (() { final __tmp = value; return __tmp as String; })()));
+      return (jsonDecode(payload) as Map<String, dynamic>).map((key, value) => MapEntry(key, value == null ? null : value as String));
     } finally {
       _rustStringFree(resultPtr);
     }
@@ -2223,7 +2498,7 @@ class CoverallDemoFfi {
     }
     try {
       final String payload = resultPtr.toDartString();
-      return (jsonDecode(payload) as List).map((item) => item == null ? null : (() { final __tmp = item; return __tmp as String; })()).toList();
+      return (jsonDecode(payload) as List).map((item) => item == null ? null : item as String).toList();
     } finally {
       _rustStringFree(resultPtr);
     }

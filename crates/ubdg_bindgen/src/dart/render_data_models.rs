@@ -1,9 +1,15 @@
 use std::collections::HashMap;
 
-use uniffi_bindgen::interface::Literal;
+use uniffi_bindgen::interface::{Literal, Type};
 
 use super::config::CustomTypeConfig;
 use super::*;
+
+fn has_nullable_field(fields: &[UdlArg]) -> bool {
+    fields
+        .iter()
+        .any(|f| matches!(f.type_, Type::Optional { .. }))
+}
 
 pub(super) fn render_data_models(
     records: &[UdlRecord],
@@ -13,6 +19,13 @@ pub(super) fn render_data_models(
     custom_types: &HashMap<String, CustomTypeConfig>,
 ) -> String {
     let mut out = String::new();
+
+    let needs_sentinel = records
+        .iter()
+        .any(|r| !r.fields.is_empty() && has_nullable_field(&r.fields));
+    if needs_sentinel {
+        out.push_str("const _sentinel = Object();\n\n");
+    }
 
     for record in records {
         let class_name = to_upper_camel(&record.name);
@@ -57,7 +70,7 @@ pub(super) fn render_data_models(
         out.push_str("    };\n");
         out.push_str("  }\n\n");
         out.push_str(&format!(
-            "  static {class_name} fromJson(Map<String, dynamic> json) {{\n"
+            "  factory {class_name}.fromJson(Map<String, dynamic> json) {{\n"
         ));
         out.push_str(&format!("    return {class_name}(\n"));
         for field in &record.fields {
@@ -86,21 +99,29 @@ pub(super) fn render_data_models(
             out.push_str(&format!("  {class_name} copyWith({{\n"));
             for field in &record.fields {
                 let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
-                let field_type = map_uniffi_type_to_dart(&field.type_, custom_types);
-                let copy_with_type = if field_type.ends_with('?') {
-                    field_type
+                let is_nullable = matches!(field.type_, Type::Optional { .. });
+                if is_nullable {
+                    out.push_str(&format!("    Object? {field_name} = _sentinel,\n"));
                 } else {
-                    format!("{field_type}?")
-                };
-                out.push_str(&format!("    {copy_with_type} {field_name},\n"));
+                    let field_type = map_uniffi_type_to_dart(&field.type_, custom_types);
+                    out.push_str(&format!("    {field_type}? {field_name},\n"));
+                }
             }
             out.push_str("  }) {\n");
             out.push_str(&format!("    return {class_name}(\n"));
             for field in &record.fields {
                 let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
-                out.push_str(&format!(
-                    "      {field_name}: {field_name} ?? this.{field_name},\n"
-                ));
+                let is_nullable = matches!(field.type_, Type::Optional { .. });
+                if is_nullable {
+                    let field_type = map_uniffi_type_to_dart(&field.type_, custom_types);
+                    out.push_str(&format!(
+                        "      {field_name}: {field_name} == _sentinel ? this.{field_name} : {field_name} as {field_type},\n"
+                    ));
+                } else {
+                    out.push_str(&format!(
+                        "      {field_name}: {field_name} ?? this.{field_name},\n"
+                    ));
+                }
             }
             out.push_str("    );\n");
             out.push_str("  }\n");
@@ -152,11 +173,7 @@ pub(super) fn render_data_models(
             }
             out.push_str("  }\n");
         }
-        out.push_str(&render_record_trait_methods(
-            &class_name,
-            &record.fields,
-            &record.traits,
-        ));
+        out.push_str(&render_record_trait_methods(&class_name, &record.fields));
 
         out.push_str("}\n\n");
     }
@@ -339,7 +356,6 @@ pub(super) fn render_data_models(
             out.push_str(&render_sealed_variant_trait_methods(
                 &class_name,
                 &variant.fields,
-                &enum_.traits,
             ));
             out.push_str("}\n\n");
         }
@@ -352,6 +368,7 @@ pub(super) fn render_data_models(
                 "final class {unknown_class} extends {enum_name} {{\n"
             ));
             out.push_str(&format!("  const {unknown_class}();\n"));
+            out.push_str(&render_sealed_variant_trait_methods(&unknown_class, &[]));
             out.push_str("}\n\n");
         }
     }
@@ -392,6 +409,10 @@ pub(super) fn render_data_models(
                     ));
                 }
             }
+            out.push_str(&render_error_variant_to_string(
+                &variant_exception,
+                &variant.fields,
+            ));
             out.push_str("}\n\n");
         }
         if enum_.is_non_exhaustive {
@@ -403,6 +424,7 @@ pub(super) fn render_data_models(
                 "final class {unknown_exception} extends {exception_name} {{\n"
             ));
             out.push_str(&format!("  const {unknown_exception}();\n"));
+            out.push_str(&render_error_variant_to_string(&unknown_exception, &[]));
             out.push_str("}\n\n");
         }
         if emit_uniffi_error_lift_helpers {
@@ -464,22 +486,22 @@ pub(super) fn render_data_models(
             out.push_str("}\n\n");
 
             out.push_str(&format!("{enum_name} _decode{enum_name}(String raw) {{\n"));
-            out.push_str("  switch (raw) {\n");
+            out.push_str("  return switch (raw) {\n");
             for variant in &enum_.variants {
                 let variant_name = safe_dart_identifier(&to_lower_camel(&variant.name));
-                out.push_str(&format!("    case '{variant_name}':\n"));
-                out.push_str(&format!("      return {enum_name}.{variant_name};\n"));
+                out.push_str(&format!(
+                    "    '{variant_name}' => {enum_name}.{variant_name},\n"
+                ));
             }
-            out.push_str("    default:\n");
             if enum_.is_non_exhaustive {
-                out.push_str(&format!("      return {enum_name}.unknown;\n"));
+                out.push_str(&format!("    _ => {enum_name}.unknown,\n"));
             } else {
                 out.push_str(&format!(
-                    "      throw StateError('Unknown {} variant: $raw');\n",
+                    "    _ => throw StateError('Unknown {} variant: $raw'),\n",
                     enum_name
                 ));
             }
-            out.push_str("  }\n");
+            out.push_str("  };\n");
             out.push_str("}\n\n");
             continue;
         }
@@ -654,93 +676,105 @@ pub(super) fn render_data_models(
     out
 }
 
-/// Render `toString`, `operator ==`, and `hashCode` for a record class
-/// when the corresponding traits are declared via `[Traits=(Display, Eq, Hash)]`.
-fn render_record_trait_methods(class_name: &str, fields: &[UdlArg], traits: &[String]) -> String {
+/// Render `toString`, `operator ==`, and `hashCode` for a record class or
+/// sealed enum variant class. All value types always get these three methods
+/// for idiomatic Dart structural equality and debugging.
+fn render_record_trait_methods(class_name: &str, fields: &[UdlArg]) -> String {
     let mut out = String::new();
-    let has_display = traits.iter().any(|t| t == "Display");
-    let has_eq = traits.iter().any(|t| t == "Eq");
-    let has_hash = traits.iter().any(|t| t == "Hash");
 
-    if has_display {
-        out.push('\n');
-        out.push_str("  @override\n");
-        out.push_str("  String toString() {\n");
-        let field_parts: Vec<String> = fields
-            .iter()
-            .map(|f| {
-                let name = safe_dart_identifier(&to_lower_camel(&f.name));
-                format!("{name}: ${name}")
-            })
-            .collect();
+    // toString
+    out.push('\n');
+    out.push_str("  @override\n");
+    out.push_str("  String toString() {\n");
+    let field_parts: Vec<String> = fields
+        .iter()
+        .map(|f| {
+            let name = safe_dart_identifier(&to_lower_camel(&f.name));
+            format!("{name}: ${name}")
+        })
+        .collect();
+    out.push_str(&format!(
+        "    return '{class_name}({})';\n",
+        field_parts.join(", ")
+    ));
+    out.push_str("  }\n");
+
+    // operator ==
+    out.push('\n');
+    out.push_str("  @override\n");
+    out.push_str("  bool operator ==(Object other) =>\n");
+    out.push_str("      identical(this, other) ||\n");
+    let field_comparisons: Vec<String> = fields
+        .iter()
+        .map(|f| {
+            let name = safe_dart_identifier(&to_lower_camel(&f.name));
+            format!("{name} == other.{name}")
+        })
+        .collect();
+    if field_comparisons.is_empty() {
+        out.push_str(&format!("      other is {class_name};\n"));
+    } else {
         out.push_str(&format!(
-            "    return '{class_name}({})';\n",
-            field_parts.join(", ")
+            "      other is {class_name} && {};\n",
+            field_comparisons.join(" && ")
         ));
-        out.push_str("  }\n");
     }
 
-    if has_eq {
-        out.push('\n');
-        out.push_str("  @override\n");
-        out.push_str("  bool operator ==(Object other) =>\n");
-        out.push_str("      identical(this, other) ||\n");
-        let field_comparisons: Vec<String> = fields
-            .iter()
-            .map(|f| {
-                let name = safe_dart_identifier(&to_lower_camel(&f.name));
-                format!("{name} == other.{name}")
-            })
-            .collect();
-        if field_comparisons.is_empty() {
-            out.push_str(&format!("      other is {class_name};\n"));
-        } else {
-            out.push_str(&format!(
-                "      other is {class_name} && {};\n",
-                field_comparisons.join(" && ")
-            ));
-        }
-    }
-
-    if has_hash {
-        out.push('\n');
-        out.push_str("  @override\n");
-        let field_names: Vec<String> = fields
-            .iter()
-            .map(|f| safe_dart_identifier(&to_lower_camel(&f.name)))
-            .collect();
-        if field_names.is_empty() {
-            out.push_str("  int get hashCode => runtimeType.hashCode;\n");
-        } else if field_names.len() == 1 {
-            out.push_str(&format!(
-                "  int get hashCode => {}.hashCode;\n",
-                field_names[0]
-            ));
-        } else if field_names.len() <= 20 {
-            out.push_str(&format!(
-                "  int get hashCode => Object.hash({});\n",
-                field_names.join(", ")
-            ));
-        } else {
-            out.push_str(&format!(
-                "  int get hashCode => Object.hashAll([{}]);\n",
-                field_names.join(", ")
-            ));
-        }
+    // hashCode
+    out.push('\n');
+    out.push_str("  @override\n");
+    let field_names: Vec<String> = fields
+        .iter()
+        .map(|f| safe_dart_identifier(&to_lower_camel(&f.name)))
+        .collect();
+    if field_names.is_empty() {
+        out.push_str("  int get hashCode => runtimeType.hashCode;\n");
+    } else if field_names.len() == 1 {
+        out.push_str(&format!(
+            "  int get hashCode => {}.hashCode;\n",
+            field_names[0]
+        ));
+    } else if field_names.len() <= 20 {
+        out.push_str(&format!(
+            "  int get hashCode => Object.hash({});\n",
+            field_names.join(", ")
+        ));
+    } else {
+        out.push_str(&format!(
+            "  int get hashCode => Object.hashAll([{}]);\n",
+            field_names.join(", ")
+        ));
     }
 
     out
 }
 
-/// Render `toString`, `operator ==`, and `hashCode` for a sealed enum variant class
-/// when the corresponding traits are declared via `[Traits=(Display, Eq, Hash)]`.
-fn render_sealed_variant_trait_methods(
-    class_name: &str,
-    fields: &[UdlArg],
-    traits: &[String],
-) -> String {
+/// Render `toString`, `operator ==`, and `hashCode` for a sealed enum variant class.
+fn render_sealed_variant_trait_methods(class_name: &str, fields: &[UdlArg]) -> String {
     // Reuse the same logic as records -- the generated methods are structurally identical.
-    render_record_trait_methods(class_name, fields, traits)
+    render_record_trait_methods(class_name, fields)
+}
+
+/// Render only `toString` for error enum variant classes. Exceptions use identity
+/// equality in Dart, so `==`/`hashCode` are intentionally omitted.
+fn render_error_variant_to_string(class_name: &str, fields: &[UdlArg]) -> String {
+    let mut out = String::new();
+    out.push('\n');
+    out.push_str("  @override\n");
+    out.push_str("  String toString() {\n");
+    let field_parts: Vec<String> = fields
+        .iter()
+        .map(|f| {
+            let name = safe_dart_identifier(&to_lower_camel(&f.name));
+            format!("{name}: ${name}")
+        })
+        .collect();
+    out.push_str(&format!(
+        "    return '{class_name}({})';\n",
+        field_parts.join(", ")
+    ));
+    out.push_str("  }\n");
+    out
 }
 
 /// Render a discriminant literal as a Dart integer literal.

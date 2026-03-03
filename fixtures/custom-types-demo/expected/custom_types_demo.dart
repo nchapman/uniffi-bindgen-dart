@@ -309,7 +309,7 @@ class CustomTypesDemoFfi {
   late final void Function(int handle) _asyncCountMapEchoRustFutureFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_free_string');
 
   Future<Map<String, int>> asyncCountMapEcho(Map<String, int> items) async {
-    final String itemsNativeJson = jsonEncode(items.map((key, value) => MapEntry(key, value)));
+    final String itemsNativeJson = jsonEncode(items);
     final ffi.Pointer<Utf8> itemsNative = itemsNativeJson.toNativeUtf8();
     final int futureHandle;
     try {
@@ -529,7 +529,7 @@ class CustomTypesDemoFfi {
   late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> items) _countMapEcho = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> items), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> items)>('count_map_echo');
 
   Map<String, int> countMapEcho(Map<String, int> items) {
-    final String itemsNativeJson = jsonEncode(items.map((key, value) => MapEntry(key, value)));
+    final String itemsNativeJson = jsonEncode(items);
     final ffi.Pointer<Utf8> itemsNative = itemsNativeJson.toNativeUtf8();
     try {
       final ffi.Pointer<Utf8> resultPtr = _countMapEcho(itemsNative);
@@ -762,7 +762,7 @@ class CustomTypesDemoFfi {
   late final void Function(int handle) _customCounterAsyncCountMapEchoRustFutureFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_free_string');
 
   Future<Map<String, int>> customCounterInvokeAsyncCountMapEcho(int handle, Map<String, int> items) async {
-    final String itemsNativeJson = jsonEncode(items.map((key, value) => MapEntry(key, value)));
+    final String itemsNativeJson = jsonEncode(items);
     final ffi.Pointer<Utf8> itemsNative = itemsNativeJson.toNativeUtf8();
     final int futureHandle;
     try {
@@ -964,7 +964,7 @@ class CustomTypesDemoFfi {
   late final ffi.Pointer<Utf8> Function(int handle, ffi.Pointer<Utf8> items) _customCounterCountMapEcho = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Uint64 handle, ffi.Pointer<Utf8> items), ffi.Pointer<Utf8> Function(int handle, ffi.Pointer<Utf8> items)>('customcounter_count_map_echo');
 
   Map<String, int> customCounterInvokeCountMapEcho(int handle, Map<String, int> items) {
-    final String itemsNativeJson = jsonEncode(items.map((key, value) => MapEntry(key, value)));
+    final String itemsNativeJson = jsonEncode(items);
     final ffi.Pointer<Utf8> itemsNative = itemsNativeJson.toNativeUtf8();
     try {
     final ffi.Pointer<Utf8> resultPtr = _customCounterCountMapEcho(handle, itemsNative);

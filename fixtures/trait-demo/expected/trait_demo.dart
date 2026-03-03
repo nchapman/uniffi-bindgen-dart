@@ -33,7 +33,7 @@ class TraitRecord {
     };
   }
 
-  static TraitRecord fromJson(Map<String, dynamic> json) {
+  factory TraitRecord.fromJson(Map<String, dynamic> json) {
     return TraitRecord(
       name: json['name'] as String,
       value: (json['value'] as num).toInt(),
@@ -125,16 +125,12 @@ String _encodeTraitColor(TraitColor value) {
 }
 
 TraitColor _decodeTraitColor(String raw) {
-  switch (raw) {
-    case 'red':
-      return TraitColor.red;
-    case 'green':
-      return TraitColor.green;
-    case 'blue':
-      return TraitColor.blue;
-    default:
-      throw StateError('Unknown TraitColor variant: $raw');
-  }
+  return switch (raw) {
+    'red' => TraitColor.red,
+    'green' => TraitColor.green,
+    'blue' => TraitColor.blue,
+    _ => throw StateError('Unknown TraitColor variant: $raw'),
+  };
 }
 
 String _encodeTraitShape(TraitShape value) {

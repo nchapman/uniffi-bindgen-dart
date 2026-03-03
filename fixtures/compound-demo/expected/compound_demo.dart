@@ -117,7 +117,7 @@ class CompoundDemoFfi {
   late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> items) _counts = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> items), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> items)>('counts');
 
   Map<String, int> counts(Map<String, int> items) {
-    final String itemsNativeJson = jsonEncode(items.map((key, value) => MapEntry(key, value)));
+    final String itemsNativeJson = jsonEncode(items);
     final ffi.Pointer<Utf8> itemsNative = itemsNativeJson.toNativeUtf8();
     try {
       final ffi.Pointer<Utf8> resultPtr = _counts(itemsNative);
@@ -138,7 +138,7 @@ class CompoundDemoFfi {
   late final ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> values) _listify = _lib.lookupFunction<ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> values), ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> values)>('listify');
 
   List<int> listify(List<int> values) {
-    final String valuesNativeJson = jsonEncode(values.map((item) => item).toList());
+    final String valuesNativeJson = jsonEncode(values);
     final ffi.Pointer<Utf8> valuesNative = valuesNativeJson.toNativeUtf8();
     try {
       final ffi.Pointer<Utf8> resultPtr = _listify(valuesNative);

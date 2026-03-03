@@ -51,10 +51,36 @@ sealed class AsyncError {
 
 final class AsyncErrorNotFound extends AsyncError {
   const AsyncErrorNotFound();
+
+  @override
+  String toString() {
+    return 'AsyncErrorNotFound()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AsyncErrorNotFound;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class AsyncErrorInvalidInput extends AsyncError {
   const AsyncErrorInvalidInput();
+
+  @override
+  String toString() {
+    return 'AsyncErrorInvalidInput()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AsyncErrorInvalidInput;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 sealed class AsyncErrorException implements Exception {
@@ -63,10 +89,20 @@ sealed class AsyncErrorException implements Exception {
 
 final class AsyncErrorExceptionNotFound extends AsyncErrorException {
   const AsyncErrorExceptionNotFound();
+
+  @override
+  String toString() {
+    return 'AsyncErrorExceptionNotFound()';
+  }
 }
 
 final class AsyncErrorExceptionInvalidInput extends AsyncErrorException {
   const AsyncErrorExceptionInvalidInput();
+
+  @override
+  String toString() {
+    return 'AsyncErrorExceptionInvalidInput()';
+  }
 }
 
 String _encodeAsyncError(AsyncError value) {
@@ -919,7 +955,7 @@ class FuturesStressFfi {
   late final void Function(int handle) _summarizeAsyncRustFutureFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_free_string');
 
   Future<Map<String, int>> summarizeAsync(Map<String, int> values) async {
-    final String valuesNativeJson = jsonEncode(values.map((key, value) => MapEntry(key, value)));
+    final String valuesNativeJson = jsonEncode(values);
     final ffi.Pointer<Utf8> valuesNative = valuesNativeJson.toNativeUtf8();
     final int futureHandle;
     try {
@@ -1371,7 +1407,7 @@ class FuturesStressFfi {
   late final void Function(int handle) _workerAsyncCountsRustFutureFree = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle), void Function(int handle)>('rust_future_free_string');
 
   Future<Map<String, int>> workerInvokeAsyncCounts(int handle, Map<String, int> items) async {
-    final String itemsNativeJson = jsonEncode(items.map((key, value) => MapEntry(key, value)));
+    final String itemsNativeJson = jsonEncode(items);
     final ffi.Pointer<Utf8> itemsNative = itemsNativeJson.toNativeUtf8();
     final int futureHandle;
     try {

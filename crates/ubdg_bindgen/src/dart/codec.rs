@@ -4,6 +4,59 @@ use uniffi_bindgen::interface::Type;
 use super::config::CustomTypeConfig;
 use super::*;
 
+/// Returns true when JSON-encoding a value of the given type is a no-op
+/// (the value is already a valid JSON primitive: int, float, bool, string).
+fn is_identity_json_encode(type_: &Type, custom_types: &HashMap<String, CustomTypeConfig>) -> bool {
+    match type_ {
+        Type::UInt8
+        | Type::Int8
+        | Type::UInt16
+        | Type::Int16
+        | Type::UInt32
+        | Type::Int32
+        | Type::UInt64
+        | Type::Int64
+        | Type::Float32
+        | Type::Float64
+        | Type::Boolean
+        | Type::String => true,
+        Type::Custom { name, builtin, .. } => {
+            if custom_types.contains_key(name.as_str()) {
+                false
+            } else {
+                is_identity_json_encode(builtin, custom_types)
+            }
+        }
+        _ => false,
+    }
+}
+
+/// Returns true when JSON-decoding a value of the given type is a simple cast
+/// (e.g., `value as String`), making IIFE wrapping unnecessary for optionals.
+fn is_simple_json_decode(type_: &Type, custom_types: &HashMap<String, CustomTypeConfig>) -> bool {
+    match type_ {
+        Type::Boolean | Type::String => true,
+        Type::UInt8
+        | Type::Int8
+        | Type::UInt16
+        | Type::Int16
+        | Type::UInt32
+        | Type::Int32
+        | Type::UInt64
+        | Type::Int64
+        | Type::Float32
+        | Type::Float64 => true,
+        Type::Custom { name, builtin, .. } => {
+            if custom_types.contains_key(name.as_str()) {
+                false
+            } else {
+                is_simple_json_decode(builtin, custom_types)
+            }
+        }
+        _ => false,
+    }
+}
+
 pub(super) fn render_json_encode_expr(
     value_expr: &str,
     type_: &Type,
@@ -14,14 +67,22 @@ pub(super) fn render_json_encode_expr(
         Type::Duration => format!("{value_expr}.inMicroseconds"),
         Type::Bytes => format!("base64Encode({value_expr})"),
         Type::Optional { inner_type } => {
-            let inner = render_json_encode_expr("__tmp", inner_type, custom_types);
-            format!(
-                "{value_expr} == null ? null : (() {{ final __tmp = {value_expr}!; return {inner}; }})()"
-            )
+            if is_identity_json_encode(inner_type, custom_types) {
+                value_expr.to_string()
+            } else {
+                let inner = render_json_encode_expr("__tmp", inner_type, custom_types);
+                format!(
+                    "{value_expr} == null ? null : (() {{ final __tmp = {value_expr}!; return {inner}; }})()"
+                )
+            }
         }
         Type::Sequence { inner_type } => {
-            let inner = render_json_encode_expr("item", inner_type, custom_types);
-            format!("{value_expr}.map((item) => {inner}).toList()")
+            if is_identity_json_encode(inner_type, custom_types) {
+                value_expr.to_string()
+            } else {
+                let inner = render_json_encode_expr("item", inner_type, custom_types);
+                format!("{value_expr}.map((item) => {inner}).toList()")
+            }
         }
         // Only reached for string-keyed maps; non-string maps use the binary codec path.
         Type::Map {
@@ -33,8 +94,12 @@ pub(super) fn render_json_encode_expr(
                 "render_json_encode_expr called for non-string map key: {:?}",
                 key_type
             );
-            let inner = render_json_encode_expr("value", value_type, custom_types);
-            format!("{value_expr}.map((key, value) => MapEntry(key, {inner}))")
+            if is_identity_json_encode(value_type, custom_types) {
+                value_expr.to_string()
+            } else {
+                let inner = render_json_encode_expr("value", value_type, custom_types);
+                format!("{value_expr}.map((key, value) => MapEntry(key, {inner}))")
+            }
         }
         Type::Custom { name, builtin, .. } => {
             if let Some(cfg) = custom_types.get(name.as_str()) {
@@ -78,10 +143,16 @@ pub(super) fn render_json_decode_expr(
         Type::Duration => format!("Duration(microseconds: ({value_expr} as num).toInt())"),
         Type::Bytes => format!("base64Decode({value_expr} as String)"),
         Type::Optional { inner_type } => {
-            let inner = render_json_decode_expr("__tmp", inner_type, custom_types);
-            format!(
-                "{value_expr} == null ? null : (() {{ final __tmp = {value_expr}; return {inner}; }})()"
-            )
+            if is_simple_json_decode(inner_type, custom_types) {
+                // Safe: value_expr appears twice but all callers pass idempotent map lookups.
+                let inner = render_json_decode_expr(value_expr, inner_type, custom_types);
+                format!("{value_expr} == null ? null : {inner}")
+            } else {
+                let inner = render_json_decode_expr("__tmp", inner_type, custom_types);
+                format!(
+                    "{value_expr} == null ? null : (() {{ final __tmp = {value_expr}; return {inner}; }})()"
+                )
+            }
         }
         Type::Sequence { inner_type } => {
             let inner = render_json_decode_expr("item", inner_type, custom_types);
@@ -865,10 +936,23 @@ mod tests {
             inner_type: Box::new(Type::Int32),
         };
         let result = render_json_encode_expr("value", &ty, &no_customs());
-        // Null-coalescing IIFE pattern: check for null, unwrap with `!`, encode inner.
+        // Identity inner type: optional encode is a no-op passthrough.
+        assert_eq!(result, "value");
+    }
+
+    #[test]
+    fn json_encode_optional_record() {
+        let ty = Type::Optional {
+            inner_type: Box::new(Type::Record {
+                module_path: String::new(),
+                name: "my_record".to_string(),
+            }),
+        };
+        let result = render_json_encode_expr("value", &ty, &no_customs());
+        // Non-identity inner type: IIFE pattern is used.
         assert!(result.contains("value == null ? null :"));
         assert!(result.contains("value!"));
-        assert!(result.contains("return __tmp;"));
+        assert!(result.contains(".toJson()"));
     }
 
     #[test]
@@ -877,7 +961,21 @@ mod tests {
             inner_type: Box::new(Type::String),
         };
         let result = render_json_encode_expr("value", &ty, &no_customs());
-        assert!(result.contains(".map((item) => item).toList()"));
+        // Identity inner type: sequence encode is a no-op passthrough.
+        assert_eq!(result, "value");
+    }
+
+    #[test]
+    fn json_encode_sequence_record() {
+        let ty = Type::Sequence {
+            inner_type: Box::new(Type::Record {
+                module_path: String::new(),
+                name: "my_record".to_string(),
+            }),
+        };
+        let result = render_json_encode_expr("value", &ty, &no_customs());
+        // Non-identity inner type: map transform is used.
+        assert!(result.contains(".map((item) => item.toJson()).toList()"));
     }
 
     // ── Optional / Sequence / Bytes / Object: render_json_decode_expr ────
@@ -888,11 +986,22 @@ mod tests {
             inner_type: Box::new(Type::Int32),
         };
         let result = render_json_decode_expr("v", &ty, &no_customs());
-        // Null-check IIFE with inner cast on the unwrapped __tmp variable.
+        // Simple inner type: inline ternary without IIFE.
+        assert_eq!(result, "v == null ? null : (v as num).toInt()");
+    }
+
+    #[test]
+    fn json_decode_optional_record() {
+        let ty = Type::Optional {
+            inner_type: Box::new(Type::Record {
+                module_path: String::new(),
+                name: "my_record".to_string(),
+            }),
+        };
+        let result = render_json_decode_expr("v", &ty, &no_customs());
+        // Non-simple inner type: IIFE pattern is used.
         assert!(result.contains("v == null ? null :"));
-        assert!(result.contains("(__tmp as num).toInt()"));
-        // The inner decode should reference __tmp, not the original v.
-        assert!(!result.contains("(v as num).toInt()"));
+        assert!(result.contains("__tmp"));
     }
 
     #[test]

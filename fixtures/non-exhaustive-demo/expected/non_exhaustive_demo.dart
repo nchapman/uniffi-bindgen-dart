@@ -11,15 +11,54 @@ sealed class AppError {
 
 final class AppErrorNotFound extends AppError {
   const AppErrorNotFound();
+
+  @override
+  String toString() {
+    return 'AppErrorNotFound()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AppErrorNotFound;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class AppErrorPermissionDenied extends AppError {
   const AppErrorPermissionDenied();
+
+  @override
+  String toString() {
+    return 'AppErrorPermissionDenied()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AppErrorPermissionDenied;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 /// Unknown variant for forward-compatibility with non-exhaustive enums.
 final class AppErrorUnknown extends AppError {
   const AppErrorUnknown();
+
+  @override
+  String toString() {
+    return 'AppErrorUnknown()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AppErrorUnknown;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 enum Status {
@@ -35,15 +74,30 @@ sealed class AppErrorException implements Exception {
 
 final class AppErrorExceptionNotFound extends AppErrorException {
   const AppErrorExceptionNotFound();
+
+  @override
+  String toString() {
+    return 'AppErrorExceptionNotFound()';
+  }
 }
 
 final class AppErrorExceptionPermissionDenied extends AppErrorException {
   const AppErrorExceptionPermissionDenied();
+
+  @override
+  String toString() {
+    return 'AppErrorExceptionPermissionDenied()';
+  }
 }
 
 /// Unknown variant for forward-compatibility with non-exhaustive error enums.
 final class AppErrorExceptionUnknown extends AppErrorException {
   const AppErrorExceptionUnknown();
+
+  @override
+  String toString() {
+    return 'AppErrorExceptionUnknown()';
+  }
 }
 
 String _encodeAppError(AppError value) {
@@ -84,14 +138,11 @@ String _encodeStatus(Status value) {
 }
 
 Status _decodeStatus(String raw) {
-  switch (raw) {
-    case 'active':
-      return Status.active;
-    case 'inactive':
-      return Status.inactive;
-    default:
-      return Status.unknown;
-  }
+  return switch (raw) {
+    'active' => Status.active,
+    'inactive' => Status.inactive,
+    _ => Status.unknown,
+  };
 }
 
 String _encodeAppErrorException(AppErrorException value) {

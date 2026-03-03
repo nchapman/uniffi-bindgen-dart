@@ -6,6 +6,8 @@ import 'dart:convert';
 import 'dart:ffi' as ffi;
 import 'package:ffi/ffi.dart';
 
+const _sentinel = Object();
+
 class Config {
   const Config({
     required this.name,
@@ -24,16 +26,16 @@ class Config {
       'name': this.name,
       'timeout': this.timeout,
       'verbose': this.verbose,
-      'label': this.label == null ? null : (() { final __tmp = this.label!; return __tmp; })(),
+      'label': this.label,
     };
   }
 
-  static Config fromJson(Map<String, dynamic> json) {
+  factory Config.fromJson(Map<String, dynamic> json) {
     return Config(
       name: json['name'] as String,
       timeout: json.containsKey('timeout') ? (json['timeout'] as num).toInt() : 30,
       verbose: json.containsKey('verbose') ? json['verbose'] as bool : false,
-      label: json.containsKey('label') ? json['label'] == null ? null : (() { final __tmp = json['label']; return __tmp as String; })() : null,
+      label: json.containsKey('label') ? json['label'] == null ? null : json['label'] as String : null,
     );
   }
 
@@ -41,15 +43,28 @@ class Config {
     String? name,
     int? timeout,
     bool? verbose,
-    String? label,
+    Object? label = _sentinel,
   }) {
     return Config(
       name: name ?? this.name,
       timeout: timeout ?? this.timeout,
       verbose: verbose ?? this.verbose,
-      label: label ?? this.label,
+      label: label == _sentinel ? this.label : label as String?,
     );
   }
+
+  @override
+  String toString() {
+    return 'Config(name: $name, timeout: $timeout, verbose: $verbose, label: $label)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Config && name == other.name && timeout == other.timeout && verbose == other.verbose && label == other.label;
+
+  @override
+  int get hashCode => Object.hash(name, timeout, verbose, label);
 }
 
 class DefaultsDemoFfi {
