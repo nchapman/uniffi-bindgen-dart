@@ -11,7 +11,7 @@ Thank you for your interest in contributing! This document covers the essentials
 
 ```bash
 # Clone and build
-git clone https://github.com/aspect-build/uniffi-bindgen-dart.git
+git clone https://github.com/nchapman/uniffi-bindgen-dart.git
 cd uniffi-bindgen-dart
 cargo build --workspace
 
@@ -62,7 +62,7 @@ Golden tests compare generated Dart output byte-for-byte against expected files.
 
 ## Reporting Issues
 
-Open an issue at [github.com/aspect-build/uniffi-bindgen-dart/issues](https://github.com/aspect-build/uniffi-bindgen-dart/issues) with:
+Open an issue at [github.com/nchapman/uniffi-bindgen-dart/issues](https://github.com/nchapman/uniffi-bindgen-dart/issues) with:
 - UniFFI version and Rust toolchain version
 - Minimal UDL that reproduces the problem
 - Expected vs actual generated output

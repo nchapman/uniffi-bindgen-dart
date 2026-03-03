@@ -9,7 +9,7 @@ This project follows [Semantic Versioning](https://semver.org/):
 - **Patch**: Bug fixes, golden test corrections, documentation updates
 
 The workspace version in the root `Cargo.toml` is the single source of truth.
-All crates (`ubdg_bindgen`, `ubdg_runtime`, `ubdg_testing`) inherit it via `version.workspace = true`.
+All crates (`uniffi-bindgen-dart`, `uniffi-bindgen-dart-runtime`, `uniffi-bindgen-dart-testing`) inherit it via `version.workspace = true`.
 
 ## Pre-release Checklist
 
@@ -39,9 +39,8 @@ All crates pick up the new version automatically.
 ## Publish
 
 ```bash
-# Publish crates in dependency order
-cargo publish -p ubdg_runtime
-cargo publish -p ubdg_bindgen
+# Publish the main crate
+cargo publish -p uniffi-bindgen-dart
 
 # Tag the release
 git tag vX.Y.Z

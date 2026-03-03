@@ -8,20 +8,20 @@ CONFIG_FILE="$ROOT_DIR/fixtures/simple-fns/uniffi.toml"
 
 mkdir -p "$OUT_DIR"
 
-cargo run -p ubdg_bindgen --bin uniffi-bindgen-dart -- \
+cargo run -p uniffi-bindgen-dart --bin uniffi-bindgen-dart -- \
   generate "$SOURCE_FILE" \
   --out-dir "$OUT_DIR" \
   --config "$CONFIG_FILE"
 
 if [[ -n "${UBDG_RECORD_ENUM_METHODS_LIB:-}" ]]; then
-  cargo run -p ubdg_bindgen --bin uniffi-bindgen-dart -- \
+  cargo run -p uniffi-bindgen-dart --bin uniffi-bindgen-dart -- \
     generate "${UBDG_RECORD_ENUM_METHODS_LIB}" \
     --crate "uniffi_record_enum_methods" \
     --out-dir "$OUT_DIR"
 fi
 
 if [[ -n "${UBDG_LIBRARY_MODE_DEMO_LIB:-}" ]]; then
-  cargo run -p ubdg_bindgen --bin uniffi-bindgen-dart -- \
+  cargo run -p uniffi-bindgen-dart --bin uniffi-bindgen-dart -- \
     generate "${UBDG_LIBRARY_MODE_DEMO_LIB}" \
     --crate "uniffi_library_mode_demo" \
     --out-dir "$OUT_DIR"
@@ -33,12 +33,12 @@ for fixture in compound-demo coverall-demo keywords-demo; do
   if [[ -f "$FIXTURE_UDL" ]]; then
     FIXTURE_CONFIG="$ROOT_DIR/fixtures/$fixture/uniffi.toml"
     if [[ -f "$FIXTURE_CONFIG" ]]; then
-      cargo run -p ubdg_bindgen --bin uniffi-bindgen-dart -- \
+      cargo run -p uniffi-bindgen-dart --bin uniffi-bindgen-dart -- \
         generate "$FIXTURE_UDL" \
         --out-dir "$OUT_DIR" \
         --config "$FIXTURE_CONFIG"
     else
-      cargo run -p ubdg_bindgen --bin uniffi-bindgen-dart -- \
+      cargo run -p uniffi-bindgen-dart --bin uniffi-bindgen-dart -- \
         generate "$FIXTURE_UDL" \
         --out-dir "$OUT_DIR"
     fi

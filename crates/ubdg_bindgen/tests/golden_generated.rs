@@ -20,7 +20,7 @@ fn generate(source: &Path, out_dir: &Path, config: Option<&Path>) {
         args.push(config.display().to_string());
     }
 
-    ubdg_bindgen::run(args).expect("generate bindings");
+    uniffi_bindgen_dart::run(args).expect("generate bindings");
 }
 
 fn generate_library(source: &Path, crate_name: &str, out_dir: &Path) {
@@ -33,7 +33,7 @@ fn generate_library(source: &Path, crate_name: &str, out_dir: &Path) {
         "--out-dir".to_string(),
         out_dir.display().to_string(),
     ];
-    ubdg_bindgen::run(args).expect("generate bindings (library mode)");
+    uniffi_bindgen_dart::run(args).expect("generate bindings (library mode)");
 }
 
 fn assert_matches_expected(actual: &Path, expected: &Path) {

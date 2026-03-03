@@ -1,5 +1,5 @@
 [package]
-name = "ubdg_testing"
+name = "uniffi-bindgen-dart-testing"
 description = "Test utilities for uniffi-bindgen-dart"
 publish = false
 version.workspace = true
@@ -9,5 +9,8 @@ authors.workspace = true
 repository.workspace = true
 keywords.workspace = true
 categories.workspace = true
+
+[lib]
+name = "uniffi_bindgen_dart_testing"
 
 [dependencies]

@@ -28,8 +28,8 @@ just generate fixtures/simple-fns/src/simple-fns.udl --out-dir /tmp/out
 just generate path/to/libcrate.dylib --crate crate_name --out-dir /tmp/out
 
 # Run a single Rust test
-cargo test -p ubdg_bindgen golden_simple_fns
-cargo test -p ubdg_bindgen golden_coverall_demo
+cargo test -p uniffi-bindgen-dart golden_simple_fns
+cargo test -p uniffi-bindgen-dart golden_coverall_demo
 ```
 
 ## Architecture
@@ -37,8 +37,8 @@ cargo test -p ubdg_bindgen golden_coverall_demo
 ### Crate Layout
 
 - **`crates/ubdg_bindgen`** — Main code generator. CLI entrypoint, config parsing, Dart output.
-- **`crates/ubdg_runtime`** — Runtime support library for generated Dart bindings.
-- **`crates/ubdg_testing`** — Shared test utilities for fixture and integration testing.
+- **`crates/ubdg_runtime`** — Runtime support library for generated Dart bindings. (lib name: `uniffi_bindgen_dart_runtime`)
+- **`crates/ubdg_testing`** — Shared test utilities for fixture and integration testing. (lib name: `uniffi_bindgen_dart_testing`)
 
 ### Generator Pipeline
 
@@ -102,7 +102,7 @@ Additionally, `scripts/analyze_golden.sh` (or `just analyze-golden`) runs `dart 
 
 - Generated library names use snake_case (e.g., `simple_fns`)
 - Exported Dart names use camelCase for functions/methods, PascalCase for types
-- Crate names prefixed with `ubdg_`
+- Published crate: `uniffi-bindgen-dart` (lib name: `uniffi_bindgen_dart`)
 - UDL filenames use kebab-case (`simple-fns.udl`)
 
 ### Feature Coverage

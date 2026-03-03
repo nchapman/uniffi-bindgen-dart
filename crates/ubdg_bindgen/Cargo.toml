@@ -1,5 +1,5 @@
 [package]
-name = "ubdg_bindgen"
+name = "uniffi-bindgen-dart"
 description = "Dart bindings generator for UniFFI"
 version.workspace = true
 edition.workspace = true
@@ -8,6 +8,10 @@ authors.workspace = true
 repository.workspace = true
 keywords.workspace = true
 categories.workspace = true
+readme = "../../README.md"
+
+[lib]
+name = "uniffi_bindgen_dart"
 
 [[bin]]
 name = "uniffi-bindgen-dart"
