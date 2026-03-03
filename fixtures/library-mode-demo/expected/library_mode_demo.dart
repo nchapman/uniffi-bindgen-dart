@@ -8,6 +8,8 @@ import 'dart:ffi' as ffi;
 import 'package:ffi/ffi.dart';
 import 'dart:typed_data';
 
+typedef Label = String;
+
 final class _UniFfiFfiBufferElement extends ffi.Union {
   @ffi.Uint8()
   external int u8;
