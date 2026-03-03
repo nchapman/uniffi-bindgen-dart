@@ -519,7 +519,7 @@ pub(super) fn render_ffibuffer_async_complete_and_decode(
         } else if is_runtime_optional_object_type(ret_type) {
             let inner = match runtime_unwrapped_type(ret_type) {
                 Type::Optional { inner_type } => inner_type,
-                _ => unreachable!(),
+                other => unreachable!("expected Optional, got {other:?}"),
             };
             let lift = render_object_lift_expr_with_objects(
                 inner,

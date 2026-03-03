@@ -1262,7 +1262,7 @@ pub(super) fn render_bound_methods(
                 } else if is_runtime_optional_object_type(ret_type) {
                     let inner = match runtime_unwrapped_type(ret_type) {
                         Type::Optional { inner_type } => inner_type,
-                        _ => unreachable!(),
+                        other => unreachable!("expected Optional or Sequence, got {other:?}"),
                     };
                     let lift = render_object_lift_expr_with_objects(
                         inner,
@@ -1278,7 +1278,7 @@ pub(super) fn render_bound_methods(
                 } else if is_runtime_optional_record_type(ret_type) {
                     let inner = match runtime_unwrapped_type(ret_type) {
                         Type::Optional { inner_type } => inner_type,
-                        _ => unreachable!(),
+                        other => unreachable!("expected Optional or Sequence, got {other:?}"),
                     };
                     let record_name = record_name_from_type(inner).unwrap_or("Record");
                     out.push_str("          if (resultPtr == ffi.nullptr) {\n");
@@ -1296,7 +1296,7 @@ pub(super) fn render_bound_methods(
                 } else if is_runtime_optional_enum_type(ret_type) {
                     let inner = match runtime_unwrapped_type(ret_type) {
                         Type::Optional { inner_type } => inner_type,
-                        _ => unreachable!(),
+                        other => unreachable!("expected Optional or Sequence, got {other:?}"),
                     };
                     let enum_name = enum_name_from_type(inner).unwrap_or("Enum");
                     out.push_str("          if (resultPtr == ffi.nullptr) {\n");
@@ -1329,7 +1329,7 @@ pub(super) fn render_bound_methods(
                 } else if is_runtime_sequence_json_type(ret_type) {
                     let inner_type = match runtime_unwrapped_type(ret_type) {
                         Type::Sequence { inner_type } => inner_type,
-                        _ => unreachable!(),
+                        other => unreachable!("expected Optional or Sequence, got {other:?}"),
                     };
                     let decode = render_json_decode_expr("item", inner_type, custom_types);
                     out.push_str("          if (resultPtr == ffi.nullptr) {\n");
@@ -1883,7 +1883,7 @@ pub(super) fn render_bound_methods(
                 Some(type_) if is_runtime_optional_object_type(type_) => {
                     let inner = match runtime_unwrapped_type(type_) {
                         Type::Optional { inner_type } => inner_type,
-                        _ => unreachable!(),
+                        other => unreachable!("expected Optional or Sequence, got {other:?}"),
                     };
                     out.push_str(&format!("      final int resultHandle = {call_expr};\n"));
                     out.push_str("      if (resultHandle == 0) {\n");
@@ -1901,7 +1901,7 @@ pub(super) fn render_bound_methods(
                 Some(type_) if is_runtime_optional_record_type(type_) => {
                     let inner = match runtime_unwrapped_type(type_) {
                         Type::Optional { inner_type } => inner_type,
-                        _ => unreachable!(),
+                        other => unreachable!("expected Optional or Sequence, got {other:?}"),
                     };
                     let record_name = record_name_from_type(inner).unwrap_or("Record");
                     out.push_str(&format!(
@@ -1923,7 +1923,7 @@ pub(super) fn render_bound_methods(
                 Some(type_) if is_runtime_optional_enum_type(type_) => {
                     let inner = match runtime_unwrapped_type(type_) {
                         Type::Optional { inner_type } => inner_type,
-                        _ => unreachable!(),
+                        other => unreachable!("expected Optional or Sequence, got {other:?}"),
                     };
                     let enum_name = enum_name_from_type(inner).unwrap_or("Enum");
                     out.push_str(&format!(
@@ -1964,7 +1964,7 @@ pub(super) fn render_bound_methods(
                 Some(type_) if is_runtime_sequence_json_type(type_) => {
                     let inner_type = match runtime_unwrapped_type(type_) {
                         Type::Sequence { inner_type } => inner_type,
-                        _ => unreachable!(),
+                        other => unreachable!("expected Optional or Sequence, got {other:?}"),
                     };
                     let decode = render_json_decode_expr("item", inner_type, custom_types);
                     out.push_str(&format!(
@@ -2905,7 +2905,9 @@ pub(super) fn render_bound_methods(
                         Some(ret_type) if is_runtime_optional_object_type(ret_type) => {
                             let inner = match runtime_unwrapped_type(ret_type) {
                                 Type::Optional { inner_type } => inner_type,
-                                _ => unreachable!(),
+                                other => {
+                                    unreachable!("expected Optional or Sequence, got {other:?}")
+                                }
                             };
                             out.push_str(
                                 "      final int resultHandle = (returnBuf + 0).ref.u64;\n",
@@ -3047,9 +3049,21 @@ pub(super) fn render_bound_methods(
                         out.push_str("  }\n");
                         continue;
                     };
-                    let async_spec =
+                    let Some(async_spec) =
                         async_rust_future_spec_from_uniffi_return_type(method.return_type.as_ref())
-                            .unwrap();
+                    else {
+                        out.push('\n');
+                        out.push_str(&format!(
+                            "  {signature_return_type} {method_invoke}({}) async {{\n",
+                            dart_args.join(", ")
+                        ));
+                        out.push_str(&format!(
+                            "    throw UnsupportedError('unsupported async return type ({})');\n",
+                            method.name
+                        ));
+                        out.push_str("  }\n");
+                        continue;
+                    };
                     // Compute argument FFI offsets (handle is first arg).
                     let ffi_arg_types = if method.ffi_arg_types.len() == method.args.len() + 1 {
                         method.ffi_arg_types.clone()
@@ -4223,7 +4237,7 @@ pub(super) fn render_bound_methods(
                 } else if is_runtime_optional_object_type(ret) {
                     let inner = match runtime_unwrapped_type(ret) {
                         Type::Optional { inner_type } => inner_type,
-                        _ => unreachable!(),
+                        other => unreachable!("expected Optional or Sequence, got {other:?}"),
                     };
                     let lift = render_object_lift_expr_with_objects(
                         inner,
@@ -4240,7 +4254,7 @@ pub(super) fn render_bound_methods(
                 } else if is_runtime_optional_record_type(ret) {
                     let inner = match runtime_unwrapped_type(ret) {
                         Type::Optional { inner_type } => inner_type,
-                        _ => unreachable!(),
+                        other => unreachable!("expected Optional or Sequence, got {other:?}"),
                     };
                     let record_name = record_name_from_type(inner).unwrap_or("Record");
                     out.push_str(&format!(
@@ -4261,7 +4275,7 @@ pub(super) fn render_bound_methods(
                 } else if is_runtime_optional_enum_type(ret) {
                     let inner = match runtime_unwrapped_type(ret) {
                         Type::Optional { inner_type } => inner_type,
-                        _ => unreachable!(),
+                        other => unreachable!("expected Optional or Sequence, got {other:?}"),
                     };
                     let enum_name = enum_name_from_type(inner).unwrap_or("Enum");
                     out.push_str(&format!(
@@ -4300,7 +4314,7 @@ pub(super) fn render_bound_methods(
                 } else if is_runtime_sequence_json_type(ret) {
                     let inner_type = match runtime_unwrapped_type(ret) {
                         Type::Sequence { inner_type } => inner_type,
-                        _ => unreachable!(),
+                        other => unreachable!("expected Optional or Sequence, got {other:?}"),
                     };
                     let decode = render_json_decode_expr("item", inner_type, custom_types);
                     out.push_str(&format!(

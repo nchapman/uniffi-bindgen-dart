@@ -324,7 +324,7 @@ fn golden_record_enum_methods_library() {
             }
         }
         Err(_) => {
-            eprintln!("UBDG_RECORD_ENUM_METHODS_LIB not set; skipping library-mode golden test");
+            println!("SKIPPED: UBDG_RECORD_ENUM_METHODS_LIB not set");
             return;
         }
     };
@@ -352,7 +352,7 @@ fn golden_library_mode_demo() {
             }
         }
         Err(_) => {
-            eprintln!("UBDG_LIBRARY_MODE_DEMO_LIB not set; skipping library-mode golden test");
+            println!("SKIPPED: UBDG_LIBRARY_MODE_DEMO_LIB not set");
             return;
         }
     };

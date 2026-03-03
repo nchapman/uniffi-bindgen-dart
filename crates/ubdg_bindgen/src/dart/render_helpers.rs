@@ -447,7 +447,7 @@ pub(super) fn append_runtime_arg_marshalling(
         let native_name = format!("{arg_name}Native");
         let inner = match runtime_unwrapped_type(type_) {
             Type::Optional { inner_type } => inner_type,
-            _ => unreachable!(),
+            other => unreachable!("expected Optional, got {other:?}"),
         };
         let enum_name = enum_name_from_type(inner).unwrap_or("Enum");
         pre_call.push(format!(
@@ -470,7 +470,7 @@ pub(super) fn append_runtime_arg_marshalling(
         let handle_name = format!("{arg_name}Handle");
         let inner = match runtime_unwrapped_type(type_) {
             Type::Optional { inner_type } => inner_type,
-            _ => unreachable!(),
+            other => unreachable!("expected Optional, got {other:?}"),
         };
         let object_name = object_name_from_type(inner).unwrap_or("Object");
         pre_call.push(format!(
