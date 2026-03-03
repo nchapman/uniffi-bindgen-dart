@@ -718,3 +718,208 @@ pub(super) fn emit_function_skip_warning(
         function_name,
     );
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+    use uniffi_bindgen::interface::{DefaultValue, Literal, Type};
+
+    fn no_customs() -> HashMap<String, super::super::config::CustomTypeConfig> {
+        HashMap::new()
+    }
+
+    // ── render_doc_comment ──────────────────────────────────────────
+
+    #[test]
+    fn doc_comment_none_returns_empty() {
+        assert_eq!(render_doc_comment(None, ""), "");
+    }
+
+    #[test]
+    fn doc_comment_empty_string_returns_empty() {
+        assert_eq!(render_doc_comment(Some(""), ""), "");
+    }
+
+    #[test]
+    fn doc_comment_single_line_with_indent() {
+        assert_eq!(
+            render_doc_comment(Some("Hello world"), "  "),
+            "  /// Hello world\n"
+        );
+    }
+
+    #[test]
+    fn doc_comment_multi_line() {
+        assert_eq!(
+            render_doc_comment(Some("Line 1\nLine 2"), ""),
+            "/// Line 1\n/// Line 2\n"
+        );
+    }
+
+    #[test]
+    fn doc_comment_trims_outer_whitespace() {
+        assert_eq!(render_doc_comment(Some("  trimmed  "), ""), "/// trimmed\n");
+    }
+
+    // ── escape_dart_string_literal ──────────────────────────────────
+
+    #[test]
+    fn escape_plain_string_unchanged() {
+        assert_eq!(escape_dart_string_literal("hello"), "hello");
+    }
+
+    #[test]
+    fn escape_single_quotes_and_newlines() {
+        assert_eq!(escape_dart_string_literal("it's"), "it\\'s");
+        assert_eq!(escape_dart_string_literal("line\nnew"), "line\\nnew");
+    }
+
+    #[test]
+    fn escape_backslash_and_tab() {
+        assert_eq!(escape_dart_string_literal("back\\slash"), "back\\\\slash");
+        assert_eq!(escape_dart_string_literal("tab\there"), "tab\\there");
+    }
+
+    // ── render_throws_expr ──────────────────────────────────────────
+
+    #[test]
+    fn throws_expr_enum_type() {
+        let ty = Type::Enum {
+            name: "my_error".into(),
+            module_path: "".into(),
+        };
+        let result = render_throws_expr(&ty, "errVal", "    ");
+        assert!(
+            result.contains("MyErrorExceptionFfiCodec.decode(errVal)"),
+            "unexpected: {result}"
+        );
+    }
+
+    #[test]
+    fn throws_expr_object_type() {
+        let ty = Type::Object {
+            name: "my_error".into(),
+            module_path: "".into(),
+            imp: uniffi_bindgen::interface::ObjectImpl::Struct,
+        };
+        let result = render_throws_expr(&ty, "errVal", "    ");
+        assert!(
+            result.contains("MyError._(this, (errVal as num).toInt())"),
+            "unexpected: {result}"
+        );
+    }
+
+    // ── render_default_value_expr ───────────────────────────────────
+
+    #[test]
+    fn default_literal_boolean_true() {
+        let result = render_default_value_expr(
+            &DefaultValue::Literal(Literal::Boolean(true)),
+            &Type::Boolean,
+            &[],
+            &no_customs(),
+        );
+        assert_eq!(result, Some("true".to_string()));
+    }
+
+    #[test]
+    fn default_literal_boolean_false() {
+        let result = render_default_value_expr(
+            &DefaultValue::Literal(Literal::Boolean(false)),
+            &Type::Boolean,
+            &[],
+            &no_customs(),
+        );
+        assert_eq!(result, Some("false".to_string()));
+    }
+
+    #[test]
+    fn default_literal_string() {
+        let result = render_default_value_expr(
+            &DefaultValue::Literal(Literal::String("hello".into())),
+            &Type::String,
+            &[],
+            &no_customs(),
+        );
+        assert_eq!(result, Some("'hello'".to_string()));
+    }
+
+    #[test]
+    fn default_literal_none() {
+        let result = render_default_value_expr(
+            &DefaultValue::Literal(Literal::None),
+            &Type::Optional {
+                inner_type: Box::new(Type::String),
+            },
+            &[],
+            &no_customs(),
+        );
+        assert_eq!(result, Some("null".to_string()));
+    }
+
+    #[test]
+    fn default_literal_empty_sequence_and_map() {
+        let seq = render_default_value_expr(
+            &DefaultValue::Literal(Literal::EmptySequence),
+            &Type::Sequence {
+                inner_type: Box::new(Type::Int32),
+            },
+            &[],
+            &no_customs(),
+        );
+        assert_eq!(seq, Some("const []".to_string()));
+
+        let map = render_default_value_expr(
+            &DefaultValue::Literal(Literal::EmptyMap),
+            &Type::Map {
+                key_type: Box::new(Type::String),
+                value_type: Box::new(Type::Int32),
+            },
+            &[],
+            &no_customs(),
+        );
+        assert_eq!(map, Some("const {}".to_string()));
+    }
+
+    #[test]
+    fn default_default_boolean() {
+        let result =
+            render_default_value_expr(&DefaultValue::Default, &Type::Boolean, &[], &no_customs());
+        assert_eq!(result, Some("false".to_string()));
+    }
+
+    #[test]
+    fn default_default_string() {
+        let result =
+            render_default_value_expr(&DefaultValue::Default, &Type::String, &[], &no_customs());
+        assert_eq!(result, Some("''".to_string()));
+    }
+
+    #[test]
+    fn default_default_int32() {
+        let result =
+            render_default_value_expr(&DefaultValue::Default, &Type::Int32, &[], &no_customs());
+        assert_eq!(result, Some("0".to_string()));
+    }
+
+    #[test]
+    fn default_default_float64() {
+        let result =
+            render_default_value_expr(&DefaultValue::Default, &Type::Float64, &[], &no_customs());
+        assert_eq!(result, Some("0.0".to_string()));
+    }
+
+    #[test]
+    fn default_default_optional() {
+        let result = render_default_value_expr(
+            &DefaultValue::Default,
+            &Type::Optional {
+                inner_type: Box::new(Type::String),
+            },
+            &[],
+            &no_customs(),
+        );
+        assert_eq!(result, Some("null".to_string()));
+    }
+}

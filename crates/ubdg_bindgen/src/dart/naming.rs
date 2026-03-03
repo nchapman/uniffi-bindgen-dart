@@ -154,3 +154,127 @@ pub(super) fn is_dart_keyword(input: &str) -> bool {
             | "yield"
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // to_upper_camel tests
+    #[test]
+    fn upper_camel_snake_case() {
+        assert_eq!(to_upper_camel("simple_fn"), "SimpleFn");
+    }
+
+    #[test]
+    fn upper_camel_kebab_case() {
+        assert_eq!(to_upper_camel("hello-world"), "HelloWorld");
+    }
+
+    #[test]
+    fn upper_camel_empty() {
+        assert_eq!(to_upper_camel(""), "Uniffi");
+    }
+
+    #[test]
+    fn upper_camel_single_word() {
+        assert_eq!(to_upper_camel("already"), "Already");
+    }
+
+    #[test]
+    fn upper_camel_all_caps() {
+        assert_eq!(to_upper_camel("ALL_CAPS"), "ALLCAPS");
+    }
+
+    #[test]
+    fn upper_camel_single_chars() {
+        assert_eq!(to_upper_camel("a_b_c"), "ABC");
+    }
+
+    // to_lower_camel tests
+    #[test]
+    fn lower_camel_snake_case() {
+        assert_eq!(to_lower_camel("simple_fn"), "simpleFn");
+    }
+
+    #[test]
+    fn lower_camel_kebab_case() {
+        assert_eq!(to_lower_camel("hello-world"), "helloWorld");
+    }
+
+    #[test]
+    fn lower_camel_empty() {
+        assert_eq!(to_lower_camel(""), "value");
+    }
+
+    #[test]
+    fn lower_camel_already_camel() {
+        assert_eq!(to_lower_camel("CamelCase"), "camelCase");
+    }
+
+    // dart_identifier tests
+    #[test]
+    fn dart_identifier_kebab() {
+        assert_eq!(dart_identifier("hello-world"), "hello_world");
+    }
+
+    #[test]
+    fn dart_identifier_upper() {
+        assert_eq!(dart_identifier("MyClass"), "myclass");
+    }
+
+    #[test]
+    fn dart_identifier_empty() {
+        assert_eq!(dart_identifier(""), "uniffi_bindings");
+    }
+
+    #[test]
+    fn dart_identifier_single_char() {
+        assert_eq!(dart_identifier("a"), "a");
+    }
+
+    // safe_dart_identifier tests
+    #[test]
+    fn safe_identifier_keyword() {
+        assert_eq!(safe_dart_identifier("class"), "class_");
+        assert_eq!(safe_dart_identifier("void"), "void_");
+    }
+
+    #[test]
+    fn safe_identifier_non_keyword() {
+        assert_eq!(safe_dart_identifier("name"), "name");
+        assert_eq!(safe_dart_identifier("myVar"), "myVar");
+    }
+
+    // is_dart_keyword tests
+    #[test]
+    fn keyword_detection() {
+        assert!(is_dart_keyword("class"));
+        assert!(is_dart_keyword("abstract"));
+        assert!(is_dart_keyword("yield"));
+        assert!(is_dart_keyword("Function"));
+        assert!(!is_dart_keyword("myVar"));
+    }
+
+    // uniffi_trait_method_kind tests
+    #[test]
+    fn trait_method_kinds() {
+        assert_eq!(
+            uniffi_trait_method_kind("uniffi_trait_display"),
+            Some("display")
+        );
+        assert_eq!(
+            uniffi_trait_method_kind("uniffi_trait_debug"),
+            Some("debug")
+        );
+        assert_eq!(uniffi_trait_method_kind("uniffi_trait_hash"), Some("hash"));
+        assert_eq!(uniffi_trait_method_kind("uniffi_trait_eq"), Some("eq"));
+        assert_eq!(uniffi_trait_method_kind("random_name"), None);
+    }
+
+    // is_uniffi_trait_method_name tests
+    #[test]
+    fn trait_method_name_detection() {
+        assert!(is_uniffi_trait_method_name("uniffi_trait_display"));
+        assert!(!is_uniffi_trait_method_name("some_other_method"));
+    }
+}

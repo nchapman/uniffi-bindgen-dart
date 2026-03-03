@@ -11,7 +11,6 @@ import 'dart:typed_data';
 typedef Blob = Uint8List;
 typedef Count = int;
 typedef CountBuckets = Map<String, List<int>>;
-typedef CountList = List<int>;
 typedef Label = String;
 typedef MaybeBlobMap = Map<String, Uint8List?>;
 

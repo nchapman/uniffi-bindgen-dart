@@ -559,3 +559,330 @@ pub(super) fn map_runtime_dart_ffi_type(
         _ => None,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+    use uniffi_bindgen::interface::{ObjectImpl, Type};
+
+    use super::super::config::CustomTypeConfig;
+
+    fn no_customs() -> HashMap<String, CustomTypeConfig> {
+        HashMap::new()
+    }
+
+    // ── runtime_unwrapped_type ──────────────────────────────────────────
+
+    #[test]
+    fn runtime_unwrapped_type_primitive_returns_self() {
+        let t = Type::Int32;
+        assert!(matches!(runtime_unwrapped_type(&t), Type::Int32));
+    }
+
+    #[test]
+    fn runtime_unwrapped_type_custom_returns_builtin() {
+        let t = Type::Custom {
+            name: "Url".into(),
+            module_path: "".into(),
+            builtin: Box::new(Type::String),
+        };
+        assert!(matches!(runtime_unwrapped_type(&t), Type::String));
+    }
+
+    #[test]
+    fn runtime_unwrapped_type_nested_custom_returns_innermost() {
+        let t = Type::Custom {
+            name: "Outer".into(),
+            module_path: "".into(),
+            builtin: Box::new(Type::Custom {
+                name: "Inner".into(),
+                module_path: "".into(),
+                builtin: Box::new(Type::Int32),
+            }),
+        };
+        assert!(matches!(runtime_unwrapped_type(&t), Type::Int32));
+    }
+
+    // ── is_runtime_string_type ──────────────────────────────────────────
+
+    #[test]
+    fn is_runtime_string_type_true_for_string() {
+        assert!(is_runtime_string_type(&Type::String));
+    }
+
+    #[test]
+    fn is_runtime_string_type_false_for_int() {
+        assert!(!is_runtime_string_type(&Type::Int32));
+    }
+
+    // ── is_runtime_bytes_type ───────────────────────────────────────────
+
+    #[test]
+    fn is_runtime_bytes_type_true_for_bytes() {
+        assert!(is_runtime_bytes_type(&Type::Bytes));
+    }
+
+    #[test]
+    fn is_runtime_bytes_type_false_for_string() {
+        assert!(!is_runtime_bytes_type(&Type::String));
+    }
+
+    // ── is_runtime_record_type ──────────────────────────────────────────
+
+    #[test]
+    fn is_runtime_record_type_true_for_record() {
+        let t = Type::Record {
+            name: "Foo".into(),
+            module_path: "".into(),
+        };
+        assert!(is_runtime_record_type(&t));
+    }
+
+    #[test]
+    fn is_runtime_record_type_false_for_string() {
+        assert!(!is_runtime_record_type(&Type::String));
+    }
+
+    // ── is_runtime_enum_type ────────────────────────────────────────────
+
+    #[test]
+    fn is_runtime_enum_type_true_for_enum() {
+        let t = Type::Enum {
+            name: "Color".into(),
+            module_path: "".into(),
+        };
+        assert!(is_runtime_enum_type(&t, &[]));
+    }
+
+    #[test]
+    fn is_runtime_enum_type_false_for_string() {
+        assert!(!is_runtime_enum_type(&Type::String, &[]));
+    }
+
+    // ── is_runtime_object_type ──────────────────────────────────────────
+
+    #[test]
+    fn is_runtime_object_type_true_for_object() {
+        let t = Type::Object {
+            name: "Foo".into(),
+            module_path: "".into(),
+            imp: ObjectImpl::Struct,
+        };
+        assert!(is_runtime_object_type(&t));
+    }
+
+    #[test]
+    fn is_runtime_object_type_false_for_string() {
+        assert!(!is_runtime_object_type(&Type::String));
+    }
+
+    // ── map_uniffi_type_to_dart ─────────────────────────────────────────
+
+    #[test]
+    fn map_type_integer_variants() {
+        let customs = no_customs();
+        assert_eq!(map_uniffi_type_to_dart(&Type::UInt8, &customs), "int");
+        assert_eq!(map_uniffi_type_to_dart(&Type::Int32, &customs), "int");
+        assert_eq!(map_uniffi_type_to_dart(&Type::UInt64, &customs), "int");
+    }
+
+    #[test]
+    fn map_type_float_variants() {
+        let customs = no_customs();
+        assert_eq!(map_uniffi_type_to_dart(&Type::Float32, &customs), "double");
+        assert_eq!(map_uniffi_type_to_dart(&Type::Float64, &customs), "double");
+    }
+
+    #[test]
+    fn map_type_boolean() {
+        assert_eq!(
+            map_uniffi_type_to_dart(&Type::Boolean, &no_customs()),
+            "bool"
+        );
+    }
+
+    #[test]
+    fn map_type_string() {
+        assert_eq!(
+            map_uniffi_type_to_dart(&Type::String, &no_customs()),
+            "String"
+        );
+    }
+
+    #[test]
+    fn map_type_bytes() {
+        assert_eq!(
+            map_uniffi_type_to_dart(&Type::Bytes, &no_customs()),
+            "Uint8List"
+        );
+    }
+
+    #[test]
+    fn map_type_timestamp_and_duration() {
+        let customs = no_customs();
+        assert_eq!(
+            map_uniffi_type_to_dart(&Type::Timestamp, &customs),
+            "DateTime"
+        );
+        assert_eq!(
+            map_uniffi_type_to_dart(&Type::Duration, &customs),
+            "Duration"
+        );
+    }
+
+    #[test]
+    fn map_type_optional_string() {
+        let t = Type::Optional {
+            inner_type: Box::new(Type::String),
+        };
+        assert_eq!(map_uniffi_type_to_dart(&t, &no_customs()), "String?");
+    }
+
+    #[test]
+    fn map_type_sequence_int() {
+        let t = Type::Sequence {
+            inner_type: Box::new(Type::Int32),
+        };
+        assert_eq!(map_uniffi_type_to_dart(&t, &no_customs()), "List<int>");
+    }
+
+    #[test]
+    fn map_type_record_name() {
+        let t = Type::Record {
+            name: "MyRecord".into(),
+            module_path: "".into(),
+        };
+        assert_eq!(map_uniffi_type_to_dart(&t, &no_customs()), "MyRecord");
+    }
+
+    #[test]
+    fn map_type_enum_upper_camel() {
+        let t = Type::Enum {
+            name: "my_enum".into(),
+            module_path: "".into(),
+        };
+        assert_eq!(map_uniffi_type_to_dart(&t, &no_customs()), "MyEnum");
+    }
+
+    // ── map_runtime_native_ffi_type ─────────────────────────────────────
+
+    #[test]
+    fn native_ffi_uint8() {
+        assert_eq!(
+            map_runtime_native_ffi_type(&Type::UInt8, &[], &[]),
+            Some("ffi.Uint8")
+        );
+    }
+
+    #[test]
+    fn native_ffi_string() {
+        assert_eq!(
+            map_runtime_native_ffi_type(&Type::String, &[], &[]),
+            Some("ffi.Pointer<Utf8>")
+        );
+    }
+
+    #[test]
+    fn native_ffi_boolean() {
+        assert_eq!(
+            map_runtime_native_ffi_type(&Type::Boolean, &[], &[]),
+            Some("ffi.Bool")
+        );
+    }
+
+    #[test]
+    fn native_ffi_float64() {
+        assert_eq!(
+            map_runtime_native_ffi_type(&Type::Float64, &[], &[]),
+            Some("ffi.Double")
+        );
+    }
+
+    #[test]
+    fn native_ffi_object() {
+        let t = Type::Object {
+            name: "Foo".into(),
+            module_path: "".into(),
+            imp: ObjectImpl::Struct,
+        };
+        assert_eq!(
+            map_runtime_native_ffi_type(&t, &[], &[]),
+            Some("ffi.Uint64")
+        );
+    }
+
+    #[test]
+    fn native_ffi_record() {
+        let t = Type::Record {
+            name: "Bar".into(),
+            module_path: "".into(),
+        };
+        assert_eq!(
+            map_runtime_native_ffi_type(&t, &[], &[]),
+            Some("ffi.Pointer<Utf8>")
+        );
+    }
+
+    // ── lift_custom_if_needed / lower_custom_if_needed ──────────────────
+
+    fn url_customs() -> HashMap<String, CustomTypeConfig> {
+        let mut customs = HashMap::new();
+        customs.insert(
+            "Url".to_string(),
+            CustomTypeConfig {
+                type_name: Some("Uri".to_string()),
+                imports: None,
+                lift: Some("Uri.parse({})".to_string()),
+                lower: Some("{}.toString()".to_string()),
+            },
+        );
+        customs
+    }
+
+    #[test]
+    fn lift_non_custom_returns_unchanged() {
+        assert_eq!(
+            lift_custom_if_needed("raw", &Type::String, &no_customs()),
+            "raw"
+        );
+    }
+
+    #[test]
+    fn lift_custom_applies_template() {
+        let customs = url_customs();
+        let t = Type::Custom {
+            name: "Url".into(),
+            module_path: "".into(),
+            builtin: Box::new(Type::String),
+        };
+        assert_eq!(lift_custom_if_needed("raw", &t, &customs), "Uri.parse(raw)");
+    }
+
+    #[test]
+    fn lower_custom_applies_template() {
+        let customs = url_customs();
+        let t = Type::Custom {
+            name: "Url".into(),
+            module_path: "".into(),
+            builtin: Box::new(Type::String),
+        };
+        assert_eq!(
+            lower_custom_if_needed("value", &t, &customs),
+            "value.toString()"
+        );
+    }
+
+    #[test]
+    fn lift_optional_custom_applies_template() {
+        let customs = url_customs();
+        let t = Type::Optional {
+            inner_type: Box::new(Type::Custom {
+                name: "Url".into(),
+                module_path: "".into(),
+                builtin: Box::new(Type::String),
+            }),
+        };
+        assert_eq!(lift_custom_if_needed("raw", &t, &customs), "Uri.parse(raw)");
+    }
+}

@@ -8,7 +8,6 @@ import 'dart:ffi' as ffi;
 import 'package:ffi/ffi.dart';
 import 'dart:typed_data';
 
-typedef Blob = Uint8List;
 typedef MaybeBlobMap = Map<String, Uint8List?>;
 
 final class _RustCallStatus extends ffi.Struct {

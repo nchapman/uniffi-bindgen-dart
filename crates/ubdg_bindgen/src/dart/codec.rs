@@ -641,3 +641,350 @@ pub(super) fn render_uniffi_binary_read_expression(
         ),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+    use uniffi_bindgen::interface::{ObjectImpl, Type};
+
+    fn no_customs() -> HashMap<String, super::super::config::CustomTypeConfig> {
+        HashMap::new()
+    }
+
+    // ── render_json_encode_expr ──────────────────────────────────────────
+
+    #[test]
+    fn json_encode_timestamp() {
+        let result = render_json_encode_expr("value", &Type::Timestamp, &no_customs());
+        assert_eq!(result, "value.toUtc().microsecondsSinceEpoch");
+    }
+
+    #[test]
+    fn json_encode_duration() {
+        let result = render_json_encode_expr("value", &Type::Duration, &no_customs());
+        assert_eq!(result, "value.inMicroseconds");
+    }
+
+    #[test]
+    fn json_encode_bytes() {
+        let result = render_json_encode_expr("value", &Type::Bytes, &no_customs());
+        assert_eq!(result, "base64Encode(value)");
+    }
+
+    #[test]
+    fn json_encode_primitive_int32() {
+        let result = render_json_encode_expr("value", &Type::Int32, &no_customs());
+        assert_eq!(result, "value");
+    }
+
+    #[test]
+    fn json_encode_string() {
+        let result = render_json_encode_expr("value", &Type::String, &no_customs());
+        assert_eq!(result, "value");
+    }
+
+    #[test]
+    fn json_encode_record() {
+        let ty = Type::Record {
+            module_path: String::new(),
+            name: "my_record".to_string(),
+        };
+        let result = render_json_encode_expr("value", &ty, &no_customs());
+        assert_eq!(result, "value.toJson()");
+    }
+
+    #[test]
+    fn json_encode_enum() {
+        let ty = Type::Enum {
+            module_path: String::new(),
+            name: "my_color".to_string(),
+        };
+        let result = render_json_encode_expr("value", &ty, &no_customs());
+        assert_eq!(result, "MyColorFfiCodec.encode(value)");
+    }
+
+    #[test]
+    fn json_encode_object() {
+        let ty = Type::Object {
+            module_path: String::new(),
+            name: "my_counter".to_string(),
+            imp: ObjectImpl::Struct,
+        };
+        let result = render_json_encode_expr("value", &ty, &no_customs());
+        assert_eq!(result, "MyCounterFfiCodec.lower(value)");
+    }
+
+    // ── render_json_decode_expr ──────────────────────────────────────────
+
+    #[test]
+    fn json_decode_int32() {
+        let result = render_json_decode_expr("v", &Type::Int32, &no_customs());
+        assert_eq!(result, "(v as num).toInt()");
+    }
+
+    #[test]
+    fn json_decode_float64() {
+        let result = render_json_decode_expr("v", &Type::Float64, &no_customs());
+        assert_eq!(result, "(v as num).toDouble()");
+    }
+
+    #[test]
+    fn json_decode_boolean() {
+        let result = render_json_decode_expr("v", &Type::Boolean, &no_customs());
+        assert_eq!(result, "v as bool");
+    }
+
+    #[test]
+    fn json_decode_string() {
+        let result = render_json_decode_expr("v", &Type::String, &no_customs());
+        assert_eq!(result, "v as String");
+    }
+
+    #[test]
+    fn json_decode_timestamp() {
+        let result = render_json_decode_expr("v", &Type::Timestamp, &no_customs());
+        assert!(result.contains("DateTime.fromMicrosecondsSinceEpoch"));
+    }
+
+    #[test]
+    fn json_decode_duration() {
+        let result = render_json_decode_expr("v", &Type::Duration, &no_customs());
+        assert!(result.contains("Duration(microseconds:"));
+    }
+
+    #[test]
+    fn json_decode_record() {
+        let ty = Type::Record {
+            module_path: String::new(),
+            name: "my_record".to_string(),
+        };
+        let result = render_json_decode_expr("v", &ty, &no_customs());
+        assert_eq!(result, "MyRecord.fromJson(v as Map<String, dynamic>)");
+    }
+
+    #[test]
+    fn json_decode_enum() {
+        let ty = Type::Enum {
+            module_path: String::new(),
+            name: "color".to_string(),
+        };
+        let result = render_json_decode_expr("v", &ty, &no_customs());
+        assert_eq!(result, "ColorFfiCodec.decode(v as String)");
+    }
+
+    // ── render_uniffi_binary_write_statement ─────────────────────────────
+
+    #[test]
+    fn binary_write_u8() {
+        let result = render_uniffi_binary_write_statement(
+            &Type::UInt8,
+            "value",
+            "writer",
+            &[],
+            "  ",
+            &no_customs(),
+        );
+        assert_eq!(result, "  writer.writeU8(value);\n");
+    }
+
+    #[test]
+    fn binary_write_string() {
+        let result = render_uniffi_binary_write_statement(
+            &Type::String,
+            "value",
+            "writer",
+            &[],
+            "  ",
+            &no_customs(),
+        );
+        assert_eq!(result, "  writer.writeString(value);\n");
+    }
+
+    #[test]
+    fn binary_write_bool() {
+        let result = render_uniffi_binary_write_statement(
+            &Type::Boolean,
+            "value",
+            "writer",
+            &[],
+            "  ",
+            &no_customs(),
+        );
+        assert_eq!(result, "  writer.writeBool(value);\n");
+    }
+
+    #[test]
+    fn binary_write_f64() {
+        let result = render_uniffi_binary_write_statement(
+            &Type::Float64,
+            "value",
+            "writer",
+            &[],
+            "  ",
+            &no_customs(),
+        );
+        assert_eq!(result, "  writer.writeF64(value);\n");
+    }
+
+    // ── render_uniffi_binary_read_expression ─────────────────────────────
+
+    #[test]
+    fn binary_read_u8() {
+        let result =
+            render_uniffi_binary_read_expression(&Type::UInt8, "reader", &[], &no_customs());
+        assert_eq!(result, "reader.readU8()");
+    }
+
+    #[test]
+    fn binary_read_string() {
+        let result =
+            render_uniffi_binary_read_expression(&Type::String, "reader", &[], &no_customs());
+        assert_eq!(result, "reader.readString()");
+    }
+
+    #[test]
+    fn binary_read_bool() {
+        let result =
+            render_uniffi_binary_read_expression(&Type::Boolean, "reader", &[], &no_customs());
+        assert_eq!(result, "reader.readBool()");
+    }
+
+    #[test]
+    fn binary_read_f64() {
+        let result =
+            render_uniffi_binary_read_expression(&Type::Float64, "reader", &[], &no_customs());
+        assert_eq!(result, "reader.readF64()");
+    }
+
+    // ── Optional / Sequence: render_json_encode_expr ─────────────────────
+
+    #[test]
+    fn json_encode_optional_int32() {
+        let ty = Type::Optional {
+            inner_type: Box::new(Type::Int32),
+        };
+        let result = render_json_encode_expr("value", &ty, &no_customs());
+        // Null-coalescing IIFE pattern: check for null, unwrap with `!`, encode inner.
+        assert!(result.contains("value == null ? null :"));
+        assert!(result.contains("value!"));
+        assert!(result.contains("return __tmp;"));
+    }
+
+    #[test]
+    fn json_encode_sequence_string() {
+        let ty = Type::Sequence {
+            inner_type: Box::new(Type::String),
+        };
+        let result = render_json_encode_expr("value", &ty, &no_customs());
+        assert!(result.contains(".map((item) => item).toList()"));
+    }
+
+    // ── Optional / Sequence / Bytes / Object: render_json_decode_expr ────
+
+    #[test]
+    fn json_decode_optional_int32() {
+        let ty = Type::Optional {
+            inner_type: Box::new(Type::Int32),
+        };
+        let result = render_json_decode_expr("v", &ty, &no_customs());
+        // Null-check IIFE with inner cast on the unwrapped __tmp variable.
+        assert!(result.contains("v == null ? null :"));
+        assert!(result.contains("(__tmp as num).toInt()"));
+        // The inner decode should reference __tmp, not the original v.
+        assert!(!result.contains("(v as num).toInt()"));
+    }
+
+    #[test]
+    fn json_decode_sequence_string() {
+        let ty = Type::Sequence {
+            inner_type: Box::new(Type::String),
+        };
+        let result = render_json_decode_expr("v", &ty, &no_customs());
+        assert!(result.starts_with("(v as List)"));
+        assert!(result.contains(".map((item) =>"));
+        assert!(result.contains("item as String"));
+    }
+
+    #[test]
+    fn json_decode_bytes() {
+        let result = render_json_decode_expr("v", &Type::Bytes, &no_customs());
+        assert_eq!(result, "base64Decode(v as String)");
+    }
+
+    #[test]
+    fn json_decode_object() {
+        let ty = Type::Object {
+            module_path: String::new(),
+            name: "my_counter".to_string(),
+            imp: ObjectImpl::Struct,
+        };
+        let result = render_json_decode_expr("v", &ty, &no_customs());
+        assert_eq!(result, "MyCounterFfiCodec.lift((v as num).toInt())");
+    }
+
+    // ── Optional / Sequence: render_uniffi_binary_write_statement ────────
+
+    #[test]
+    fn binary_write_optional_int32() {
+        let ty = Type::Optional {
+            inner_type: Box::new(Type::Int32),
+        };
+        let result =
+            render_uniffi_binary_write_statement(&ty, "value", "writer", &[], "  ", &no_customs());
+        // if/else with writeI8(0) for null, writeI8(1) + writeI32 for present.
+        assert!(result.contains("if (value == null)"));
+        assert!(result.contains("writer.writeI8(0)"));
+        assert!(result.contains("writer.writeI8(1)"));
+        assert!(result.contains("writer.writeI32(value!)"));
+    }
+
+    #[test]
+    fn binary_write_sequence_string() {
+        let ty = Type::Sequence {
+            inner_type: Box::new(Type::String),
+        };
+        let result =
+            render_uniffi_binary_write_statement(&ty, "value", "writer", &[], "  ", &no_customs());
+        // writeI32(length) + for loop with writeString.
+        assert!(result.contains("writer.writeI32(value.length)"));
+        assert!(result.contains("for (final item in value)"));
+        assert!(result.contains("writer.writeString(item)"));
+    }
+
+    // ── Optional / Sequence / Bytes: render_uniffi_binary_read_expression ─
+
+    #[test]
+    fn binary_read_optional_int32() {
+        let ty = Type::Optional {
+            inner_type: Box::new(Type::Int32),
+        };
+        let result = render_uniffi_binary_read_expression(&ty, "reader", &[], &no_customs());
+        // IIFE with readI8 tag check + readI32.
+        assert!(result.contains("reader.readI8()"));
+        assert!(result.contains("__tag == 0"));
+        assert!(result.contains("return null"));
+        assert!(result.contains("reader.readI32()"));
+    }
+
+    #[test]
+    fn binary_read_sequence_string() {
+        let ty = Type::Sequence {
+            inner_type: Box::new(Type::String),
+        };
+        let result = render_uniffi_binary_read_expression(&ty, "reader", &[], &no_customs());
+        // IIFE with readI32 length + loop + readString.
+        assert!(result.contains("reader.readI32()"));
+        assert!(result.contains("<String>[]"));
+        assert!(result.contains("reader.readString()"));
+    }
+
+    #[test]
+    fn binary_read_bytes() {
+        let result =
+            render_uniffi_binary_read_expression(&Type::Bytes, "reader", &[], &no_customs());
+        // readI32 length + readBytes pattern.
+        assert!(result.contains("reader.readI32()"));
+        assert!(result.contains("reader.readBytes(__len)"));
+    }
+}

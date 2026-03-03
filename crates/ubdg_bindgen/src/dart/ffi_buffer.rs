@@ -764,3 +764,219 @@ pub(super) fn async_rust_future_spec_from_uniffi_return_type(
         _ => None,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use uniffi_bindgen::interface::{ffi::FfiType, ObjectImpl, Type};
+
+    // ── ffibuffer_symbol_name ──────────────────────────────────────────
+
+    #[test]
+    fn symbol_name_strips_uniffi_prefix() {
+        assert_eq!(
+            ffibuffer_symbol_name("uniffi_my_crate_fn_add"),
+            "uniffi_ffibuffer_my_crate_fn_add"
+        );
+    }
+
+    #[test]
+    fn symbol_name_bare_symbol() {
+        assert_eq!(
+            ffibuffer_symbol_name("some_bare_symbol"),
+            "uniffi_ffibuffer_some_bare_symbol"
+        );
+    }
+
+    #[test]
+    fn symbol_name_just_prefix() {
+        assert_eq!(ffibuffer_symbol_name("uniffi_"), "uniffi_ffibuffer_");
+    }
+
+    // ── ffibuffer_element_count ────────────────────────────────────────
+
+    #[test]
+    fn element_count_uint8() {
+        assert_eq!(ffibuffer_element_count(&FfiType::UInt8), Some(1));
+    }
+
+    #[test]
+    fn element_count_int64() {
+        assert_eq!(ffibuffer_element_count(&FfiType::Int64), Some(1));
+    }
+
+    #[test]
+    fn element_count_float32() {
+        assert_eq!(ffibuffer_element_count(&FfiType::Float32), Some(1));
+    }
+
+    #[test]
+    fn element_count_handle() {
+        assert_eq!(ffibuffer_element_count(&FfiType::Handle), Some(1));
+    }
+
+    #[test]
+    fn element_count_rust_buffer() {
+        assert_eq!(ffibuffer_element_count(&FfiType::RustBuffer(None)), Some(3));
+    }
+
+    #[test]
+    fn element_count_rust_call_status() {
+        assert_eq!(ffibuffer_element_count(&FfiType::RustCallStatus), Some(4));
+    }
+
+    #[test]
+    fn element_count_void_pointer_unsupported() {
+        assert_eq!(ffibuffer_element_count(&FfiType::VoidPointer), None);
+    }
+
+    // ── ffibuffer_primitive_union_field ─────────────────────────────────
+
+    #[test]
+    fn union_field_uint8() {
+        assert_eq!(ffibuffer_primitive_union_field(&FfiType::UInt8), Some("u8"));
+    }
+
+    #[test]
+    fn union_field_int8() {
+        assert_eq!(ffibuffer_primitive_union_field(&FfiType::Int8), Some("i8"));
+    }
+
+    #[test]
+    fn union_field_uint32() {
+        assert_eq!(
+            ffibuffer_primitive_union_field(&FfiType::UInt32),
+            Some("u32")
+        );
+    }
+
+    #[test]
+    fn union_field_uint64() {
+        assert_eq!(
+            ffibuffer_primitive_union_field(&FfiType::UInt64),
+            Some("u64")
+        );
+    }
+
+    #[test]
+    fn union_field_float32() {
+        assert_eq!(
+            ffibuffer_primitive_union_field(&FfiType::Float32),
+            Some("float32")
+        );
+    }
+
+    #[test]
+    fn union_field_float64() {
+        assert_eq!(
+            ffibuffer_primitive_union_field(&FfiType::Float64),
+            Some("float64")
+        );
+    }
+
+    #[test]
+    fn union_field_handle() {
+        assert_eq!(
+            ffibuffer_primitive_union_field(&FfiType::Handle),
+            Some("u64")
+        );
+    }
+
+    #[test]
+    fn union_field_void_pointer_ref() {
+        assert_eq!(
+            ffibuffer_primitive_union_field(&FfiType::Reference(Box::new(FfiType::VoidPointer))),
+            Some("ptr")
+        );
+    }
+
+    #[test]
+    fn union_field_rust_buffer_none() {
+        assert_eq!(
+            ffibuffer_primitive_union_field(&FfiType::RustBuffer(None)),
+            None
+        );
+    }
+
+    // ── ffibuffer_ffi_type_from_uniffi_type ─────────────────────────────
+
+    #[test]
+    fn ffi_type_from_uint8() {
+        assert_eq!(
+            ffibuffer_ffi_type_from_uniffi_type(&Type::UInt8),
+            Some(FfiType::UInt8)
+        );
+    }
+
+    #[test]
+    fn ffi_type_from_string() {
+        assert_eq!(
+            ffibuffer_ffi_type_from_uniffi_type(&Type::String),
+            Some(FfiType::RustBuffer(None))
+        );
+    }
+
+    #[test]
+    fn ffi_type_from_boolean() {
+        assert_eq!(
+            ffibuffer_ffi_type_from_uniffi_type(&Type::Boolean),
+            Some(FfiType::Int8)
+        );
+    }
+
+    #[test]
+    fn ffi_type_from_object() {
+        assert_eq!(
+            ffibuffer_ffi_type_from_uniffi_type(&Type::Object {
+                name: "Foo".into(),
+                module_path: "".into(),
+                imp: ObjectImpl::Struct,
+            }),
+            Some(FfiType::Handle)
+        );
+    }
+
+    #[test]
+    fn ffi_type_from_float64() {
+        assert_eq!(
+            ffibuffer_ffi_type_from_uniffi_type(&Type::Float64),
+            Some(FfiType::Float64)
+        );
+    }
+
+    // ── eligibility predicates ──────────────────────────────────────────
+
+    fn test_function(ffi_symbol: Option<String>, is_async: bool) -> UdlFunction {
+        UdlFunction {
+            name: "test".to_string(),
+            ffi_symbol,
+            ffi_arg_types: vec![],
+            ffi_return_type: None,
+            ffi_has_rust_call_status: false,
+            runtime_unsupported: None,
+            docstring: None,
+            is_async,
+            return_type: None,
+            throws_type: None,
+            args: vec![],
+        }
+    }
+
+    #[test]
+    fn eligible_sync_with_symbol() {
+        let f = test_function(Some("uniffi_test".into()), false);
+        assert!(is_ffibuffer_eligible_function(&f));
+    }
+
+    #[test]
+    fn ineligible_no_symbol() {
+        let f = test_function(None, false);
+        assert!(!is_ffibuffer_eligible_function(&f));
+    }
+
+    #[test]
+    fn ineligible_async() {
+        let f = test_function(Some("uniffi_test".into()), true);
+        assert!(!is_ffibuffer_eligible_function(&f));
+    }
+}

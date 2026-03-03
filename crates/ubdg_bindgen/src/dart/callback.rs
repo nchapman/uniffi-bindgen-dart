@@ -966,3 +966,132 @@ pub(super) fn render_callback_return_encode_expr(
         _ => lowered,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bridge_class_name() {
+        assert_eq!(
+            callback_bridge_class_name("MyCallback"),
+            "_MyCallbackCallbackBridge"
+        );
+    }
+
+    #[test]
+    fn vtable_struct_name() {
+        assert_eq!(
+            callback_vtable_struct_name("MyCallback"),
+            "_MyCallbackVTable"
+        );
+    }
+
+    #[test]
+    fn init_symbol() {
+        assert_eq!(
+            callback_init_symbol("MyCallback"),
+            "mycallback_callback_init"
+        );
+    }
+
+    #[test]
+    fn init_field_name() {
+        assert_eq!(
+            callback_init_field_name("MyCallback"),
+            "_myCallbackCallbackInit"
+        );
+    }
+
+    #[test]
+    fn init_done_field_name() {
+        assert_eq!(
+            callback_init_done_field_name("MyCallback"),
+            "_myCallbackCallbackInitDone"
+        );
+    }
+
+    #[test]
+    fn vtable_field_name() {
+        assert_eq!(
+            callback_vtable_field_name("MyCallback"),
+            "_myCallbackCallbackVTable"
+        );
+    }
+
+    #[test]
+    fn async_result_struct_name() {
+        assert_eq!(
+            callback_async_result_struct_name("MyCallback", "doWork"),
+            "_MyCallbackDoWorkAsyncResult"
+        );
+    }
+
+    #[test]
+    fn interface_name_from_type() {
+        let cb_type = Type::CallbackInterface {
+            name: "MyCallback".into(),
+            module_path: "".into(),
+        };
+        assert_eq!(
+            callback_interface_name_from_type(&cb_type),
+            Some("MyCallback")
+        );
+        assert_eq!(callback_interface_name_from_type(&Type::String), None);
+    }
+
+    // Trait callback naming helpers (defined in render_objects.rs).
+    use super::super::render_objects::{
+        trait_callback_bridge_class_name, trait_callback_init_done_field_name,
+        trait_callback_init_field_name, trait_callback_init_symbol,
+        trait_callback_vtable_field_name, trait_callback_vtable_struct_name,
+    };
+
+    #[test]
+    fn trait_bridge_class_name() {
+        assert_eq!(
+            trait_callback_bridge_class_name("MyService"),
+            "_MyServiceTraitCallbackBridge"
+        );
+    }
+
+    #[test]
+    fn trait_vtable_struct_name() {
+        assert_eq!(
+            trait_callback_vtable_struct_name("MyService"),
+            "_MyServiceTraitVTable"
+        );
+    }
+
+    #[test]
+    fn trait_init_symbol() {
+        assert_eq!(
+            trait_callback_init_symbol("MyService"),
+            "myservice_trait_callback_init"
+        );
+    }
+
+    #[test]
+    fn trait_init_field_name() {
+        assert_eq!(
+            trait_callback_init_field_name("MyService"),
+            "_myServiceTraitCallbackInit"
+        );
+    }
+
+    #[test]
+    fn trait_init_done_field_name() {
+        assert_eq!(
+            trait_callback_init_done_field_name("MyService"),
+            "_myServiceTraitCallbackInitDone"
+        );
+    }
+
+    #[test]
+    fn trait_vtable_field_name() {
+        assert_eq!(
+            trait_callback_vtable_field_name("MyService"),
+            "_myServiceTraitCallbackVTable"
+        );
+    }
+}
