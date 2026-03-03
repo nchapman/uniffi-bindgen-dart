@@ -14,7 +14,7 @@ pub struct CliArgs {
 
 #[derive(Debug, Subcommand)]
 pub enum CliCommand {
-    /// Generate bindings from a UDL file or library.
+    /// Generate Dart bindings from a UDL file or compiled cdylib.
     Generate(GenerateArgs),
     /// Check host tooling and print diagnostics.
     Doctor,
@@ -22,15 +22,15 @@ pub enum CliCommand {
 
 #[derive(Debug, Args)]
 pub struct GenerateArgs {
-    /// A UDL file or library path.
+    /// Path to a UDL file or compiled cdylib. Mode is auto-detected from the file extension.
     pub source: PathBuf,
 
     /// Directory in which to write generated files.
     #[arg(long)]
     pub out_dir: PathBuf,
 
-    /// Treat source as a library and run in library mode.
-    #[arg(long)]
+    /// Deprecated: mode is now auto-detected from the file extension. Kept for backwards compatibility.
+    #[arg(long, hide = true)]
     pub library: bool,
 
     /// Optional config file path.
@@ -106,6 +106,50 @@ mod tests {
                 assert_eq!(g.config, Some(PathBuf::from("uniffi.toml")));
                 assert_eq!(g.crate_name.as_deref(), Some("demo"));
                 assert!(g.no_format);
+            }
+            _ => panic!("expected generate command"),
+        }
+    }
+
+    #[test]
+    fn parses_generate_without_library_flag() {
+        let args = CliArgs::parse_from([
+            "uniffi-bindgen-dart",
+            "generate",
+            "path/to/libmycrate.so",
+            "--out-dir",
+            "out",
+            "--crate",
+            "mycrate",
+        ]);
+
+        match args.command {
+            CliCommand::Generate(g) => {
+                assert_eq!(g.source, PathBuf::from("path/to/libmycrate.so"));
+                assert!(
+                    !g.library,
+                    "library flag should default to false (auto-detected)"
+                );
+                assert_eq!(g.crate_name.as_deref(), Some("mycrate"));
+            }
+            _ => panic!("expected generate command"),
+        }
+    }
+
+    #[test]
+    fn library_flag_still_accepted_for_backwards_compat() {
+        let args = CliArgs::parse_from([
+            "uniffi-bindgen-dart",
+            "generate",
+            "path/to/libmycrate.so",
+            "--library",
+            "--out-dir",
+            "out",
+        ]);
+
+        match args.command {
+            CliCommand::Generate(g) => {
+                assert!(g.library);
             }
             _ => panic!("expected generate command"),
         }

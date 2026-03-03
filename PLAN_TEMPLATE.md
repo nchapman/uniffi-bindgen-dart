@@ -126,7 +126,7 @@ All must be true before stable release:
 
 ## CLI Contract
 ### Required Command
-- `generate <source> --out-dir <dir> [--library] [--config <file>] [--crate <name>] [--no-format]`
+- `generate <source> --out-dir <dir> [--config <file>] [--crate <name>] [--no-format]` (mode auto-detected from file extension)
 
 ### Optional Commands (Post-MVP)
 - `doctor` for environment diagnostics.

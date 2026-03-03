@@ -25,7 +25,7 @@ Legend:
 | Custom types | Implemented | builtin-backed typedef unwrapping implemented across all runtime paths (same approach as Swift/Kotlin — validation happens in Rust scaffolding); validated for string, integer, bytes/optional-bytes, and string-keyed custom-map aliases across sync/async top-level + object calls; nested container custom aliases covered in runtime smoke |
 | External/remote types | Implemented | external record/enum/interface typedef references bind through runtime wrappers with mapped `external_packages` imports; import collection scans all surfaces including record fields and enum payloads; generator emits stable public `*FfiCodec` helpers for cross-package conversion contracts; `Optional<ExternalRecord>`, `Sequence<ExternalRecord>`, and external-field-in-record paths covered by golden fixture |
 | Rename/exclude/docstrings | Implemented | `rename`/`exclude` config keys implemented for generated Dart public API wrappers with dedicated `rename-demo` golden coverage; docstring emission across all generated surfaces with `docstrings-demo` golden coverage |
-| Library-mode metadata input | Implemented | `generate --library <cdylib>` parses UniFFI metadata from library artifacts with optional crate selection via `--crate` |
+| Library-mode metadata input | Implemented | Auto-detected from file extension; parses UniFFI metadata from compiled cdylibs with optional crate selection via `--crate` |
 | Record/enum methods (proc-macro metadata) | Implemented | library-metadata-driven generation emits idiomatic Dart record methods and enum methods (flat-enum extensions + sealed-enum instance methods) plus runtime FFI lookup/invoke wrappers; comprehensive runtime fixture coverage via `record-enum-methods` with sync/async/throws/custom-type method families |
 | Non-exhaustive enums | Implemented | `[NonExhaustive]` flat enums and error enums generate unknown/fallback variants for forward-compatible deserialization; dedicated `non-exhaustive-demo` golden fixture |
 | ABI integrity checks | Implemented | contract version and per-function checksum verification at library init; mismatches throw clear diagnostic errors |
@@ -51,5 +51,5 @@ These features exist in the upstream `uniffi-rs` coverall fixture but require de
 | `sequence<Object>` return type | Objects in sequences not FFI-compatible | `get_traits()`, `get_string_util_traits()` |
 
 ## Notes
-- Current fixture coverage includes 19 golden tests across all major feature domains, anchored by `coverall-demo` (comprehensive feature combinations) and `simple-fns` (rich runtime interactions).
+- Current fixture coverage spans all major feature domains (UDL and library mode), anchored by `coverall-demo` (comprehensive feature combinations), `simple-fns` (rich runtime interactions), and `library-mode-demo` (library-mode feature coverage).
 - Strict hygiene gate includes `cargo clippy --all-targets -- -D warnings` and full `./scripts/test_bindings.sh`.

@@ -24,8 +24,8 @@ cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test --w
 # Generate bindings from a UDL file
 cargo run -- generate fixtures/simple-fns/src/simple-fns.udl --out-dir /tmp/out
 
-# Generate bindings from a compiled library (library mode)
-cargo run -- generate path/to/libcrate.dylib --library --crate crate_name --out-dir /tmp/out
+# Generate bindings from a compiled library (auto-detected from extension)
+cargo run -- generate path/to/libcrate.dylib --crate crate_name --out-dir /tmp/out
 
 # Run a single Rust test
 cargo test -p ubdg_bindgen golden_simple_fns
@@ -68,16 +68,16 @@ class SimpleFnsFfi {
 
 ### Generation Modes
 
-The generator supports two modes:
+The generator supports two modes, auto-detected from the file extension (matching upstream UniFFI behavior):
 
-1. **UDL mode** (default) — Reads a `.udl` file, generates Dart with bare symbol names (`add`, `greet`), no integrity checks. Used with hand-written native libs that manually export C functions.
-2. **Library mode** (`--library`) — Reads metadata from a compiled UniFFI cdylib, generates Dart with proper `uniffi_*` symbol names, API integrity checks (contract version + checksums), and the ffi_buffer ABI. **This is the standard upstream approach** used by all first-party UniFFI backends (Swift, Kotlin, Python, Ruby) and is the recommended production path.
+1. **Library mode** (`.dylib`/`.so`/`.dll`) — Reads metadata from a compiled UniFFI cdylib, generates Dart with proper `uniffi_*` symbol names, API integrity checks (contract version + checksums), and the ffi_buffer ABI. **This is the standard upstream approach** used by all first-party UniFFI backends (Swift, Kotlin, Python, Ruby) and is the recommended production path.
+2. **UDL mode** (`.udl`) — Reads a `.udl` file, generates Dart with bare symbol names (`add`, `greet`), no integrity checks. Used with hand-written native libs that manually export C functions.
 
 ### Native FFI Architecture
 
 For each fixture:
 1. Rust cdylib is compiled (`.dylib`/`.so`) exporting C functions
-2. `uniffi-bindgen-dart generate` reads UDL (or `--library` reads the cdylib directly) and emits `{namespace}.dart`
+2. `uniffi-bindgen-dart generate` reads the source (UDL or cdylib, auto-detected) and emits `{namespace}.dart`
 3. Consumer opens the library: `configureDefaultBindings(libraryPath: 'libmy_crate.dylib')`
 
 ### Golden Test Pattern
@@ -89,8 +89,8 @@ Fixtures live in `fixtures/{name}/` with UDL input at `src/{name}.udl` and expec
 cargo run -- generate fixtures/{name}/src/{name}.udl --out-dir /tmp/regen
 cp /tmp/regen/{namespace}.dart fixtures/{name}/expected/{namespace}.dart
 
-# Library mode (requires compiled cdylib)
-cargo run -- generate path/to/libcrate.dylib --library --crate crate_name --out-dir /tmp/regen
+# Library mode (requires compiled cdylib, auto-detected from extension)
+cargo run -- generate path/to/libcrate.dylib --crate crate_name --out-dir /tmp/regen
 cp /tmp/regen/{namespace}.dart fixtures/{name}/expected/{namespace}_library.dart
 ```
 
@@ -105,33 +105,25 @@ Library-mode golden tests are gated on environment variables (e.g., `UBDG_RECORD
 
 ### Feature Coverage
 
-**UDL-mode fixtures** (15 fixtures + 5 regression fixtures):
-
-| Feature | Fixture |
-|---------|---------|
-| Top-level sync/async functions, callbacks, objects, primitives | `simple-fns` |
-| Records, flat enums, data enums | `compound-demo`, `model-types-demo` |
-| Custom type aliases | `custom-types-demo` |
-| External cross-package types | `ext-types-demo` |
-| Async stress testing (all return families) | `futures-stress` |
-| UDL `///` docstrings | `docstrings-demo` |
-| Rename/exclude config | `rename-demo` |
-| Comprehensive feature combinations (records, objects, enums, errors, callbacks, traits) | `coverall-demo` |
-| Reserved word escaping | `keywords-demo` |
-| Large enum/error code-gen scale + all primitives | `type-limits-demo` |
-| Record/enum methods | `record-enum-methods` |
-| Trait attributes on interfaces, records, and enums | `trait-demo` |
-| Flat and rich error enums, non-exhaustive variants | `error-types-demo`, `non-exhaustive-demo` |
-| Regression: custom shadow types, async object lift, callback custom async | `regressions/*` |
-| Regression: optional param defaults, record field defaults | `regressions/defaults-demo` |
-| Regression: forward/mutual interface references | `regressions/forward-refs-demo` |
-
-**Library-mode fixtures** (2 fixtures):
-
-| Feature | Fixture |
-|---------|---------|
-| Record/enum methods, custom types, errors (library mode) | `record-enum-methods` (library golden) |
-| Top-level sync/async/throws fns, objects, records, enums, custom types, collections | `library-mode-demo` |
+| Feature | Fixture | Mode |
+|---------|---------|------|
+| Top-level sync/async functions, callbacks, objects, primitives | `simple-fns` | UDL |
+| Records, flat enums, data enums | `compound-demo`, `model-types-demo` | UDL |
+| Custom type aliases | `custom-types-demo` | UDL |
+| External cross-package types | `ext-types-demo` | UDL |
+| Async stress testing (all return families) | `futures-stress` | UDL |
+| UDL `///` docstrings | `docstrings-demo` | UDL |
+| Rename/exclude config | `rename-demo` | UDL |
+| Comprehensive feature combinations (records, objects, enums, errors, callbacks, traits) | `coverall-demo` | UDL |
+| Reserved word escaping | `keywords-demo` | UDL |
+| Large enum/error code-gen scale + all primitives | `type-limits-demo` | UDL |
+| Record/enum methods | `record-enum-methods` | UDL + Library |
+| Trait attributes on interfaces, records, and enums | `trait-demo` | UDL |
+| Flat and rich error enums, non-exhaustive variants | `error-types-demo`, `non-exhaustive-demo` | UDL |
+| Top-level sync/async/throws fns, objects, records, enums, custom types, collections | `library-mode-demo` | Library |
+| Regression: custom shadow types, async object lift, callback custom async | `regressions/*` | UDL |
+| Regression: optional param defaults, record field defaults | `regressions/defaults-demo` | UDL |
+| Regression: forward/mutual interface references | `regressions/forward-refs-demo` | UDL |
 
 ### External Type Support
 

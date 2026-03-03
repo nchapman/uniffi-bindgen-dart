@@ -39,7 +39,7 @@ use types::*;
 
 pub fn generate_bindings(args: &GenerateArgs) -> Result<()> {
     let cfg = config::load(args)?;
-    let metadata = parse_udl_metadata(&args.source, args.crate_name.as_deref(), args.library)?;
+    let metadata = parse_udl_metadata(&args.source, args.crate_name.as_deref())?;
     let namespace = metadata
         .namespace
         .clone()
@@ -699,22 +699,24 @@ mod tests {
     }
 
     #[test]
-    fn library_mode_uses_library_metadata_path() {
+    fn non_udl_extension_auto_detects_library_mode() {
         let temp = tempfile::tempdir().expect("tempdir");
         let out_dir = temp.path().join("out");
+        // .dylib extension triggers library mode automatically — no --library flag needed
         let source = temp.path().join("libmissing.dylib");
         fs::write(&source, b"not-a-real-library").expect("write source");
 
         let args = GenerateArgs {
             source,
             out_dir,
-            library: true,
+            library: false, // flag is ignored; extension determines mode
             config: None,
             crate_name: None,
             no_format: false,
         };
 
-        let err = generate_bindings(&args).expect_err("library mode should attempt metadata parse");
+        let err = generate_bindings(&args)
+            .expect_err("non-.udl extension should auto-detect library mode");
         let msg = format!("{err:#}");
         assert!(msg.contains("failed to parse library metadata"));
     }

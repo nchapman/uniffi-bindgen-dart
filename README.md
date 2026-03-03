@@ -21,7 +21,7 @@ production-grade Dart code from UniFFI interface definitions. It targets
 - Custom type aliases and external/remote type imports
 - Trait method mapping (`Display` → `toString()`, `Hash` → `hashCode`, `Eq` → `operator ==`, `Ord` → `compareTo`)
 - Rename, exclude, and docstring support
-- Library-mode metadata extraction (`--library`) for proc-macro crates
+- Auto-detected library-mode metadata extraction for proc-macro crates
 
 ## Install
 
@@ -41,16 +41,16 @@ cargo build --release
 
 ## Usage
 
-Generate bindings from a UDL file:
+Generate bindings from a compiled UniFFI library (recommended):
+
+```bash
+uniffi-bindgen-dart generate path/to/libmycrate.so --out-dir out/
+```
+
+The tool auto-detects the input format from the file extension. You can also generate from a UDL file:
 
 ```bash
 uniffi-bindgen-dart generate path/to/definitions.udl --out-dir out/
-```
-
-Generate from a compiled library (proc-macro / library mode):
-
-```bash
-uniffi-bindgen-dart generate path/to/libmycrate.so --library --out-dir out/
 ```
 
 ### CLI flags
@@ -58,9 +58,8 @@ uniffi-bindgen-dart generate path/to/libmycrate.so --library --out-dir out/
 | Flag | Description |
 |---|---|
 | `--out-dir <dir>` | Output directory for generated Dart files |
-| `--library` | Treat source as a compiled cdylib (library mode) |
 | `--config <file>` | Path to `uniffi.toml` configuration |
-| `--crate <name>` | In library mode, generate bindings for this crate only |
+| `--crate <name>` | Generate bindings for this crate only (library mode) |
 | `--no-format` | Skip `dart format` on generated output |
 
 ### Doctor

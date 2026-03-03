@@ -7,6 +7,13 @@ use uniffi_bindgen::interface::{AsType, ComponentInterface, Type};
 
 use super::*;
 
+fn is_udl(source: &Path) -> bool {
+    matches!(
+        source.extension().and_then(|e| e.to_str()),
+        Some(ext) if ext.eq_ignore_ascii_case("udl")
+    )
+}
+
 pub(super) fn namespace_from_source(source: &Path) -> Result<String> {
     if let Some(namespace) = extract_namespace_from_udl(source) {
         return Ok(namespace);
@@ -24,7 +31,7 @@ pub(super) fn namespace_from_source(source: &Path) -> Result<String> {
 }
 
 pub(super) fn extract_namespace_from_udl(source: &Path) -> Option<String> {
-    if source.extension().and_then(|e| e.to_str()) != Some("udl") {
+    if !is_udl(source) {
         return None;
     }
 
@@ -49,23 +56,10 @@ pub(super) fn extract_namespace_from_udl(source: &Path) -> Option<String> {
     }
 }
 
-pub(super) fn parse_udl_metadata(
-    source: &Path,
-    crate_name: Option<&str>,
-    library_mode: bool,
-) -> Result<UdlMetadata> {
-    if source.extension().and_then(|e| e.to_str()) != Some("udl") {
-        if !library_mode {
-            return Ok(UdlMetadata {
-                namespace: None,
-                local_module_path: String::new(),
-                namespace_docstring: None,
-                uniffi_contract_version: None,
-                ffi_uniffi_contract_version_symbol: None,
-                api_checksums: Vec::new(),
-                ..UdlMetadata::default()
-            });
-        }
+pub(super) fn parse_udl_metadata(source: &Path, crate_name: Option<&str>) -> Result<UdlMetadata> {
+    if !is_udl(source) {
+        // Auto-detect: non-.udl files are treated as compiled cdylibs (library mode),
+        // matching upstream UniFFI behavior where mode is inferred from file extension.
         let source_str = source
             .to_str()
             .ok_or_else(|| anyhow::anyhow!("library source path must be valid UTF-8"))?;

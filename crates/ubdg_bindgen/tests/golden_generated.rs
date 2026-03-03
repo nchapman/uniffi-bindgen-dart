@@ -28,7 +28,6 @@ fn generate_library(source: &Path, crate_name: &str, out_dir: &Path) {
         "uniffi-bindgen-dart".to_string(),
         "generate".to_string(),
         source.display().to_string(),
-        "--library".to_string(),
         "--crate".to_string(),
         crate_name.to_string(),
         "--out-dir".to_string(),
@@ -307,10 +306,10 @@ fn golden_regression_forward_refs_demo() {
     assert_matches_expected(&out_dir.join("forward_refs_demo.dart"), &expected);
 }
 
-// ── Library-mode golden tests ──────────────────────────────────────────────
-// These require a compiled cdylib. They are gated on env vars that point to
-// the built library path. Regular `cargo test` skips them; CI and
-// test_bindings.sh set the vars after building the fixtures.
+// ── Golden tests requiring a compiled cdylib ───────────────────────────────
+// These run unconditionally in CI (test_bindings.sh) and are skipped in local
+// `cargo test` when the build artifacts are not yet available. Mode is
+// auto-detected from the file extension (no --library flag needed).
 
 #[test]
 fn golden_record_enum_methods_library() {

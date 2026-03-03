@@ -25,7 +25,8 @@ cargo fmt --check
 ```
 
 `./scripts/test_bindings.sh` performs:
-- workspace Rust tests
-- Dart binding generation
+- workspace Rust tests (UDL golden tests run unconditionally)
 - native fixture build (`cdylib` for FFI runtime tests)
+- Dart binding generation for all fixtures (UDL and library mode)
+- library-mode golden tests (run with env vars pointing to built cdylibs)
 - Dart analyze/test when the Dart SDK is available
