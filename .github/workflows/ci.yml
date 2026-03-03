@@ -7,7 +7,10 @@ on:
 
 jobs:
   lint-and-unit:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -19,6 +22,12 @@ jobs:
         run: cargo clippy --all-targets -- -D warnings
       - name: Test workspace
         run: cargo test --workspace
+
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
 
   build-runtime-artifacts:
     needs: lint-and-unit
