@@ -1757,6 +1757,7 @@ interface Outcome {
             ],
             methods: vec![],
             traits: vec![],
+            trait_methods: UdlObjectTraitMethods::default(),
         }];
 
         let content = render_uniffi_binary_helpers(&[], &enums, &HashMap::new());
@@ -1790,6 +1791,7 @@ interface Outcome {
                 args: vec![],
             }],
             traits: vec![],
+            trait_methods: UdlObjectTraitMethods::default(),
         }];
         let enums = vec![UdlEnum {
             name: "State".to_string(),
@@ -1825,6 +1827,7 @@ interface Outcome {
                 args: vec![],
             }],
             traits: vec![],
+            trait_methods: UdlObjectTraitMethods::default(),
         }];
 
         let content = render_dart_scaffold(&RenderContext {
@@ -1889,6 +1892,7 @@ interface Outcome {
             ],
             methods: vec![],
             traits: vec![],
+            trait_methods: UdlObjectTraitMethods::default(),
         }];
 
         let content = render_data_models(&[], &enums, &[], false, &HashMap::new());
@@ -1938,6 +1942,7 @@ interface Outcome {
             ],
             methods: vec![],
             traits: vec![],
+            trait_methods: UdlObjectTraitMethods::default(),
         }];
 
         let content = render_data_models(&[], &enums, &[], false, &HashMap::new());
@@ -2205,6 +2210,7 @@ interface Outcome {
             }],
             methods: vec![],
             traits: vec![],
+            trait_methods: UdlObjectTraitMethods::default(),
         }];
 
         let content = render_dart_scaffold(&RenderContext {

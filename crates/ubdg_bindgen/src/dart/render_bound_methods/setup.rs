@@ -346,6 +346,7 @@ mod tests {
             fields: vec![],
             methods,
             traits: vec![],
+            trait_methods: UdlObjectTraitMethods::default(),
         }
     }
 
@@ -359,6 +360,7 @@ mod tests {
             variants: vec![],
             methods,
             traits: vec![],
+            trait_methods: UdlObjectTraitMethods::default(),
         }
     }
 

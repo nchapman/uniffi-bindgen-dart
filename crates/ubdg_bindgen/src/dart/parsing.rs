@@ -3,7 +3,7 @@ use std::path::Path;
 
 use anyhow::{bail, Context, Result};
 use camino::Utf8Path;
-use uniffi_bindgen::interface::{AsType, ComponentInterface, Type};
+use uniffi_bindgen::interface::{AsType, ComponentInterface, Method, Type, UniffiTraitMethods};
 
 use super::*;
 
@@ -151,61 +151,39 @@ pub(super) fn component_interface_to_metadata(
     let records = ci
         .record_definitions()
         .iter()
-        .map(|record| UdlRecord {
-            name: record.name().to_string(),
-            docstring: record.docstring().map(ToString::to_string),
-            fields: record
-                .fields()
-                .iter()
-                .map(|field| UdlArg {
-                    name: field.name().to_string(),
-                    type_: field.as_type(),
-                    docstring: field.docstring().map(ToString::to_string),
-                    default: field.default_value().cloned(),
-                })
-                .collect(),
-            traits: udl_interface_traits
-                .get(record.name())
-                .cloned()
-                .unwrap_or_default(),
-            methods: record
+        .map(|record| {
+            let methods: Vec<UdlObjectMethod> = record
                 .methods()
                 .iter()
-                .map(|m| UdlObjectMethod {
-                    name: m.name().to_string(),
-                    ffi_symbol: include_ffi_symbols.then(|| m.ffi_func().name().to_string()),
-                    ffi_arg_types: if include_ffi_symbols {
-                        m.ffi_func().arguments().iter().map(|a| a.type_()).collect()
-                    } else {
-                        Vec::new()
-                    },
-                    ffi_return_type: include_ffi_symbols
-                        .then(|| m.ffi_func().return_type().cloned())
-                        .flatten(),
-                    ffi_has_rust_call_status: if include_ffi_symbols {
-                        m.ffi_func().has_rust_call_status_arg()
-                    } else {
-                        false
-                    },
-                    runtime_unsupported: include_ffi_symbols
-                        .then(|| runtime_unsupported_reason_for_ffi_func(m.ffi_func()))
-                        .flatten(),
-                    docstring: m.docstring().map(ToString::to_string),
-                    is_async: m.is_async(),
-                    return_type: m.return_type().cloned(),
-                    throws_type: m.throws_type().cloned(),
-                    args: m
-                        .arguments()
-                        .into_iter()
-                        .map(|a| UdlArg {
-                            name: a.name().to_string(),
-                            type_: a.as_type(),
-                            docstring: None,
-                            default: a.default_value().cloned(),
-                        })
-                        .collect(),
-                })
-                .collect(),
+                .map(|m| ci_method_to_udl(m, include_ffi_symbols))
+                .collect();
+
+            let ci_trait_methods = record.uniffi_trait_methods();
+            let mut trait_methods = UdlObjectTraitMethods::default();
+            extract_record_enum_trait_methods(&ci_trait_methods, &mut trait_methods);
+
+            let traits = udl_interface_traits
+                .get(record.name())
+                .cloned()
+                .unwrap_or_default();
+
+            UdlRecord {
+                name: record.name().to_string(),
+                docstring: record.docstring().map(ToString::to_string),
+                fields: record
+                    .fields()
+                    .iter()
+                    .map(|field| UdlArg {
+                        name: field.name().to_string(),
+                        type_: field.as_type(),
+                        docstring: field.docstring().map(ToString::to_string),
+                        default: field.default_value().cloned(),
+                    })
+                    .collect(),
+                traits,
+                methods,
+                trait_methods,
+            }
         })
         .collect::<Vec<_>>();
     let enums = ci
@@ -213,16 +191,28 @@ pub(super) fn component_interface_to_metadata(
         .iter()
         .map(|enum_| {
             let has_discr = enum_.variant_discr_type().is_some();
+            let methods: Vec<UdlObjectMethod> = enum_
+                .methods()
+                .iter()
+                .map(|m| ci_method_to_udl(m, include_ffi_symbols))
+                .collect();
+
+            let ci_trait_methods = enum_.uniffi_trait_methods();
+            let mut trait_methods = UdlObjectTraitMethods::default();
+            extract_record_enum_trait_methods(&ci_trait_methods, &mut trait_methods);
+
+            let traits = udl_interface_traits
+                .get(enum_.name())
+                .cloned()
+                .unwrap_or_default();
+
             UdlEnum {
                 name: enum_.name().to_string(),
                 docstring: enum_.docstring().map(ToString::to_string),
                 is_error: ci.is_name_used_as_error(enum_.name()),
                 is_non_exhaustive: enum_.is_non_exhaustive(),
                 has_discr_type: has_discr,
-                traits: udl_interface_traits
-                    .get(enum_.name())
-                    .cloned()
-                    .unwrap_or_default(),
+                traits,
                 variants: enum_
                     .variants()
                     .iter()
@@ -247,44 +237,8 @@ pub(super) fn component_interface_to_metadata(
                         },
                     })
                     .collect(),
-                methods: enum_
-                    .methods()
-                    .iter()
-                    .map(|m| UdlObjectMethod {
-                        name: m.name().to_string(),
-                        ffi_symbol: include_ffi_symbols.then(|| m.ffi_func().name().to_string()),
-                        ffi_arg_types: if include_ffi_symbols {
-                            m.ffi_func().arguments().iter().map(|a| a.type_()).collect()
-                        } else {
-                            Vec::new()
-                        },
-                        ffi_return_type: include_ffi_symbols
-                            .then(|| m.ffi_func().return_type().cloned())
-                            .flatten(),
-                        ffi_has_rust_call_status: if include_ffi_symbols {
-                            m.ffi_func().has_rust_call_status_arg()
-                        } else {
-                            false
-                        },
-                        runtime_unsupported: include_ffi_symbols
-                            .then(|| runtime_unsupported_reason_for_ffi_func(m.ffi_func()))
-                            .flatten(),
-                        docstring: m.docstring().map(ToString::to_string),
-                        is_async: m.is_async(),
-                        return_type: m.return_type().cloned(),
-                        throws_type: m.throws_type().cloned(),
-                        args: m
-                            .arguments()
-                            .into_iter()
-                            .map(|a| UdlArg {
-                                name: a.name().to_string(),
-                                type_: a.as_type(),
-                                docstring: None,
-                                default: a.default_value().cloned(),
-                            })
-                            .collect(),
-                    })
-                    .collect(),
+                methods,
+                trait_methods,
             }
         })
         .collect::<Vec<_>>();
@@ -758,5 +712,72 @@ pub(super) fn parse_enum_name_from_line(line: &str) -> Option<String> {
         None
     } else {
         Some(name)
+    }
+}
+
+/// Convert a `uniffi_bindgen::interface::Method` to a `UdlObjectMethod`.
+fn ci_method_to_udl(m: &Method, include_ffi_symbols: bool) -> UdlObjectMethod {
+    UdlObjectMethod {
+        name: m.name().to_string(),
+        ffi_symbol: include_ffi_symbols.then(|| m.ffi_func().name().to_string()),
+        ffi_arg_types: if include_ffi_symbols {
+            m.ffi_func().arguments().iter().map(|a| a.type_()).collect()
+        } else {
+            Vec::new()
+        },
+        ffi_return_type: include_ffi_symbols
+            .then(|| m.ffi_func().return_type().cloned())
+            .flatten(),
+        ffi_has_rust_call_status: if include_ffi_symbols {
+            m.ffi_func().has_rust_call_status_arg()
+        } else {
+            false
+        },
+        runtime_unsupported: include_ffi_symbols
+            .then(|| runtime_unsupported_reason_for_ffi_func(m.ffi_func()))
+            .flatten(),
+        docstring: m.docstring().map(ToString::to_string),
+        is_async: m.is_async(),
+        return_type: m.return_type().cloned(),
+        throws_type: m.throws_type().cloned(),
+        args: m
+            .arguments()
+            .into_iter()
+            .map(|a| UdlArg {
+                name: a.name().to_string(),
+                type_: a.as_type(),
+                docstring: None,
+                default: a.default_value().cloned(),
+            })
+            .collect(),
+    }
+}
+
+/// Extract trait-synthesised method names from `UniffiTraitMethods` into
+/// the `trait_methods` struct.  These are stored as metadata only — records
+/// and enums render structural trait implementations (toString, ==, hashCode)
+/// via the `traits: Vec<String>` field, so we do NOT push them into the
+/// regular `methods` list.
+fn extract_record_enum_trait_methods(
+    ci_trait_methods: &UniffiTraitMethods,
+    trait_methods: &mut UdlObjectTraitMethods,
+) {
+    if let Some(ref m) = ci_trait_methods.display_fmt {
+        trait_methods.display = Some(m.name().to_string());
+    }
+    if let Some(ref m) = ci_trait_methods.debug_fmt {
+        trait_methods.debug = Some(m.name().to_string());
+    }
+    if let Some(ref m) = ci_trait_methods.hash_hash {
+        trait_methods.hash = Some(m.name().to_string());
+    }
+    if let Some(ref m) = ci_trait_methods.eq_eq {
+        trait_methods.eq = Some(m.name().to_string());
+    }
+    if let Some(ref m) = ci_trait_methods.eq_ne {
+        trait_methods.ne = Some(m.name().to_string());
+    }
+    if let Some(ref m) = ci_trait_methods.ord_cmp {
+        trait_methods.ord_cmp = Some(m.name().to_string());
     }
 }

@@ -107,6 +107,9 @@ pub(super) struct UdlRecord {
     pub(super) methods: Vec<UdlObjectMethod>,
     /// Traits declared via `[Traits=(Display, Eq, Hash)]` on this dictionary.
     pub(super) traits: Vec<String>,
+    /// Trait-synthesised method names for Display/Debug/Eq/Hash/Ord,
+    /// populated from `uniffi_trait_methods()` on the `ComponentInterface` record.
+    pub(super) trait_methods: UdlObjectTraitMethods,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -122,6 +125,9 @@ pub(super) struct UdlEnum {
     pub(super) methods: Vec<UdlObjectMethod>,
     /// Traits declared via `[Traits=(Display, Eq, Hash)]` on this enum.
     pub(super) traits: Vec<String>,
+    /// Trait-synthesised method names for Display/Debug/Eq/Hash/Ord,
+    /// populated from `uniffi_trait_methods()` on the `ComponentInterface` enum.
+    pub(super) trait_methods: UdlObjectTraitMethods,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
