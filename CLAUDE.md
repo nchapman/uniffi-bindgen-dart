@@ -9,23 +9,23 @@ uniffi-bindgen-dart is a Dart backend for UniFFI — it generates idiomatic Dart
 ## Build & Test Commands
 
 ```bash
-# Build Rust workspace
-cargo build --workspace
-
-# Run Rust tests (unit + golden)
-cargo test --workspace
-
 # Full CI check (run before committing)
-cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test --workspace
+just check
 
-# Build fixtures, generate bindings, and run Dart runtime tests
-./scripts/test_bindings.sh
+# Run all tests including Dart runtime tests
+just test-all
+
+# Analyze golden files with dart analyze
+just analyze-golden
+
+# Regenerate all UDL-mode golden files
+just regen-golden
 
 # Generate bindings from a UDL file
-cargo run -- generate fixtures/simple-fns/src/simple-fns.udl --out-dir /tmp/out
+just generate fixtures/simple-fns/src/simple-fns.udl --out-dir /tmp/out
 
 # Generate bindings from a compiled library (auto-detected from extension)
-cargo run -- generate path/to/libcrate.dylib --crate crate_name --out-dir /tmp/out
+just generate path/to/libcrate.dylib --crate crate_name --out-dir /tmp/out
 
 # Run a single Rust test
 cargo test -p ubdg_bindgen golden_simple_fns
@@ -46,7 +46,7 @@ cargo test -p ubdg_bindgen golden_coverall_demo
 main.rs → cli.rs (Clap) → lib.rs::run() → dart/mod.rs::generate_bindings()
 ```
 
-`dart/mod.rs` is the core generation module (~9000 lines). It resolves config from an optional TOML file (`[bindings.dart]` section), derives the library name from the UDL filename, and renders Dart output.
+`dart/mod.rs` is the core generation entry point, decomposed into focused submodules (`render_bound_methods/`, `render_objects.rs`, `render_data_models.rs`, `render_stubs.rs`, `callback.rs`, `codec.rs`, `ffi_buffer.rs`, `type_map.rs`, etc.). It resolves config from an optional TOML file (`[bindings.dart]` section), derives the library name from the UDL filename, and renders Dart output.
 
 ### Generated Output Format
 
@@ -95,6 +95,8 @@ cp /tmp/regen/{namespace}.dart fixtures/{name}/expected/{namespace}_library.dart
 ```
 
 Library-mode golden tests are gated on environment variables (e.g., `UBDG_RECORD_ENUM_METHODS_LIB`, `UBDG_LIBRARY_MODE_DEMO_LIB`) pointing to the compiled cdylib. They skip gracefully when the vars are not set. `test_bindings.sh` builds all fixtures and re-runs `cargo test` with the vars set.
+
+Additionally, `scripts/analyze_golden.sh` (or `just analyze-golden`) runs `dart analyze` on all golden files to verify they are valid Dart — catching type errors, missing imports, and other structural issues that byte-for-byte comparison alone would miss.
 
 ### Naming Conventions
 
@@ -154,6 +156,7 @@ These external repos are used for correctness verification:
 | Dart generation logic | `crates/ubdg_bindgen/src/dart/mod.rs` |
 | CLI definition | `crates/ubdg_bindgen/src/cli.rs` |
 | Golden test harness | `crates/ubdg_bindgen/tests/golden_generated.rs` |
-| Rust fixture crates | `integration/` |
-| Dart runtime tests | `integration/dart_package_template/test/` |
+| Golden file analyzer | `scripts/analyze_golden.sh` |
+| Dart runtime tests | `binding_tests/test/` |
 | Build/test scripts | `scripts/` |
+| Task runner | `justfile` |
