@@ -103,7 +103,7 @@ class MethodPoint {
     };
   }
 
-  static MethodPoint fromJson(Map<String, dynamic> json) {
+  factory MethodPoint.fromJson(Map<String, dynamic> json) {
     return MethodPoint(
       x: (json['x'] as num).toInt(),
       y: (json['y'] as num).toInt(),
@@ -135,6 +135,19 @@ class MethodPoint {
   int checksum() {
     return _bindings().methodpointChecksum(this);
   }
+
+  @override
+  String toString() {
+    return 'MethodPoint(x: $x, y: $y)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MethodPoint && x == other.x && y == other.y;
+
+  @override
+  int get hashCode => Object.hash(x, y);
 }
 
 sealed class MethodError {
@@ -143,6 +156,19 @@ sealed class MethodError {
 
 final class MethodErrorDivisionByZero extends MethodError {
   const MethodErrorDivisionByZero();
+
+  @override
+  String toString() {
+    return 'MethodErrorDivisionByZero()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MethodErrorDivisionByZero;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 final class MethodErrorNegativeInput extends MethodError {
@@ -150,6 +176,19 @@ final class MethodErrorNegativeInput extends MethodError {
     required this.value,
   });
   final int value;
+
+  @override
+  String toString() {
+    return 'MethodErrorNegativeInput(value: $value)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MethodErrorNegativeInput && value == other.value;
+
+  @override
+  int get hashCode => value.hashCode;
 }
 
 sealed class MethodOutcome {
@@ -173,6 +212,19 @@ final class MethodOutcomeOk extends MethodOutcome {
     required this.value,
   });
   final int value;
+
+  @override
+  String toString() {
+    return 'MethodOutcomeOk(value: $value)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MethodOutcomeOk && value == other.value;
+
+  @override
+  int get hashCode => value.hashCode;
 }
 
 final class MethodOutcomeErr extends MethodOutcome {
@@ -180,6 +232,19 @@ final class MethodOutcomeErr extends MethodOutcome {
     required this.message,
   });
   final String message;
+
+  @override
+  String toString() {
+    return 'MethodOutcomeErr(message: $message)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MethodOutcomeErr && message == other.message;
+
+  @override
+  int get hashCode => message.hashCode;
 }
 
 enum MethodState {
@@ -212,6 +277,11 @@ sealed class MethodErrorException implements Exception {
 
 final class MethodErrorExceptionDivisionByZero extends MethodErrorException {
   const MethodErrorExceptionDivisionByZero();
+
+  @override
+  String toString() {
+    return 'MethodErrorExceptionDivisionByZero()';
+  }
 }
 
 final class MethodErrorExceptionNegativeInput extends MethodErrorException {
@@ -219,6 +289,11 @@ final class MethodErrorExceptionNegativeInput extends MethodErrorException {
     required this.value,
   });
   final int value;
+
+  @override
+  String toString() {
+    return 'MethodErrorExceptionNegativeInput(value: $value)';
+  }
 }
 
 MethodErrorException _uniffiLiftMethodErrorException(Uint8List bytes) {
@@ -304,14 +379,11 @@ String _encodeMethodState(MethodState value) {
 }
 
 MethodState _decodeMethodState(String raw) {
-  switch (raw) {
-    case 'idle':
-      return MethodState.idle;
-    case 'busy':
-      return MethodState.busy;
-    default:
-      throw StateError('Unknown MethodState variant: $raw');
-  }
+  return switch (raw) {
+    'idle' => MethodState.idle,
+    'busy' => MethodState.busy,
+    _ => throw StateError('Unknown MethodState variant: $raw'),
+  };
 }
 
 String _encodeMethodErrorException(MethodErrorException value) {

@@ -103,7 +103,7 @@ class Point {
     };
   }
 
-  static Point fromJson(Map<String, dynamic> json) {
+  factory Point.fromJson(Map<String, dynamic> json) {
     return Point(
       x: (json['x'] as num).toDouble(),
       y: (json['y'] as num).toDouble(),
@@ -119,6 +119,19 @@ class Point {
       y: y ?? this.y,
     );
   }
+
+  @override
+  String toString() {
+    return 'Point(x: $x, y: $y)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Point && x == other.x && y == other.y;
+
+  @override
+  int get hashCode => Object.hash(x, y);
 }
 
 sealed class ArithError {
@@ -127,6 +140,19 @@ sealed class ArithError {
 
 final class ArithErrorDivisionByZero extends ArithError {
   const ArithErrorDivisionByZero();
+
+  @override
+  String toString() {
+    return 'ArithErrorDivisionByZero()';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ArithErrorDivisionByZero;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 sealed class Shape {
@@ -138,6 +164,19 @@ final class ShapeCircle extends Shape {
     required this.radius,
   });
   final double radius;
+
+  @override
+  String toString() {
+    return 'ShapeCircle(radius: $radius)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ShapeCircle && radius == other.radius;
+
+  @override
+  int get hashCode => radius.hashCode;
 }
 
 final class ShapeRect extends Shape {
@@ -147,6 +186,19 @@ final class ShapeRect extends Shape {
   });
   final double w;
   final double h;
+
+  @override
+  String toString() {
+    return 'ShapeRect(w: $w, h: $h)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ShapeRect && w == other.w && h == other.h;
+
+  @override
+  int get hashCode => Object.hash(w, h);
 }
 
 sealed class ArithErrorException implements Exception {
@@ -155,6 +207,11 @@ sealed class ArithErrorException implements Exception {
 
 final class ArithErrorExceptionDivisionByZero extends ArithErrorException {
   const ArithErrorExceptionDivisionByZero();
+
+  @override
+  String toString() {
+    return 'ArithErrorExceptionDivisionByZero()';
+  }
 }
 
 ArithErrorException _uniffiLiftArithErrorException(Uint8List bytes) {
