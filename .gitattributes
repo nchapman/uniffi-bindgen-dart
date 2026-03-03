@@ -1,0 +1,2 @@
+# Keep golden fixture files as LF so byte-for-byte comparisons work on Windows
+fixtures/**/*.dart text eol=lf
