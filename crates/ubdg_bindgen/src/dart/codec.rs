@@ -515,13 +515,9 @@ pub(super) fn render_uniffi_binary_helpers(
                 } else {
                     let variant_name = format!("{type_name}{}", to_upper_camel(&variant.name));
                     if variant.fields.is_empty() {
-                        out.push_str(&format!(
-                            "{indent}    return const {variant_name}();\n"
-                        ));
+                        out.push_str(&format!("{indent}    return const {variant_name}();\n"));
                     } else {
-                        out.push_str(&format!(
-                            "{indent}    return {variant_name}(\n"
-                        ));
+                        out.push_str(&format!("{indent}    return {variant_name}(\n"));
                         for field in &variant.fields {
                             let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
                             let expr = render_uniffi_binary_read_expression(
@@ -530,9 +526,7 @@ pub(super) fn render_uniffi_binary_helpers(
                                 enums,
                                 custom_types,
                             );
-                            out.push_str(&format!(
-                                "{indent}      {field_name}: {expr},\n"
-                            ));
+                            out.push_str(&format!("{indent}      {field_name}: {expr},\n"));
                         }
                         out.push_str(&format!("{indent}    );\n"));
                     }
@@ -541,14 +535,10 @@ pub(super) fn render_uniffi_binary_helpers(
             out.push_str(&format!("{indent}  default:\n"));
             if enum_.is_non_exhaustive {
                 if is_flat_enum {
-                    out.push_str(&format!(
-                        "{indent}    return {type_name}.unknown;\n"
-                    ));
+                    out.push_str(&format!("{indent}    return {type_name}.unknown;\n"));
                 } else {
                     let unknown_class = format!("{type_name}Unknown");
-                    out.push_str(&format!(
-                        "{indent}    return const {unknown_class}();\n"
-                    ));
+                    out.push_str(&format!("{indent}    return const {unknown_class}();\n"));
                 }
             } else {
                 out.push_str(&format!(
