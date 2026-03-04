@@ -654,7 +654,7 @@ checksum = "ebc1c04c71510c7f702b52b7c350734c9ff1295c464a03335b00bb84fc54f853"
 
 [[package]]
 name = "uniffi-bindgen-dart"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "camino",
@@ -667,11 +667,11 @@ dependencies = [
 
 [[package]]
 name = "uniffi-bindgen-dart-runtime"
-version = "0.1.0"
+version = "0.1.2"
 
 [[package]]
 name = "uniffi-bindgen-dart-testing"
-version = "0.1.0"
+version = "0.1.2"
 
 [[package]]
 name = "uniffi_bindgen"

@@ -339,11 +339,12 @@ pub(super) fn render_uniffi_binary_helpers(
     for record in records {
         let type_name = to_upper_camel(&record.name);
         let supported = all_fields_binary_supported(&record.fields, enums);
+
+        // Writer-based encode (writes fields inline to a parent writer)
         out.push_str(&format!(
-            "Uint8List _uniffiEncode{type_name}({type_name} value) {{\n"
+            "void _uniffiWrite{type_name}({type_name} value, _UniFfiBinaryWriter writer) {{\n"
         ));
         if supported {
-            out.push_str("  final writer = _UniFfiBinaryWriter();\n");
             for field in &record.fields {
                 let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
                 let stmt = render_uniffi_binary_write_statement(
@@ -356,6 +357,20 @@ pub(super) fn render_uniffi_binary_helpers(
                 );
                 out.push_str(&stmt);
             }
+        } else {
+            out.push_str(&format!(
+                "  throw UnsupportedError('UniFFI binary encode not fully supported for {type_name}');\n"
+            ));
+        }
+        out.push_str("}\n\n");
+
+        // Bytes-based encode (top-level convenience wrapper)
+        out.push_str(&format!(
+            "Uint8List _uniffiEncode{type_name}({type_name} value) {{\n"
+        ));
+        if supported {
+            out.push_str("  final writer = _UniFfiBinaryWriter();\n");
+            out.push_str(&format!("  _uniffiWrite{type_name}(value, writer);\n"));
             out.push_str("  return writer.toBytes();\n");
         } else {
             out.push_str(&format!(
@@ -364,12 +379,12 @@ pub(super) fn render_uniffi_binary_helpers(
         }
         out.push_str("}\n\n");
 
+        // Reader-based decode (reads fields inline from a parent reader)
         out.push_str(&format!(
-            "{type_name} _uniffiDecode{type_name}(Uint8List bytes) {{\n"
+            "{type_name} _uniffiRead{type_name}(_UniFfiBinaryReader reader) {{\n"
         ));
         if supported {
-            out.push_str("  final reader = _UniFfiBinaryReader(bytes);\n");
-            out.push_str(&format!("  final value = {type_name}(\n"));
+            out.push_str(&format!("  return {type_name}(\n"));
             for field in &record.fields {
                 let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
                 let expr = render_uniffi_binary_read_expression(
@@ -381,6 +396,22 @@ pub(super) fn render_uniffi_binary_helpers(
                 out.push_str(&format!("    {field_name}: {expr},\n"));
             }
             out.push_str("  );\n");
+        } else {
+            out.push_str(&format!(
+                "  throw UnsupportedError('UniFFI binary decode not fully supported for {type_name}');\n"
+            ));
+        }
+        out.push_str("}\n\n");
+
+        // Bytes-based decode (top-level convenience wrapper)
+        out.push_str(&format!(
+            "{type_name} _uniffiDecode{type_name}(Uint8List bytes) {{\n"
+        ));
+        if supported {
+            out.push_str("  final reader = _UniFfiBinaryReader(bytes);\n");
+            out.push_str(&format!(
+                "  final value = _uniffiRead{type_name}(reader);\n"
+            ));
             out.push_str("  if (!reader.isDone) {\n");
             out.push_str(&format!(
                 "    throw StateError('extra bytes remaining while decoding {type_name}');\n"
@@ -402,10 +433,11 @@ pub(super) fn render_uniffi_binary_helpers(
             .variants
             .iter()
             .all(|v| all_fields_binary_supported(&v.fields, enums));
-        out.push_str(&format!(
-            "Uint8List _uniffiEncode{type_name}({type_name} value) {{\n"
-        ));
+
         if !all_variants_supported {
+            out.push_str(&format!(
+                "Uint8List _uniffiEncode{type_name}({type_name} value) {{\n"
+            ));
             out.push_str(&format!(
                 "  throw UnsupportedError('UniFFI binary encode not fully supported for {type_name}');\n"
             ));
@@ -419,105 +451,144 @@ pub(super) fn render_uniffi_binary_helpers(
             out.push_str("}\n\n");
             continue;
         }
-        out.push_str("  final writer = _UniFfiBinaryWriter();\n");
-        if is_flat_enum {
-            out.push_str("  final int tag = switch (value) {\n");
-            for (idx, variant) in enum_.variants.iter().enumerate() {
+
+        // Helper: emit the write-to-writer logic (shared by _uniffiWrite* and _uniffiEncode*)
+        let emit_write_body = |out: &mut String, indent: &str| {
+            if is_flat_enum {
+                out.push_str(&format!("{indent}final int tag = switch (value) {{\n"));
+                for (idx, variant) in enum_.variants.iter().enumerate() {
+                    out.push_str(&format!(
+                        "{indent}  {type_name}.{} => {},\n",
+                        safe_dart_identifier(&to_lower_camel(&variant.name)),
+                        idx + 1
+                    ));
+                }
+                if enum_.is_non_exhaustive {
+                    out.push_str(&format!(
+                        "{indent}  {type_name}.unknown => throw StateError('Cannot encode unknown {type_name} variant'),\n"
+                    ));
+                }
+                out.push_str(&format!("{indent}}};\n"));
+                out.push_str(&format!("{indent}writer.writeI32(tag);\n"));
+            } else {
+                for (idx, variant) in enum_.variants.iter().enumerate() {
+                    let variant_name = format!("{type_name}{}", to_upper_camel(&variant.name));
+                    if idx == 0 {
+                        out.push_str(&format!("{indent}if (value is {variant_name}) {{\n"));
+                    } else {
+                        out.push_str(&format!("{indent}else if (value is {variant_name}) {{\n"));
+                    }
+                    out.push_str(&format!("{indent}  writer.writeI32({});\n", idx + 1));
+                    for field in &variant.fields {
+                        let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
+                        let stmt = render_uniffi_binary_write_statement(
+                            &field.type_,
+                            &format!("value.{field_name}"),
+                            "writer",
+                            enums,
+                            &format!("{indent}  "),
+                            custom_types,
+                        );
+                        out.push_str(&stmt);
+                    }
+                    out.push_str(&format!("{indent}}}\n"));
+                }
+                out.push_str(&format!("{indent}else {{\n"));
                 out.push_str(&format!(
-                    "    {type_name}.{} => {},\n",
-                    safe_dart_identifier(&to_lower_camel(&variant.name)),
-                    idx + 1
+                    "{indent}  throw StateError('Unknown {type_name} variant instance: $value');\n"
                 ));
+                out.push_str(&format!("{indent}}}\n"));
             }
-            if enum_.is_non_exhaustive {
-                out.push_str(&format!(
-                    "    {type_name}.unknown => throw StateError('Cannot encode unknown {type_name} variant'),\n"
-                ));
-            }
-            out.push_str("  };\n");
-            out.push_str("  writer.writeI32(tag);\n");
-        } else {
+        };
+
+        // Helper: emit the read-from-reader logic (shared by _uniffiRead* and _uniffiDecode*)
+        let emit_read_body = |out: &mut String, indent: &str| {
+            out.push_str(&format!("{indent}final int tag = reader.readI32();\n"));
+            out.push_str(&format!("{indent}switch (tag) {{\n"));
             for (idx, variant) in enum_.variants.iter().enumerate() {
-                let variant_name = format!("{type_name}{}", to_upper_camel(&variant.name));
-                if idx == 0 {
-                    out.push_str(&format!("  if (value is {variant_name}) {{\n"));
+                out.push_str(&format!("{indent}  case {}:\n", idx + 1));
+                if is_flat_enum {
+                    out.push_str(&format!(
+                        "{indent}    return {type_name}.{};\n",
+                        safe_dart_identifier(&to_lower_camel(&variant.name))
+                    ));
                 } else {
-                    out.push_str(&format!("  else if (value is {variant_name}) {{\n"));
+                    let variant_name = format!("{type_name}{}", to_upper_camel(&variant.name));
+                    if variant.fields.is_empty() {
+                        out.push_str(&format!(
+                            "{indent}    return const {variant_name}();\n"
+                        ));
+                    } else {
+                        out.push_str(&format!(
+                            "{indent}    return {variant_name}(\n"
+                        ));
+                        for field in &variant.fields {
+                            let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
+                            let expr = render_uniffi_binary_read_expression(
+                                &field.type_,
+                                "reader",
+                                enums,
+                                custom_types,
+                            );
+                            out.push_str(&format!(
+                                "{indent}      {field_name}: {expr},\n"
+                            ));
+                        }
+                        out.push_str(&format!("{indent}    );\n"));
+                    }
                 }
-                out.push_str(&format!("    writer.writeI32({});\n", idx + 1));
-                for field in &variant.fields {
-                    let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
-                    let stmt = render_uniffi_binary_write_statement(
-                        &field.type_,
-                        &format!("value.{field_name}"),
-                        "writer",
-                        enums,
-                        "    ",
-                        custom_types,
-                    );
-                    out.push_str(&stmt);
-                }
-                out.push_str("  }\n");
             }
-            out.push_str("  else {\n");
-            out.push_str(&format!(
-                "    throw StateError('Unknown {type_name} variant instance: $value');\n"
-            ));
-            out.push_str("  }\n");
-        }
+            out.push_str(&format!("{indent}  default:\n"));
+            if enum_.is_non_exhaustive {
+                if is_flat_enum {
+                    out.push_str(&format!(
+                        "{indent}    return {type_name}.unknown;\n"
+                    ));
+                } else {
+                    let unknown_class = format!("{type_name}Unknown");
+                    out.push_str(&format!(
+                        "{indent}    return const {unknown_class}();\n"
+                    ));
+                }
+            } else {
+                out.push_str(&format!(
+                    "{indent}    throw StateError('Unknown {type_name} variant tag: $tag');\n"
+                ));
+            }
+            out.push_str(&format!("{indent}}}\n"));
+        };
+
+        // Writer-based encode (writes inline to a parent writer)
+        out.push_str(&format!(
+            "void _uniffiWrite{type_name}({type_name} value, _UniFfiBinaryWriter writer) {{\n"
+        ));
+        emit_write_body(&mut out, "  ");
+        out.push_str("}\n\n");
+
+        // Bytes-based encode (top-level convenience wrapper)
+        out.push_str(&format!(
+            "Uint8List _uniffiEncode{type_name}({type_name} value) {{\n"
+        ));
+        out.push_str("  final writer = _UniFfiBinaryWriter();\n");
+        out.push_str(&format!("  _uniffiWrite{type_name}(value, writer);\n"));
         out.push_str("  return writer.toBytes();\n");
         out.push_str("}\n\n");
 
+        // Reader-based decode (reads inline from a parent reader)
+        out.push_str(&format!(
+            "{type_name} _uniffiRead{type_name}(_UniFfiBinaryReader reader) {{\n"
+        ));
+        emit_read_body(&mut out, "  ");
+        out.push_str("}\n\n");
+
+        // Bytes-based decode (top-level convenience wrapper)
         out.push_str(&format!(
             "{type_name} _uniffiDecode{type_name}(Uint8List bytes) {{\n"
         ));
         out.push_str("  final reader = _UniFfiBinaryReader(bytes);\n");
-        out.push_str("  final int tag = reader.readI32();\n");
-        out.push_str(&format!("  final {type_name} value;\n"));
-        out.push_str("  switch (tag) {\n");
-        for (idx, variant) in enum_.variants.iter().enumerate() {
-            out.push_str(&format!("    case {}:\n", idx + 1));
-            if is_flat_enum {
-                out.push_str(&format!(
-                    "      value = {type_name}.{};\n",
-                    safe_dart_identifier(&to_lower_camel(&variant.name))
-                ));
-            } else {
-                let variant_name = format!("{type_name}{}", to_upper_camel(&variant.name));
-                if variant.fields.is_empty() {
-                    out.push_str(&format!("      value = const {variant_name}();\n"));
-                } else {
-                    out.push_str(&format!("      value = {variant_name}(\n"));
-                    for field in &variant.fields {
-                        let field_name = safe_dart_identifier(&to_lower_camel(&field.name));
-                        let expr = render_uniffi_binary_read_expression(
-                            &field.type_,
-                            "reader",
-                            enums,
-                            custom_types,
-                        );
-                        out.push_str(&format!("        {field_name}: {expr},\n"));
-                    }
-                    out.push_str("      );\n");
-                }
-            }
-            out.push_str("      break;\n");
-        }
-        out.push_str("    default:\n");
-        if enum_.is_non_exhaustive {
-            if is_flat_enum {
-                out.push_str(&format!("      value = {type_name}.unknown;\n"));
-            } else {
-                let unknown_class = format!("{type_name}Unknown");
-                out.push_str(&format!("      value = const {unknown_class}();\n"));
-            }
-            out.push_str("      return value;\n");
-        } else {
-            out.push_str(&format!(
-                "      throw StateError('Unknown {type_name} variant tag: $tag');\n"
-            ));
-        }
-        out.push_str("  }\n");
+        out.push_str(&format!(
+            "  final value = _uniffiRead{type_name}(reader);\n"
+        ));
         out.push_str("  if (!reader.isDone) {\n");
         out.push_str(&format!(
             "    throw StateError('extra bytes remaining while decoding {type_name}');\n"
@@ -618,15 +689,11 @@ pub(super) fn render_uniffi_binary_write_statement(
         }
         Type::Record { name, .. } => {
             let record_name = to_upper_camel(name);
-            format!(
-                "{indent}final Uint8List __encoded = _uniffiEncode{record_name}({value_expr});\n{indent}{writer}.writeI32(__encoded.length);\n{indent}{writer}.writeBytes(__encoded);\n"
-            )
+            format!("{indent}_uniffiWrite{record_name}({value_expr}, {writer});\n")
         }
         Type::Enum { name, .. } if is_runtime_enum_type(type_, enums) => {
             let enum_name = to_upper_camel(name);
-            format!(
-                "{indent}final Uint8List __encoded = _uniffiEncode{enum_name}({value_expr});\n{indent}{writer}.writeI32(__encoded.length);\n{indent}{writer}.writeBytes(__encoded);\n"
-            )
+            format!("{indent}_uniffiWrite{enum_name}({value_expr}, {writer});\n")
         }
         _ => format!(
             "{indent}throw UnsupportedError('UniFFI binary write not implemented for {}');\n",
@@ -695,16 +762,10 @@ pub(super) fn render_uniffi_binary_read_expression(
             )
         }
         Type::Record { name, .. } => {
-            format!(
-                "(() {{ final int __len = {reader}.readI32(); final Uint8List __bytes = {reader}.readBytes(__len); return _uniffiDecode{}(__bytes); }})()",
-                to_upper_camel(name)
-            )
+            format!("_uniffiRead{}({reader})", to_upper_camel(name))
         }
         Type::Enum { name, .. } if is_runtime_enum_type(type_, enums) => {
-            format!(
-                "(() {{ final int __len = {reader}.readI32(); final Uint8List __bytes = {reader}.readBytes(__len); return _uniffiDecode{}(__bytes); }})()",
-                to_upper_camel(name)
-            )
+            format!("_uniffiRead{}({reader})", to_upper_camel(name))
         }
         _ => format!(
             "throw UnsupportedError('UniFFI binary read not implemented for {}')",
@@ -1095,5 +1156,240 @@ mod tests {
         // readI32 length + readBytes pattern.
         assert!(result.contains("reader.readI32()"));
         assert!(result.contains("reader.readBytes(__len)"));
+    }
+
+    // ── Record / Enum: render_uniffi_binary_write_statement ─────────────
+    //
+    // Regression: records and enums must be written inline via
+    // _uniffiWrite* / _uniffiRead* helpers that share the parent
+    // writer/reader, NOT via length-prefixed sub-buffers.
+
+    #[test]
+    fn binary_write_record_delegates_to_uniffi_write() {
+        let ty = Type::Record {
+            module_path: String::new(),
+            name: "my_record".to_string(),
+        };
+        let result =
+            render_uniffi_binary_write_statement(&ty, "value", "writer", &[], "  ", &no_customs());
+        assert_eq!(result, "  _uniffiWriteMyRecord(value, writer);\n");
+    }
+
+    #[test]
+    fn binary_write_record_no_length_prefix() {
+        let ty = Type::Record {
+            module_path: String::new(),
+            name: "my_record".to_string(),
+        };
+        let result =
+            render_uniffi_binary_write_statement(&ty, "value", "writer", &[], "  ", &no_customs());
+        // Must NOT contain a length-prefix pattern.
+        assert!(!result.contains("writeI32"));
+        assert!(!result.contains("writeBytes"));
+    }
+
+    #[test]
+    fn binary_write_enum_delegates_to_uniffi_write() {
+        let ty = Type::Enum {
+            module_path: String::new(),
+            name: "my_color".to_string(),
+        };
+        let enums = vec![UdlEnum {
+            name: "my_color".to_string(),
+            docstring: None,
+            is_error: false,
+            is_non_exhaustive: false,
+            has_discr_type: false,
+            variants: vec![],
+            methods: vec![],
+            traits: vec![],
+            trait_methods: Default::default(),
+        }];
+        let result = render_uniffi_binary_write_statement(
+            &ty,
+            "value",
+            "writer",
+            &enums,
+            "  ",
+            &no_customs(),
+        );
+        assert_eq!(result, "  _uniffiWriteMyColor(value, writer);\n");
+    }
+
+    #[test]
+    fn binary_write_enum_no_length_prefix() {
+        let ty = Type::Enum {
+            module_path: String::new(),
+            name: "my_color".to_string(),
+        };
+        let enums = vec![UdlEnum {
+            name: "my_color".to_string(),
+            docstring: None,
+            is_error: false,
+            is_non_exhaustive: false,
+            has_discr_type: false,
+            variants: vec![],
+            methods: vec![],
+            traits: vec![],
+            trait_methods: Default::default(),
+        }];
+        let result = render_uniffi_binary_write_statement(
+            &ty,
+            "value",
+            "writer",
+            &enums,
+            "  ",
+            &no_customs(),
+        );
+        assert!(!result.contains("writeI32"));
+        assert!(!result.contains("writeBytes"));
+    }
+
+    // ── Record / Enum: render_uniffi_binary_read_expression ─────────────
+
+    #[test]
+    fn binary_read_record_delegates_to_uniffi_read() {
+        let ty = Type::Record {
+            module_path: String::new(),
+            name: "my_record".to_string(),
+        };
+        let result = render_uniffi_binary_read_expression(&ty, "reader", &[], &no_customs());
+        assert_eq!(result, "_uniffiReadMyRecord(reader)");
+    }
+
+    #[test]
+    fn binary_read_record_no_length_prefix() {
+        let ty = Type::Record {
+            module_path: String::new(),
+            name: "my_record".to_string(),
+        };
+        let result = render_uniffi_binary_read_expression(&ty, "reader", &[], &no_customs());
+        assert!(!result.contains("readI32"));
+        assert!(!result.contains("readBytes"));
+    }
+
+    #[test]
+    fn binary_read_enum_delegates_to_uniffi_read() {
+        let ty = Type::Enum {
+            module_path: String::new(),
+            name: "my_color".to_string(),
+        };
+        let enums = vec![UdlEnum {
+            name: "my_color".to_string(),
+            docstring: None,
+            is_error: false,
+            is_non_exhaustive: false,
+            has_discr_type: false,
+            variants: vec![],
+            methods: vec![],
+            traits: vec![],
+            trait_methods: Default::default(),
+        }];
+        let result = render_uniffi_binary_read_expression(&ty, "reader", &enums, &no_customs());
+        assert_eq!(result, "_uniffiReadMyColor(reader)");
+    }
+
+    #[test]
+    fn binary_read_enum_no_length_prefix() {
+        let ty = Type::Enum {
+            module_path: String::new(),
+            name: "my_color".to_string(),
+        };
+        let enums = vec![UdlEnum {
+            name: "my_color".to_string(),
+            docstring: None,
+            is_error: false,
+            is_non_exhaustive: false,
+            has_discr_type: false,
+            variants: vec![],
+            methods: vec![],
+            traits: vec![],
+            trait_methods: Default::default(),
+        }];
+        let result = render_uniffi_binary_read_expression(&ty, "reader", &enums, &no_customs());
+        assert!(!result.contains("readI32"));
+        assert!(!result.contains("readBytes"));
+    }
+
+    // ── Nested containers with Record / Enum ────────────────────────────
+
+    #[test]
+    fn binary_read_optional_record_uses_inline_read() {
+        let ty = Type::Optional {
+            inner_type: Box::new(Type::Record {
+                module_path: String::new(),
+                name: "my_point".to_string(),
+            }),
+        };
+        let result = render_uniffi_binary_read_expression(&ty, "reader", &[], &no_customs());
+        assert!(result.contains("_uniffiReadMyPoint(reader)"));
+        // Only one readI32 call: the optional tag uses readI8, not readI32.
+        assert!(!result.contains("readBytes"));
+    }
+
+    #[test]
+    fn binary_read_sequence_enum_uses_inline_read() {
+        let ty = Type::Sequence {
+            inner_type: Box::new(Type::Enum {
+                module_path: String::new(),
+                name: "my_color".to_string(),
+            }),
+        };
+        let enums = vec![UdlEnum {
+            name: "my_color".to_string(),
+            docstring: None,
+            is_error: false,
+            is_non_exhaustive: false,
+            has_discr_type: false,
+            variants: vec![],
+            methods: vec![],
+            traits: vec![],
+            trait_methods: Default::default(),
+        }];
+        let result = render_uniffi_binary_read_expression(&ty, "reader", &enums, &no_customs());
+        assert!(result.contains("_uniffiReadMyColor(reader)"));
+    }
+
+    #[test]
+    fn binary_write_optional_record_uses_inline_write() {
+        let ty = Type::Optional {
+            inner_type: Box::new(Type::Record {
+                module_path: String::new(),
+                name: "my_point".to_string(),
+            }),
+        };
+        let result =
+            render_uniffi_binary_write_statement(&ty, "value", "writer", &[], "  ", &no_customs());
+        assert!(result.contains("_uniffiWriteMyPoint(value!, writer)"));
+    }
+
+    #[test]
+    fn binary_write_sequence_enum_uses_inline_write() {
+        let ty = Type::Sequence {
+            inner_type: Box::new(Type::Enum {
+                module_path: String::new(),
+                name: "my_color".to_string(),
+            }),
+        };
+        let enums = vec![UdlEnum {
+            name: "my_color".to_string(),
+            docstring: None,
+            is_error: false,
+            is_non_exhaustive: false,
+            has_discr_type: false,
+            variants: vec![],
+            methods: vec![],
+            traits: vec![],
+            trait_methods: Default::default(),
+        }];
+        let result = render_uniffi_binary_write_statement(
+            &ty,
+            "value",
+            "writer",
+            &enums,
+            "  ",
+            &no_customs(),
+        );
+        assert!(result.contains("_uniffiWriteMyColor(item, writer)"));
     }
 }

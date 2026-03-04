@@ -1283,8 +1283,7 @@ final class _UniFfiBinaryReader {
   }
 }
 
-Uint8List _uniffiEncodeDictWithDefaults(DictWithDefaults value) {
-  final writer = _UniFfiBinaryWriter();
+void _uniffiWriteDictWithDefaults(DictWithDefaults value, _UniFfiBinaryWriter writer) {
   writer.writeString(value.name);
   if (value.category == null) {
     writer.writeI8(0);
@@ -1302,110 +1301,152 @@ Uint8List _uniffiEncodeDictWithDefaults(DictWithDefaults value) {
     writer.writeString(entry.key);
     writer.writeString(entry.value);
   }
+}
+
+Uint8List _uniffiEncodeDictWithDefaults(DictWithDefaults value) {
+  final writer = _UniFfiBinaryWriter();
+  _uniffiWriteDictWithDefaults(value, writer);
   return writer.toBytes();
 }
 
-DictWithDefaults _uniffiDecodeDictWithDefaults(Uint8List bytes) {
-  final reader = _UniFfiBinaryReader(bytes);
-  final value = DictWithDefaults(
+DictWithDefaults _uniffiReadDictWithDefaults(_UniFfiBinaryReader reader) {
+  return DictWithDefaults(
     name: reader.readString(),
     category: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readString(); })(),
     integer: reader.readI64(),
     itemList: (() { final int __len = reader.readI32(); final out = <String>[]; for (var i = 0; i < __len; i++) { out.add(reader.readString()); } return out; })(),
     itemMap: (() { final int __len = reader.readI32(); final out = <String, String>{}; for (var i = 0; i < __len; i++) { final key = reader.readString(); final value = reader.readString(); out[key] = value; } return out; })(),
   );
+}
+
+DictWithDefaults _uniffiDecodeDictWithDefaults(Uint8List bytes) {
+  final reader = _UniFfiBinaryReader(bytes);
+  final value = _uniffiReadDictWithDefaults(reader);
   if (!reader.isDone) {
     throw StateError('extra bytes remaining while decoding DictWithDefaults');
   }
   return value;
 }
 
+void _uniffiWriteEmptyStruct(EmptyStruct value, _UniFfiBinaryWriter writer) {
+}
+
 Uint8List _uniffiEncodeEmptyStruct(EmptyStruct value) {
   final writer = _UniFfiBinaryWriter();
+  _uniffiWriteEmptyStruct(value, writer);
   return writer.toBytes();
+}
+
+EmptyStruct _uniffiReadEmptyStruct(_UniFfiBinaryReader reader) {
+  return EmptyStruct(
+  );
 }
 
 EmptyStruct _uniffiDecodeEmptyStruct(Uint8List bytes) {
   final reader = _UniFfiBinaryReader(bytes);
-  final value = EmptyStruct(
-  );
+  final value = _uniffiReadEmptyStruct(reader);
   if (!reader.isDone) {
     throw StateError('extra bytes remaining while decoding EmptyStruct');
   }
   return value;
 }
 
+void _uniffiWriteRepair(Repair value, _UniFfiBinaryWriter writer) {
+  throw UnsupportedError('UniFFI binary encode not fully supported for Repair');
+}
+
 Uint8List _uniffiEncodeRepair(Repair value) {
   throw UnsupportedError('UniFFI binary encode not fully supported for Repair');
+}
+
+Repair _uniffiReadRepair(_UniFfiBinaryReader reader) {
+  throw UnsupportedError('UniFFI binary decode not fully supported for Repair');
 }
 
 Repair _uniffiDecodeRepair(Uint8List bytes) {
   throw UnsupportedError('UniFFI binary decode not fully supported for Repair');
 }
 
+void _uniffiWriteReturnOnlyDict(ReturnOnlyDict value, _UniFfiBinaryWriter writer) {
+  _uniffiWriteCoverallFlatError(value.e, writer);
+}
+
 Uint8List _uniffiEncodeReturnOnlyDict(ReturnOnlyDict value) {
   final writer = _UniFfiBinaryWriter();
-  final Uint8List __encoded = _uniffiEncodeCoverallFlatError(value.e);
-  writer.writeI32(__encoded.length);
-  writer.writeBytes(__encoded);
+  _uniffiWriteReturnOnlyDict(value, writer);
   return writer.toBytes();
+}
+
+ReturnOnlyDict _uniffiReadReturnOnlyDict(_UniFfiBinaryReader reader) {
+  return ReturnOnlyDict(
+    e: _uniffiReadCoverallFlatError(reader),
+  );
 }
 
 ReturnOnlyDict _uniffiDecodeReturnOnlyDict(Uint8List bytes) {
   final reader = _UniFfiBinaryReader(bytes);
-  final value = ReturnOnlyDict(
-    e: (() { final int __len = reader.readI32(); final Uint8List __bytes = reader.readBytes(__len); return _uniffiDecodeCoverallFlatError(__bytes); })(),
-  );
+  final value = _uniffiReadReturnOnlyDict(reader);
   if (!reader.isDone) {
     throw StateError('extra bytes remaining while decoding ReturnOnlyDict');
   }
   return value;
 }
 
+void _uniffiWriteSimpleDict(SimpleDict value, _UniFfiBinaryWriter writer) {
+  throw UnsupportedError('UniFFI binary encode not fully supported for SimpleDict');
+}
+
 Uint8List _uniffiEncodeSimpleDict(SimpleDict value) {
   throw UnsupportedError('UniFFI binary encode not fully supported for SimpleDict');
+}
+
+SimpleDict _uniffiReadSimpleDict(_UniFfiBinaryReader reader) {
+  throw UnsupportedError('UniFFI binary decode not fully supported for SimpleDict');
 }
 
 SimpleDict _uniffiDecodeSimpleDict(Uint8List bytes) {
   throw UnsupportedError('UniFFI binary decode not fully supported for SimpleDict');
 }
 
-Uint8List _uniffiEncodeColor(Color value) {
-  final writer = _UniFfiBinaryWriter();
+void _uniffiWriteColor(Color value, _UniFfiBinaryWriter writer) {
   final int tag = switch (value) {
     Color.red => 1,
     Color.blue => 2,
     Color.green => 3,
   };
   writer.writeI32(tag);
+}
+
+Uint8List _uniffiEncodeColor(Color value) {
+  final writer = _UniFfiBinaryWriter();
+  _uniffiWriteColor(value, writer);
   return writer.toBytes();
+}
+
+Color _uniffiReadColor(_UniFfiBinaryReader reader) {
+  final int tag = reader.readI32();
+  switch (tag) {
+    case 1:
+      return Color.red;
+    case 2:
+      return Color.blue;
+    case 3:
+      return Color.green;
+    default:
+      throw StateError('Unknown Color variant tag: $tag');
+  }
 }
 
 Color _uniffiDecodeColor(Uint8List bytes) {
   final reader = _UniFfiBinaryReader(bytes);
-  final int tag = reader.readI32();
-  final Color value;
-  switch (tag) {
-    case 1:
-      value = Color.red;
-      break;
-    case 2:
-      value = Color.blue;
-      break;
-    case 3:
-      value = Color.green;
-      break;
-    default:
-      throw StateError('Unknown Color variant tag: $tag');
-  }
+  final value = _uniffiReadColor(reader);
   if (!reader.isDone) {
     throw StateError('extra bytes remaining while decoding Color');
   }
   return value;
 }
 
-Uint8List _uniffiEncodeComplexError(ComplexError value) {
-  final writer = _UniFfiBinaryWriter();
+void _uniffiWriteComplexError(ComplexError value, _UniFfiBinaryWriter writer) {
   if (value is ComplexErrorOsError) {
     writer.writeI32(1);
     writer.writeI16(value.code);
@@ -1421,115 +1462,138 @@ Uint8List _uniffiEncodeComplexError(ComplexError value) {
   else {
     throw StateError('Unknown ComplexError variant instance: $value');
   }
+}
+
+Uint8List _uniffiEncodeComplexError(ComplexError value) {
+  final writer = _UniFfiBinaryWriter();
+  _uniffiWriteComplexError(value, writer);
   return writer.toBytes();
+}
+
+ComplexError _uniffiReadComplexError(_UniFfiBinaryReader reader) {
+  final int tag = reader.readI32();
+  switch (tag) {
+    case 1:
+      return ComplexErrorOsError(
+        code: reader.readI16(),
+        extendedCode: reader.readI16(),
+      );
+    case 2:
+      return ComplexErrorPermissionDenied(
+        reason: reader.readString(),
+      );
+    case 3:
+      return const ComplexErrorUnknownError();
+    default:
+      throw StateError('Unknown ComplexError variant tag: $tag');
+  }
 }
 
 ComplexError _uniffiDecodeComplexError(Uint8List bytes) {
   final reader = _UniFfiBinaryReader(bytes);
-  final int tag = reader.readI32();
-  final ComplexError value;
-  switch (tag) {
-    case 1:
-      value = ComplexErrorOsError(
-        code: reader.readI16(),
-        extendedCode: reader.readI16(),
-      );
-      break;
-    case 2:
-      value = ComplexErrorPermissionDenied(
-        reason: reader.readString(),
-      );
-      break;
-    case 3:
-      value = const ComplexErrorUnknownError();
-      break;
-    default:
-      throw StateError('Unknown ComplexError variant tag: $tag');
-  }
+  final value = _uniffiReadComplexError(reader);
   if (!reader.isDone) {
     throw StateError('extra bytes remaining while decoding ComplexError');
   }
   return value;
 }
 
-Uint8List _uniffiEncodeCoverallError(CoverallError value) {
-  final writer = _UniFfiBinaryWriter();
+void _uniffiWriteCoverallError(CoverallError value, _UniFfiBinaryWriter writer) {
   if (value is CoverallErrorTooManyHoles) {
     writer.writeI32(1);
   }
   else {
     throw StateError('Unknown CoverallError variant instance: $value');
   }
+}
+
+Uint8List _uniffiEncodeCoverallError(CoverallError value) {
+  final writer = _UniFfiBinaryWriter();
+  _uniffiWriteCoverallError(value, writer);
   return writer.toBytes();
+}
+
+CoverallError _uniffiReadCoverallError(_UniFfiBinaryReader reader) {
+  final int tag = reader.readI32();
+  switch (tag) {
+    case 1:
+      return const CoverallErrorTooManyHoles();
+    default:
+      throw StateError('Unknown CoverallError variant tag: $tag');
+  }
 }
 
 CoverallError _uniffiDecodeCoverallError(Uint8List bytes) {
   final reader = _UniFfiBinaryReader(bytes);
-  final int tag = reader.readI32();
-  final CoverallError value;
-  switch (tag) {
-    case 1:
-      value = const CoverallErrorTooManyHoles();
-      break;
-    default:
-      throw StateError('Unknown CoverallError variant tag: $tag');
-  }
+  final value = _uniffiReadCoverallError(reader);
   if (!reader.isDone) {
     throw StateError('extra bytes remaining while decoding CoverallError');
   }
   return value;
 }
 
-Uint8List _uniffiEncodeCoverallFlatError(CoverallFlatError value) {
-  final writer = _UniFfiBinaryWriter();
+void _uniffiWriteCoverallFlatError(CoverallFlatError value, _UniFfiBinaryWriter writer) {
   if (value is CoverallFlatErrorTooManyVariants) {
     writer.writeI32(1);
   }
   else {
     throw StateError('Unknown CoverallFlatError variant instance: $value');
   }
+}
+
+Uint8List _uniffiEncodeCoverallFlatError(CoverallFlatError value) {
+  final writer = _UniFfiBinaryWriter();
+  _uniffiWriteCoverallFlatError(value, writer);
   return writer.toBytes();
+}
+
+CoverallFlatError _uniffiReadCoverallFlatError(_UniFfiBinaryReader reader) {
+  final int tag = reader.readI32();
+  switch (tag) {
+    case 1:
+      return const CoverallFlatErrorTooManyVariants();
+    default:
+      throw StateError('Unknown CoverallFlatError variant tag: $tag');
+  }
 }
 
 CoverallFlatError _uniffiDecodeCoverallFlatError(Uint8List bytes) {
   final reader = _UniFfiBinaryReader(bytes);
-  final int tag = reader.readI32();
-  final CoverallFlatError value;
-  switch (tag) {
-    case 1:
-      value = const CoverallFlatErrorTooManyVariants();
-      break;
-    default:
-      throw StateError('Unknown CoverallFlatError variant tag: $tag');
-  }
+  final value = _uniffiReadCoverallFlatError(reader);
   if (!reader.isDone) {
     throw StateError('extra bytes remaining while decoding CoverallFlatError');
   }
   return value;
 }
 
-Uint8List _uniffiEncodeHTMLError(HTMLError value) {
-  final writer = _UniFfiBinaryWriter();
+void _uniffiWriteHTMLError(HTMLError value, _UniFfiBinaryWriter writer) {
   if (value is HTMLErrorInvalidHTML) {
     writer.writeI32(1);
   }
   else {
     throw StateError('Unknown HTMLError variant instance: $value');
   }
+}
+
+Uint8List _uniffiEncodeHTMLError(HTMLError value) {
+  final writer = _UniFfiBinaryWriter();
+  _uniffiWriteHTMLError(value, writer);
   return writer.toBytes();
+}
+
+HTMLError _uniffiReadHTMLError(_UniFfiBinaryReader reader) {
+  final int tag = reader.readI32();
+  switch (tag) {
+    case 1:
+      return const HTMLErrorInvalidHTML();
+    default:
+      throw StateError('Unknown HTMLError variant tag: $tag');
+  }
 }
 
 HTMLError _uniffiDecodeHTMLError(Uint8List bytes) {
   final reader = _UniFfiBinaryReader(bytes);
-  final int tag = reader.readI32();
-  final HTMLError value;
-  switch (tag) {
-    case 1:
-      value = const HTMLErrorInvalidHTML();
-      break;
-    default:
-      throw StateError('Unknown HTMLError variant tag: $tag');
-  }
+  final value = _uniffiReadHTMLError(reader);
   if (!reader.isDone) {
     throw StateError('extra bytes remaining while decoding HTMLError');
   }
@@ -1544,13 +1608,10 @@ MaybeObject _uniffiDecodeMaybeObject(Uint8List bytes) {
   throw UnsupportedError('UniFFI binary decode not fully supported for MaybeObject');
 }
 
-Uint8List _uniffiEncodeMaybeSimpleDict(MaybeSimpleDict value) {
-  final writer = _UniFfiBinaryWriter();
+void _uniffiWriteMaybeSimpleDict(MaybeSimpleDict value, _UniFfiBinaryWriter writer) {
   if (value is MaybeSimpleDictYeah) {
     writer.writeI32(1);
-    final Uint8List __encoded = _uniffiEncodeSimpleDict(value.value);
-    writer.writeI32(__encoded.length);
-    writer.writeBytes(__encoded);
+    _uniffiWriteSimpleDict(value.value, writer);
   }
   else if (value is MaybeSimpleDictNah) {
     writer.writeI32(2);
@@ -1558,52 +1619,51 @@ Uint8List _uniffiEncodeMaybeSimpleDict(MaybeSimpleDict value) {
   else {
     throw StateError('Unknown MaybeSimpleDict variant instance: $value');
   }
+}
+
+Uint8List _uniffiEncodeMaybeSimpleDict(MaybeSimpleDict value) {
+  final writer = _UniFfiBinaryWriter();
+  _uniffiWriteMaybeSimpleDict(value, writer);
   return writer.toBytes();
+}
+
+MaybeSimpleDict _uniffiReadMaybeSimpleDict(_UniFfiBinaryReader reader) {
+  final int tag = reader.readI32();
+  switch (tag) {
+    case 1:
+      return MaybeSimpleDictYeah(
+        value: _uniffiReadSimpleDict(reader),
+      );
+    case 2:
+      return const MaybeSimpleDictNah();
+    default:
+      throw StateError('Unknown MaybeSimpleDict variant tag: $tag');
+  }
 }
 
 MaybeSimpleDict _uniffiDecodeMaybeSimpleDict(Uint8List bytes) {
   final reader = _UniFfiBinaryReader(bytes);
-  final int tag = reader.readI32();
-  final MaybeSimpleDict value;
-  switch (tag) {
-    case 1:
-      value = MaybeSimpleDictYeah(
-        value: (() { final int __len = reader.readI32(); final Uint8List __bytes = reader.readBytes(__len); return _uniffiDecodeSimpleDict(__bytes); })(),
-      );
-      break;
-    case 2:
-      value = const MaybeSimpleDictNah();
-      break;
-    default:
-      throw StateError('Unknown MaybeSimpleDict variant tag: $tag');
-  }
+  final value = _uniffiReadMaybeSimpleDict(reader);
   if (!reader.isDone) {
     throw StateError('extra bytes remaining while decoding MaybeSimpleDict');
   }
   return value;
 }
 
-Uint8List _uniffiEncodeReturnOnlyEnum(ReturnOnlyEnum value) {
-  final writer = _UniFfiBinaryWriter();
+void _uniffiWriteReturnOnlyEnum(ReturnOnlyEnum value, _UniFfiBinaryWriter writer) {
   if (value is ReturnOnlyEnumOne) {
     writer.writeI32(1);
-    final Uint8List __encoded = _uniffiEncodeCoverallFlatError(value.e);
-    writer.writeI32(__encoded.length);
-    writer.writeBytes(__encoded);
+    _uniffiWriteCoverallFlatError(value.e, writer);
   }
   else if (value is ReturnOnlyEnumTwo) {
     writer.writeI32(2);
-    final Uint8List __encoded = _uniffiEncodeReturnOnlyDict(value.d);
-    writer.writeI32(__encoded.length);
-    writer.writeBytes(__encoded);
+    _uniffiWriteReturnOnlyDict(value.d, writer);
   }
   else if (value is ReturnOnlyEnumThree) {
     writer.writeI32(3);
     writer.writeI32(value.l.length);
     for (final item in value.l) {
-      final Uint8List __encoded = _uniffiEncodeCoverallFlatError(item);
-      writer.writeI32(__encoded.length);
-      writer.writeBytes(__encoded);
+      _uniffiWriteCoverallFlatError(item, writer);
     }
   }
   else if (value is ReturnOnlyEnumFour) {
@@ -1611,45 +1671,47 @@ Uint8List _uniffiEncodeReturnOnlyEnum(ReturnOnlyEnum value) {
     writer.writeI32(value.m.length);
     for (final entry in value.m.entries) {
       writer.writeString(entry.key);
-      final Uint8List __encoded = _uniffiEncodeCoverallFlatError(entry.value);
-      writer.writeI32(__encoded.length);
-      writer.writeBytes(__encoded);
+      _uniffiWriteCoverallFlatError(entry.value, writer);
     }
   }
   else {
     throw StateError('Unknown ReturnOnlyEnum variant instance: $value');
   }
+}
+
+Uint8List _uniffiEncodeReturnOnlyEnum(ReturnOnlyEnum value) {
+  final writer = _UniFfiBinaryWriter();
+  _uniffiWriteReturnOnlyEnum(value, writer);
   return writer.toBytes();
+}
+
+ReturnOnlyEnum _uniffiReadReturnOnlyEnum(_UniFfiBinaryReader reader) {
+  final int tag = reader.readI32();
+  switch (tag) {
+    case 1:
+      return ReturnOnlyEnumOne(
+        e: _uniffiReadCoverallFlatError(reader),
+      );
+    case 2:
+      return ReturnOnlyEnumTwo(
+        d: _uniffiReadReturnOnlyDict(reader),
+      );
+    case 3:
+      return ReturnOnlyEnumThree(
+        l: (() { final int __len = reader.readI32(); final out = <CoverallFlatError>[]; for (var i = 0; i < __len; i++) { out.add(_uniffiReadCoverallFlatError(reader)); } return out; })(),
+      );
+    case 4:
+      return ReturnOnlyEnumFour(
+        m: (() { final int __len = reader.readI32(); final out = <String, CoverallFlatError>{}; for (var i = 0; i < __len; i++) { final key = reader.readString(); final value = _uniffiReadCoverallFlatError(reader); out[key] = value; } return out; })(),
+      );
+    default:
+      throw StateError('Unknown ReturnOnlyEnum variant tag: $tag');
+  }
 }
 
 ReturnOnlyEnum _uniffiDecodeReturnOnlyEnum(Uint8List bytes) {
   final reader = _UniFfiBinaryReader(bytes);
-  final int tag = reader.readI32();
-  final ReturnOnlyEnum value;
-  switch (tag) {
-    case 1:
-      value = ReturnOnlyEnumOne(
-        e: (() { final int __len = reader.readI32(); final Uint8List __bytes = reader.readBytes(__len); return _uniffiDecodeCoverallFlatError(__bytes); })(),
-      );
-      break;
-    case 2:
-      value = ReturnOnlyEnumTwo(
-        d: (() { final int __len = reader.readI32(); final Uint8List __bytes = reader.readBytes(__len); return _uniffiDecodeReturnOnlyDict(__bytes); })(),
-      );
-      break;
-    case 3:
-      value = ReturnOnlyEnumThree(
-        l: (() { final int __len = reader.readI32(); final out = <CoverallFlatError>[]; for (var i = 0; i < __len; i++) { out.add((() { final int __len = reader.readI32(); final Uint8List __bytes = reader.readBytes(__len); return _uniffiDecodeCoverallFlatError(__bytes); })()); } return out; })(),
-      );
-      break;
-    case 4:
-      value = ReturnOnlyEnumFour(
-        m: (() { final int __len = reader.readI32(); final out = <String, CoverallFlatError>{}; for (var i = 0; i < __len; i++) { final key = reader.readString(); final value = (() { final int __len = reader.readI32(); final Uint8List __bytes = reader.readBytes(__len); return _uniffiDecodeCoverallFlatError(__bytes); })(); out[key] = value; } return out; })(),
-      );
-      break;
-    default:
-      throw StateError('Unknown ReturnOnlyEnum variant tag: $tag');
-  }
+  final value = _uniffiReadReturnOnlyEnum(reader);
   if (!reader.isDone) {
     throw StateError('extra bytes remaining while decoding ReturnOnlyEnum');
   }

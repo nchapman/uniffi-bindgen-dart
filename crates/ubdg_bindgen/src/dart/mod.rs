@@ -1763,7 +1763,8 @@ interface Outcome {
 
         let content = render_uniffi_binary_helpers(&[], &enums, &HashMap::new());
         assert!(content.contains("if (value is MethodErrorDivisionByZero) {"));
-        assert!(content.contains("value = const MethodErrorDivisionByZero();"));
+        // The reader-based decode emits `return const ...` instead of `value = const ...`
+        assert!(content.contains("return const MethodErrorDivisionByZero();"));
         assert!(!content.contains("value = MethodError.divisionByZero;"));
     }
 
