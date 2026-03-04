@@ -545,27 +545,34 @@ final class _UniFfiBinaryReader {
   }
 }
 
-Uint8List _uniffiEncodeMethodPoint(MethodPoint value) {
-  final writer = _UniFfiBinaryWriter();
+void _uniffiWriteMethodPoint(MethodPoint value, _UniFfiBinaryWriter writer) {
   writer.writeU32(value.x);
   writer.writeU32(value.y);
+}
+
+Uint8List _uniffiEncodeMethodPoint(MethodPoint value) {
+  final writer = _UniFfiBinaryWriter();
+  _uniffiWriteMethodPoint(value, writer);
   return writer.toBytes();
+}
+
+MethodPoint _uniffiReadMethodPoint(_UniFfiBinaryReader reader) {
+  return MethodPoint(
+    x: reader.readU32(),
+    y: reader.readU32(),
+  );
 }
 
 MethodPoint _uniffiDecodeMethodPoint(Uint8List bytes) {
   final reader = _UniFfiBinaryReader(bytes);
-  final value = MethodPoint(
-    x: reader.readU32(),
-    y: reader.readU32(),
-  );
+  final value = _uniffiReadMethodPoint(reader);
   if (!reader.isDone) {
     throw StateError('extra bytes remaining while decoding MethodPoint');
   }
   return value;
 }
 
-Uint8List _uniffiEncodeMethodError(MethodError value) {
-  final writer = _UniFfiBinaryWriter();
+void _uniffiWriteMethodError(MethodError value, _UniFfiBinaryWriter writer) {
   if (value is MethodErrorDivisionByZero) {
     writer.writeI32(1);
   }
@@ -576,33 +583,38 @@ Uint8List _uniffiEncodeMethodError(MethodError value) {
   else {
     throw StateError('Unknown MethodError variant instance: $value');
   }
+}
+
+Uint8List _uniffiEncodeMethodError(MethodError value) {
+  final writer = _UniFfiBinaryWriter();
+  _uniffiWriteMethodError(value, writer);
   return writer.toBytes();
+}
+
+MethodError _uniffiReadMethodError(_UniFfiBinaryReader reader) {
+  final int tag = reader.readI32();
+  switch (tag) {
+    case 1:
+      return const MethodErrorDivisionByZero();
+    case 2:
+      return MethodErrorNegativeInput(
+        value: reader.readI32(),
+      );
+    default:
+      throw StateError('Unknown MethodError variant tag: $tag');
+  }
 }
 
 MethodError _uniffiDecodeMethodError(Uint8List bytes) {
   final reader = _UniFfiBinaryReader(bytes);
-  final int tag = reader.readI32();
-  final MethodError value;
-  switch (tag) {
-    case 1:
-      value = const MethodErrorDivisionByZero();
-      break;
-    case 2:
-      value = MethodErrorNegativeInput(
-        value: reader.readI32(),
-      );
-      break;
-    default:
-      throw StateError('Unknown MethodError variant tag: $tag');
-  }
+  final value = _uniffiReadMethodError(reader);
   if (!reader.isDone) {
     throw StateError('extra bytes remaining while decoding MethodError');
   }
   return value;
 }
 
-Uint8List _uniffiEncodeMethodOutcome(MethodOutcome value) {
-  final writer = _UniFfiBinaryWriter();
+void _uniffiWriteMethodOutcome(MethodOutcome value, _UniFfiBinaryWriter writer) {
   if (value is MethodOutcomeOk) {
     writer.writeI32(1);
     writer.writeU32(value.value);
@@ -614,57 +626,68 @@ Uint8List _uniffiEncodeMethodOutcome(MethodOutcome value) {
   else {
     throw StateError('Unknown MethodOutcome variant instance: $value');
   }
+}
+
+Uint8List _uniffiEncodeMethodOutcome(MethodOutcome value) {
+  final writer = _UniFfiBinaryWriter();
+  _uniffiWriteMethodOutcome(value, writer);
   return writer.toBytes();
+}
+
+MethodOutcome _uniffiReadMethodOutcome(_UniFfiBinaryReader reader) {
+  final int tag = reader.readI32();
+  switch (tag) {
+    case 1:
+      return MethodOutcomeOk(
+        value: reader.readU32(),
+      );
+    case 2:
+      return MethodOutcomeErr(
+        message: reader.readString(),
+      );
+    default:
+      throw StateError('Unknown MethodOutcome variant tag: $tag');
+  }
 }
 
 MethodOutcome _uniffiDecodeMethodOutcome(Uint8List bytes) {
   final reader = _UniFfiBinaryReader(bytes);
-  final int tag = reader.readI32();
-  final MethodOutcome value;
-  switch (tag) {
-    case 1:
-      value = MethodOutcomeOk(
-        value: reader.readU32(),
-      );
-      break;
-    case 2:
-      value = MethodOutcomeErr(
-        message: reader.readString(),
-      );
-      break;
-    default:
-      throw StateError('Unknown MethodOutcome variant tag: $tag');
-  }
+  final value = _uniffiReadMethodOutcome(reader);
   if (!reader.isDone) {
     throw StateError('extra bytes remaining while decoding MethodOutcome');
   }
   return value;
 }
 
-Uint8List _uniffiEncodeMethodState(MethodState value) {
-  final writer = _UniFfiBinaryWriter();
+void _uniffiWriteMethodState(MethodState value, _UniFfiBinaryWriter writer) {
   final int tag = switch (value) {
     MethodState.idle => 1,
     MethodState.busy => 2,
   };
   writer.writeI32(tag);
+}
+
+Uint8List _uniffiEncodeMethodState(MethodState value) {
+  final writer = _UniFfiBinaryWriter();
+  _uniffiWriteMethodState(value, writer);
   return writer.toBytes();
+}
+
+MethodState _uniffiReadMethodState(_UniFfiBinaryReader reader) {
+  final int tag = reader.readI32();
+  switch (tag) {
+    case 1:
+      return MethodState.idle;
+    case 2:
+      return MethodState.busy;
+    default:
+      throw StateError('Unknown MethodState variant tag: $tag');
+  }
 }
 
 MethodState _uniffiDecodeMethodState(Uint8List bytes) {
   final reader = _UniFfiBinaryReader(bytes);
-  final int tag = reader.readI32();
-  final MethodState value;
-  switch (tag) {
-    case 1:
-      value = MethodState.idle;
-      break;
-    case 2:
-      value = MethodState.busy;
-      break;
-    default:
-      throw StateError('Unknown MethodState variant tag: $tag');
-  }
+  final value = _uniffiReadMethodState(reader);
   if (!reader.isDone) {
     throw StateError('extra bytes remaining while decoding MethodState');
   }

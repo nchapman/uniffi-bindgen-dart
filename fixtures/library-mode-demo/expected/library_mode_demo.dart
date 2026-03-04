@@ -417,55 +417,68 @@ final class _UniFfiBinaryReader {
   }
 }
 
-Uint8List _uniffiEncodePoint(Point value) {
-  final writer = _UniFfiBinaryWriter();
+void _uniffiWritePoint(Point value, _UniFfiBinaryWriter writer) {
   writer.writeF64(value.x);
   writer.writeF64(value.y);
+}
+
+Uint8List _uniffiEncodePoint(Point value) {
+  final writer = _UniFfiBinaryWriter();
+  _uniffiWritePoint(value, writer);
   return writer.toBytes();
+}
+
+Point _uniffiReadPoint(_UniFfiBinaryReader reader) {
+  return Point(
+    x: reader.readF64(),
+    y: reader.readF64(),
+  );
 }
 
 Point _uniffiDecodePoint(Uint8List bytes) {
   final reader = _UniFfiBinaryReader(bytes);
-  final value = Point(
-    x: reader.readF64(),
-    y: reader.readF64(),
-  );
+  final value = _uniffiReadPoint(reader);
   if (!reader.isDone) {
     throw StateError('extra bytes remaining while decoding Point');
   }
   return value;
 }
 
-Uint8List _uniffiEncodeArithError(ArithError value) {
-  final writer = _UniFfiBinaryWriter();
+void _uniffiWriteArithError(ArithError value, _UniFfiBinaryWriter writer) {
   if (value is ArithErrorDivisionByZero) {
     writer.writeI32(1);
   }
   else {
     throw StateError('Unknown ArithError variant instance: $value');
   }
+}
+
+Uint8List _uniffiEncodeArithError(ArithError value) {
+  final writer = _UniFfiBinaryWriter();
+  _uniffiWriteArithError(value, writer);
   return writer.toBytes();
+}
+
+ArithError _uniffiReadArithError(_UniFfiBinaryReader reader) {
+  final int tag = reader.readI32();
+  switch (tag) {
+    case 1:
+      return const ArithErrorDivisionByZero();
+    default:
+      throw StateError('Unknown ArithError variant tag: $tag');
+  }
 }
 
 ArithError _uniffiDecodeArithError(Uint8List bytes) {
   final reader = _UniFfiBinaryReader(bytes);
-  final int tag = reader.readI32();
-  final ArithError value;
-  switch (tag) {
-    case 1:
-      value = const ArithErrorDivisionByZero();
-      break;
-    default:
-      throw StateError('Unknown ArithError variant tag: $tag');
-  }
+  final value = _uniffiReadArithError(reader);
   if (!reader.isDone) {
     throw StateError('extra bytes remaining while decoding ArithError');
   }
   return value;
 }
 
-Uint8List _uniffiEncodeShape(Shape value) {
-  final writer = _UniFfiBinaryWriter();
+void _uniffiWriteShape(Shape value, _UniFfiBinaryWriter writer) {
   if (value is ShapeCircle) {
     writer.writeI32(1);
     writer.writeF64(value.radius);
@@ -478,28 +491,34 @@ Uint8List _uniffiEncodeShape(Shape value) {
   else {
     throw StateError('Unknown Shape variant instance: $value');
   }
+}
+
+Uint8List _uniffiEncodeShape(Shape value) {
+  final writer = _UniFfiBinaryWriter();
+  _uniffiWriteShape(value, writer);
   return writer.toBytes();
+}
+
+Shape _uniffiReadShape(_UniFfiBinaryReader reader) {
+  final int tag = reader.readI32();
+  switch (tag) {
+    case 1:
+      return ShapeCircle(
+        radius: reader.readF64(),
+      );
+    case 2:
+      return ShapeRect(
+        w: reader.readF64(),
+        h: reader.readF64(),
+      );
+    default:
+      throw StateError('Unknown Shape variant tag: $tag');
+  }
 }
 
 Shape _uniffiDecodeShape(Uint8List bytes) {
   final reader = _UniFfiBinaryReader(bytes);
-  final int tag = reader.readI32();
-  final Shape value;
-  switch (tag) {
-    case 1:
-      value = ShapeCircle(
-        radius: reader.readF64(),
-      );
-      break;
-    case 2:
-      value = ShapeRect(
-        w: reader.readF64(),
-        h: reader.readF64(),
-      );
-      break;
-    default:
-      throw StateError('Unknown Shape variant tag: $tag');
-  }
+  final value = _uniffiReadShape(reader);
   if (!reader.isDone) {
     throw StateError('extra bytes remaining while decoding Shape');
   }
