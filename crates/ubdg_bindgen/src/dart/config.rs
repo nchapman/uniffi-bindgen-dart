@@ -8,7 +8,7 @@ use serde::Deserialize;
 use crate::GenerateArgs;
 
 #[derive(Debug, Clone, Default, Deserialize)]
-#[serde(default, deny_unknown_fields)]
+#[serde(default)]
 pub struct DartBindingsConfig {
     pub module_name: Option<String>,
     pub ffi_class_name: Option<String>,
@@ -52,14 +52,13 @@ impl CustomTypeConfig {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 struct RootConfig {
     #[serde(default)]
     bindings: BindingsConfig,
 }
 
 #[derive(Debug, Default, Deserialize)]
-#[serde(default, deny_unknown_fields)]
+#[serde(default)]
 struct BindingsConfig {
     dart: DartBindingsConfig,
 }
@@ -208,6 +207,44 @@ lift = "Count({})"
 
         // No entry → not present
         assert!(!cfg.custom_types.contains_key("Label"));
+    }
+
+    #[test]
+    fn parse_shared_multi_language_toml() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("uniffi.toml");
+        fs::write(
+            &config_path,
+            r#"
+[bindings.dart]
+module_name = "MyModule"
+
+[bindings.js]
+module_name = "MyJsModule"
+
+[bindings.python]
+package_name = "my_package"
+
+[bindings.swift]
+module_name = "MySwiftModule"
+
+[bindings.kotlin]
+package_name = "com.example"
+"#,
+        )
+        .expect("write config");
+
+        let args = GenerateArgs {
+            source: temp.path().join("demo.udl"),
+            out_dir: temp.path().join("out"),
+            library: false,
+            config: Some(config_path),
+            crate_name: None,
+            no_format: false,
+        };
+
+        let cfg = load(&args).expect("load config");
+        assert_eq!(cfg.module_name.as_deref(), Some("MyModule"));
     }
 
     #[test]
