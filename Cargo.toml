@@ -7,7 +7,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.1.3"
+version = "0.2.0"
 edition = "2021"
 license = "MIT"
 authors = ["Nick Chapman <nchapman@fastmail.com>"]
@@ -22,4 +22,4 @@ clap = { version = "4.5.32", features = ["derive"] }
 serde = { version = "1.0.219", features = ["derive"] }
 tempfile = "3.19.0"
 toml = "0.8.20"
-uniffi_bindgen = "0.31.0"
+uniffi_bindgen = "0.32.2"

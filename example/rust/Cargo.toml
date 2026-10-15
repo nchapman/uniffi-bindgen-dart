@@ -8,4 +8,4 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-uniffi = { version = "0.31.0" }
+uniffi = { version = "0.32.2" }

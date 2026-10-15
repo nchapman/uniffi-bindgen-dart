@@ -84,6 +84,16 @@ pub(super) fn render_json_encode_expr(
                 format!("{value_expr}.map((item) => {inner}).toList()")
             }
         }
+        // Set is Iterable: same encode path as Sequence (JSON has no set literal).
+        Type::Set { inner_type } => {
+            if is_identity_json_encode(inner_type, custom_types) {
+                value_expr.to_string()
+            } else {
+                let inner = render_json_encode_expr("item", inner_type, custom_types);
+                format!("{value_expr}.map((item) => {inner}).toList()")
+            }
+        }
+        Type::Box { inner_type } => render_json_encode_expr(value_expr, inner_type, custom_types),
         // Only reached for string-keyed maps; non-string maps use the binary codec path.
         Type::Map {
             key_type,
@@ -158,6 +168,12 @@ pub(super) fn render_json_decode_expr(
             let inner = render_json_decode_expr("item", inner_type, custom_types);
             format!("({value_expr} as List).map((item) => {inner}).toList()")
         }
+        Type::Set { inner_type } => {
+            let inner = render_json_decode_expr("item", inner_type, custom_types);
+            format!("({value_expr} as List).map((item) => {inner}).toSet()")
+        }
+        // `Type::Box` is scaffolding-only; decode the inner type directly.
+        Type::Box { inner_type } => render_json_decode_expr(value_expr, inner_type, custom_types),
         // Only reached for string-keyed maps; non-string maps use the binary codec path.
         Type::Map {
             key_type,
@@ -223,7 +239,10 @@ fn is_binary_supported_type(type_: &Type, enums: &[UdlEnum]) -> bool {
         | Type::Timestamp
         | Type::Duration => true,
         Type::Optional { inner_type } => is_binary_supported_type(inner_type, enums),
-        Type::Sequence { inner_type } => is_binary_supported_type(inner_type, enums),
+        Type::Sequence { inner_type } | Type::Set { inner_type } => {
+            is_binary_supported_type(inner_type, enums)
+        }
+        Type::Box { inner_type } => is_binary_supported_type(inner_type, enums),
         Type::Map {
             key_type,
             value_type,
@@ -662,6 +681,23 @@ pub(super) fn render_uniffi_binary_write_statement(
                 "{indent}{writer}.writeI32({value_expr}.length);\n{indent}for (final item in {value_expr}) {{\n{inner_stmt}{indent}}}\n"
             )
         }
+        // Sets serialize like sequences on the wire (length + items); Set is Iterable.
+        Type::Set { inner_type } => {
+            let inner_stmt = render_uniffi_binary_write_statement(
+                inner_type,
+                "item",
+                writer,
+                enums,
+                &(indent.to_string() + "  "),
+                custom_types,
+            );
+            format!(
+                "{indent}{writer}.writeI32({value_expr}.length);\n{indent}for (final item in {value_expr}) {{\n{inner_stmt}{indent}}}\n"
+            )
+        }
+        Type::Box { inner_type } => {
+            render_uniffi_binary_write_statement(inner_type, value_expr, writer, enums, indent, custom_types)
+        }
         Type::Map { key_type, value_type } => {
             let key_stmt =
                 render_uniffi_binary_write_statement(key_type, "entry.key", writer, enums, &(indent.to_string() + "  "), custom_types);
@@ -737,6 +773,18 @@ pub(super) fn render_uniffi_binary_read_expression(
             format!(
                 "(() {{ final int __len = {reader}.readI32(); final out = <{inner_type_name}>[]; for (var i = 0; i < __len; i++) {{ out.add({inner}); }} return out; }})()"
             )
+        }
+        // Sets read like sequences, collecting into a Dart Set.
+        Type::Set { inner_type } => {
+            let inner =
+                render_uniffi_binary_read_expression(inner_type, reader, enums, custom_types);
+            let inner_type_name = map_uniffi_type_to_dart(inner_type, custom_types);
+            format!(
+                "(() {{ final int __len = {reader}.readI32(); final out = <{inner_type_name}>{{}}; for (var i = 0; i < __len; i++) {{ out.add({inner}); }} return out; }})()"
+            )
+        }
+        Type::Box { inner_type } => {
+            render_uniffi_binary_read_expression(inner_type, reader, enums, custom_types)
         }
         Type::Map {
             key_type,
