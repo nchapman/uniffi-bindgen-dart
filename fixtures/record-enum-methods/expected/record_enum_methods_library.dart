@@ -731,8 +731,8 @@ class RecordEnumMethodsFfi {
     } catch (err) {
       throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_uniffi_record_enum_methods_checksum_func_method_outcome_ok`: $err');
     }
-    if (_checksum_uniffi_uniffi_record_enum_methods_checksum_func_method_outcome_ok != 31606) {
-      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_record_enum_methods_checksum_func_method_outcome_ok`: expected 31606, got $_checksum_uniffi_uniffi_record_enum_methods_checksum_func_method_outcome_ok');
+    if (_checksum_uniffi_uniffi_record_enum_methods_checksum_func_method_outcome_ok != 24467) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_record_enum_methods_checksum_func_method_outcome_ok`: expected 24467, got $_checksum_uniffi_uniffi_record_enum_methods_checksum_func_method_outcome_ok');
     }
     final int _checksum_uniffi_uniffi_record_enum_methods_checksum_func_method_point_new;
     try {
@@ -741,8 +741,8 @@ class RecordEnumMethodsFfi {
     } catch (err) {
       throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_uniffi_record_enum_methods_checksum_func_method_point_new`: $err');
     }
-    if (_checksum_uniffi_uniffi_record_enum_methods_checksum_func_method_point_new != 52766) {
-      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_record_enum_methods_checksum_func_method_point_new`: expected 52766, got $_checksum_uniffi_uniffi_record_enum_methods_checksum_func_method_point_new');
+    if (_checksum_uniffi_uniffi_record_enum_methods_checksum_func_method_point_new != 27578) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_record_enum_methods_checksum_func_method_point_new`: expected 27578, got $_checksum_uniffi_uniffi_record_enum_methods_checksum_func_method_point_new');
     }
     final int _checksum_uniffi_uniffi_record_enum_methods_checksum_func_method_state_busy;
     try {
@@ -751,8 +751,8 @@ class RecordEnumMethodsFfi {
     } catch (err) {
       throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_uniffi_record_enum_methods_checksum_func_method_state_busy`: $err');
     }
-    if (_checksum_uniffi_uniffi_record_enum_methods_checksum_func_method_state_busy != 30812) {
-      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_record_enum_methods_checksum_func_method_state_busy`: expected 30812, got $_checksum_uniffi_uniffi_record_enum_methods_checksum_func_method_state_busy');
+    if (_checksum_uniffi_uniffi_record_enum_methods_checksum_func_method_state_busy != 31527) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_record_enum_methods_checksum_func_method_state_busy`: expected 31527, got $_checksum_uniffi_uniffi_record_enum_methods_checksum_func_method_state_busy');
     }
   }
 

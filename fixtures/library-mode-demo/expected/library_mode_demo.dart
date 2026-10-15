@@ -562,8 +562,8 @@ class LibraryModeDemoFfi {
     } catch (err) {
       throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_uniffi_library_mode_demo_checksum_func_describe_shape`: $err');
     }
-    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_func_describe_shape != 51108) {
-      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_func_describe_shape`: expected 51108, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_func_describe_shape');
+    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_func_describe_shape != 9095) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_func_describe_shape`: expected 9095, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_func_describe_shape');
     }
     final int _checksum_uniffi_uniffi_library_mode_demo_checksum_func_divide;
     try {
@@ -572,8 +572,8 @@ class LibraryModeDemoFfi {
     } catch (err) {
       throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_uniffi_library_mode_demo_checksum_func_divide`: $err');
     }
-    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_func_divide != 55250) {
-      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_func_divide`: expected 55250, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_func_divide');
+    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_func_divide != 56313) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_func_divide`: expected 56313, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_func_divide');
     }
     final int _checksum_uniffi_uniffi_library_mode_demo_checksum_func_divide_async;
     try {
@@ -582,8 +582,8 @@ class LibraryModeDemoFfi {
     } catch (err) {
       throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_uniffi_library_mode_demo_checksum_func_divide_async`: $err');
     }
-    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_func_divide_async != 15218) {
-      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_func_divide_async`: expected 15218, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_func_divide_async');
+    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_func_divide_async != 54769) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_func_divide_async`: expected 54769, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_func_divide_async');
     }
     final int _checksum_uniffi_uniffi_library_mode_demo_checksum_func_echo_label;
     try {
@@ -592,8 +592,8 @@ class LibraryModeDemoFfi {
     } catch (err) {
       throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_uniffi_library_mode_demo_checksum_func_echo_label`: $err');
     }
-    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_func_echo_label != 2529) {
-      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_func_echo_label`: expected 2529, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_func_echo_label');
+    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_func_echo_label != 35873) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_func_echo_label`: expected 35873, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_func_echo_label');
     }
     final int _checksum_uniffi_uniffi_library_mode_demo_checksum_func_echo_map;
     try {
@@ -602,8 +602,8 @@ class LibraryModeDemoFfi {
     } catch (err) {
       throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_uniffi_library_mode_demo_checksum_func_echo_map`: $err');
     }
-    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_func_echo_map != 56419) {
-      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_func_echo_map`: expected 56419, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_func_echo_map');
+    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_func_echo_map != 430) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_func_echo_map`: expected 430, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_func_echo_map');
     }
     final int _checksum_uniffi_uniffi_library_mode_demo_checksum_func_echo_strings;
     try {
@@ -612,8 +612,8 @@ class LibraryModeDemoFfi {
     } catch (err) {
       throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_uniffi_library_mode_demo_checksum_func_echo_strings`: $err');
     }
-    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_func_echo_strings != 8754) {
-      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_func_echo_strings`: expected 8754, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_func_echo_strings');
+    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_func_echo_strings != 61284) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_func_echo_strings`: expected 61284, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_func_echo_strings');
     }
     final int _checksum_uniffi_uniffi_library_mode_demo_checksum_func_greet;
     try {
@@ -622,8 +622,8 @@ class LibraryModeDemoFfi {
     } catch (err) {
       throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_uniffi_library_mode_demo_checksum_func_greet`: $err');
     }
-    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_func_greet != 8324) {
-      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_func_greet`: expected 8324, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_func_greet');
+    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_func_greet != 7032) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_func_greet`: expected 7032, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_func_greet');
     }
     final int _checksum_uniffi_uniffi_library_mode_demo_checksum_func_greet_async;
     try {
@@ -632,8 +632,28 @@ class LibraryModeDemoFfi {
     } catch (err) {
       throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_uniffi_library_mode_demo_checksum_func_greet_async`: $err');
     }
-    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_func_greet_async != 11130) {
-      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_func_greet_async`: expected 11130, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_func_greet_async');
+    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_func_greet_async != 4198) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_func_greet_async`: expected 4198, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_func_greet_async');
+    }
+    final int _checksum_uniffi_uniffi_library_mode_demo_checksum_func_grouped;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_uniffi_library_mode_demo_checksum_func_grouped');
+      _checksum_uniffi_uniffi_library_mode_demo_checksum_func_grouped = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_uniffi_library_mode_demo_checksum_func_grouped`: $err');
+    }
+    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_func_grouped != 57236) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_func_grouped`: expected 57236, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_func_grouped');
+    }
+    final int _checksum_uniffi_uniffi_library_mode_demo_checksum_func_ids;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_uniffi_library_mode_demo_checksum_func_ids');
+      _checksum_uniffi_uniffi_library_mode_demo_checksum_func_ids = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_uniffi_library_mode_demo_checksum_func_ids`: $err');
+    }
+    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_func_ids != 33645) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_func_ids`: expected 33645, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_func_ids');
     }
     final int _checksum_uniffi_uniffi_library_mode_demo_checksum_func_make_point;
     try {
@@ -642,8 +662,8 @@ class LibraryModeDemoFfi {
     } catch (err) {
       throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_uniffi_library_mode_demo_checksum_func_make_point`: $err');
     }
-    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_func_make_point != 32456) {
-      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_func_make_point`: expected 32456, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_func_make_point');
+    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_func_make_point != 43134) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_func_make_point`: expected 43134, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_func_make_point');
     }
     final int _checksum_uniffi_uniffi_library_mode_demo_checksum_func_maybe_greet;
     try {
@@ -652,8 +672,38 @@ class LibraryModeDemoFfi {
     } catch (err) {
       throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_uniffi_library_mode_demo_checksum_func_maybe_greet`: $err');
     }
-    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_func_maybe_greet != 46882) {
-      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_func_maybe_greet`: expected 46882, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_func_maybe_greet');
+    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_func_maybe_greet != 47911) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_func_maybe_greet`: expected 47911, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_func_maybe_greet');
+    }
+    final int _checksum_uniffi_uniffi_library_mode_demo_checksum_func_maybe_tags;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_uniffi_library_mode_demo_checksum_func_maybe_tags');
+      _checksum_uniffi_uniffi_library_mode_demo_checksum_func_maybe_tags = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_uniffi_library_mode_demo_checksum_func_maybe_tags`: $err');
+    }
+    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_func_maybe_tags != 22468) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_func_maybe_tags`: expected 22468, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_func_maybe_tags');
+    }
+    final int _checksum_uniffi_uniffi_library_mode_demo_checksum_func_total;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_uniffi_library_mode_demo_checksum_func_total');
+      _checksum_uniffi_uniffi_library_mode_demo_checksum_func_total = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_uniffi_library_mode_demo_checksum_func_total`: $err');
+    }
+    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_func_total != 49179) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_func_total`: expected 49179, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_func_total');
+    }
+    final int _checksum_uniffi_uniffi_library_mode_demo_checksum_func_unique_tags;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_uniffi_library_mode_demo_checksum_func_unique_tags');
+      _checksum_uniffi_uniffi_library_mode_demo_checksum_func_unique_tags = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_uniffi_library_mode_demo_checksum_func_unique_tags`: $err');
+    }
+    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_func_unique_tags != 53197) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_func_unique_tags`: expected 53197, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_func_unique_tags');
     }
     final int _checksum_uniffi_uniffi_library_mode_demo_checksum_method_counter_async_divide;
     try {
@@ -662,8 +712,8 @@ class LibraryModeDemoFfi {
     } catch (err) {
       throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_uniffi_library_mode_demo_checksum_method_counter_async_divide`: $err');
     }
-    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_method_counter_async_divide != 27466) {
-      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_method_counter_async_divide`: expected 27466, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_method_counter_async_divide');
+    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_method_counter_async_divide != 47401) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_method_counter_async_divide`: expected 47401, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_method_counter_async_divide');
     }
     final int _checksum_uniffi_uniffi_library_mode_demo_checksum_method_counter_async_get;
     try {
@@ -672,8 +722,8 @@ class LibraryModeDemoFfi {
     } catch (err) {
       throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_uniffi_library_mode_demo_checksum_method_counter_async_get`: $err');
     }
-    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_method_counter_async_get != 31515) {
-      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_method_counter_async_get`: expected 31515, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_method_counter_async_get');
+    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_method_counter_async_get != 58238) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_method_counter_async_get`: expected 58238, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_method_counter_async_get');
     }
     final int _checksum_uniffi_uniffi_library_mode_demo_checksum_method_counter_get;
     try {
@@ -682,8 +732,8 @@ class LibraryModeDemoFfi {
     } catch (err) {
       throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_uniffi_library_mode_demo_checksum_method_counter_get`: $err');
     }
-    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_method_counter_get != 63821) {
-      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_method_counter_get`: expected 63821, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_method_counter_get');
+    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_method_counter_get != 49126) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_method_counter_get`: expected 49126, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_method_counter_get');
     }
     final int _checksum_uniffi_uniffi_library_mode_demo_checksum_method_counter_increment;
     try {
@@ -692,8 +742,8 @@ class LibraryModeDemoFfi {
     } catch (err) {
       throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_uniffi_library_mode_demo_checksum_method_counter_increment`: $err');
     }
-    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_method_counter_increment != 54696) {
-      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_method_counter_increment`: expected 54696, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_method_counter_increment');
+    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_method_counter_increment != 57178) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_method_counter_increment`: expected 57178, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_method_counter_increment');
     }
     final int _checksum_uniffi_uniffi_library_mode_demo_checksum_constructor_counter_new;
     try {
@@ -702,8 +752,8 @@ class LibraryModeDemoFfi {
     } catch (err) {
       throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_uniffi_library_mode_demo_checksum_constructor_counter_new`: $err');
     }
-    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_constructor_counter_new != 16809) {
-      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_constructor_counter_new`: expected 16809, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_constructor_counter_new');
+    if (_checksum_uniffi_uniffi_library_mode_demo_checksum_constructor_counter_new != 16310) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_uniffi_library_mode_demo_checksum_constructor_counter_new`: expected 16310, got $_checksum_uniffi_uniffi_library_mode_demo_checksum_constructor_counter_new');
     }
   }
 
@@ -1461,6 +1511,120 @@ class LibraryModeDemoFfi {
     }
   }
 
+  late final void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr) _groupedFfiBuffer = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr), void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)>('uniffi_ffibuffer_uniffi_library_mode_demo_fn_func_grouped');
+
+  List<Set<String>> grouped() {
+    final ffi.Pointer<_UniFfiFfiBufferElement> argBuf = calloc<_UniFfiFfiBufferElement>(0);
+    final ffi.Pointer<_UniFfiFfiBufferElement> returnBuf = calloc<_UniFfiFfiBufferElement>(7);
+    final foreignArgPtrs = <ffi.Pointer<ffi.Uint8>>[];
+    final rustRetBufferPtrs = <ffi.Pointer<_UniFfiRustBuffer>>[];
+    try {
+      _groupedFfiBuffer(argBuf, returnBuf);
+      final int statusCode = (returnBuf + 3).ref.i8;
+      if (statusCode != _uniFfiRustCallStatusSuccess) {
+        final ffi.Pointer<_UniFfiRustBuffer> errBufPtr = calloc<_UniFfiRustBuffer>();
+        errBufPtr.ref
+          ..capacity = (returnBuf + 4).ref.u64
+          ..len = (returnBuf + 5).ref.u64
+          ..data = (returnBuf + 6).ref.ptr.cast<ffi.Uint8>();
+        rustRetBufferPtrs.add(errBufPtr);
+        throw StateError('UniFFI ffibuffer call failed with status $statusCode');
+      }
+      final ffi.Pointer<_UniFfiRustBuffer> retBufPtr = calloc<_UniFfiRustBuffer>();
+      retBufPtr.ref
+        ..capacity = (returnBuf + 0).ref.u64
+        ..len = (returnBuf + 1).ref.u64
+        ..data = (returnBuf + 2).ref.ptr.cast<ffi.Uint8>();
+      rustRetBufferPtrs.add(retBufPtr);
+      final Uint8List retBytes = retBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(retBufPtr.ref.data.asTypedList(retBufPtr.ref.len));
+      final _UniFfiBinaryReader retReader = _UniFfiBinaryReader(retBytes);
+      final decodedValue = (() { final int __len = retReader.readI32(); final out = <Set<String>>[]; for (var i = 0; i < __len; i++) { out.add((() { final int __len = retReader.readI32(); final out = <String>{}; for (var i = 0; i < __len; i++) { out.add(retReader.readString()); } return out; })()); } return out; })();
+      if (!retReader.isDone) {
+        throw StateError('extra bytes remaining while decoding UniFFI ffibuffer return payload');
+      }
+      return decodedValue;
+    } finally {
+      for (final ptr in foreignArgPtrs) {
+        if (ptr != ffi.nullptr) {
+          calloc.free(ptr);
+        }
+      }
+      for (final bufPtr in rustRetBufferPtrs) {
+        if (bufPtr.ref.data == ffi.nullptr && bufPtr.ref.len == 0 && bufPtr.ref.capacity == 0) {
+          continue;
+        }
+        final ffi.Pointer<_UniFfiRustCallStatus> freeStatusPtr = calloc<_UniFfiRustCallStatus>();
+        freeStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
+        freeStatusPtr.ref.errorBuf
+          ..capacity = 0
+          ..len = 0
+          ..data = ffi.nullptr;
+        _uniFfiRustBufferFree(bufPtr.ref, freeStatusPtr);
+        calloc.free(freeStatusPtr);
+        calloc.free(bufPtr);
+      }
+      calloc.free(argBuf);
+      calloc.free(returnBuf);
+    }
+  }
+
+  late final void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr) _idsFfiBuffer = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr), void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)>('uniffi_ffibuffer_uniffi_library_mode_demo_fn_func_ids');
+
+  Set<int> ids() {
+    final ffi.Pointer<_UniFfiFfiBufferElement> argBuf = calloc<_UniFfiFfiBufferElement>(0);
+    final ffi.Pointer<_UniFfiFfiBufferElement> returnBuf = calloc<_UniFfiFfiBufferElement>(7);
+    final foreignArgPtrs = <ffi.Pointer<ffi.Uint8>>[];
+    final rustRetBufferPtrs = <ffi.Pointer<_UniFfiRustBuffer>>[];
+    try {
+      _idsFfiBuffer(argBuf, returnBuf);
+      final int statusCode = (returnBuf + 3).ref.i8;
+      if (statusCode != _uniFfiRustCallStatusSuccess) {
+        final ffi.Pointer<_UniFfiRustBuffer> errBufPtr = calloc<_UniFfiRustBuffer>();
+        errBufPtr.ref
+          ..capacity = (returnBuf + 4).ref.u64
+          ..len = (returnBuf + 5).ref.u64
+          ..data = (returnBuf + 6).ref.ptr.cast<ffi.Uint8>();
+        rustRetBufferPtrs.add(errBufPtr);
+        throw StateError('UniFFI ffibuffer call failed with status $statusCode');
+      }
+      final ffi.Pointer<_UniFfiRustBuffer> retBufPtr = calloc<_UniFfiRustBuffer>();
+      retBufPtr.ref
+        ..capacity = (returnBuf + 0).ref.u64
+        ..len = (returnBuf + 1).ref.u64
+        ..data = (returnBuf + 2).ref.ptr.cast<ffi.Uint8>();
+      rustRetBufferPtrs.add(retBufPtr);
+      final Uint8List retBytes = retBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(retBufPtr.ref.data.asTypedList(retBufPtr.ref.len));
+      final _UniFfiBinaryReader retReader = _UniFfiBinaryReader(retBytes);
+      final decodedValue = (() { final int __len = retReader.readI32(); final out = <int>{}; for (var i = 0; i < __len; i++) { out.add(retReader.readU32()); } return out; })();
+      if (!retReader.isDone) {
+        throw StateError('extra bytes remaining while decoding UniFFI ffibuffer return payload');
+      }
+      return decodedValue;
+    } finally {
+      for (final ptr in foreignArgPtrs) {
+        if (ptr != ffi.nullptr) {
+          calloc.free(ptr);
+        }
+      }
+      for (final bufPtr in rustRetBufferPtrs) {
+        if (bufPtr.ref.data == ffi.nullptr && bufPtr.ref.len == 0 && bufPtr.ref.capacity == 0) {
+          continue;
+        }
+        final ffi.Pointer<_UniFfiRustCallStatus> freeStatusPtr = calloc<_UniFfiRustCallStatus>();
+        freeStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
+        freeStatusPtr.ref.errorBuf
+          ..capacity = 0
+          ..len = 0
+          ..data = ffi.nullptr;
+        _uniFfiRustBufferFree(bufPtr.ref, freeStatusPtr);
+        calloc.free(freeStatusPtr);
+        calloc.free(bufPtr);
+      }
+      calloc.free(argBuf);
+      calloc.free(returnBuf);
+    }
+  }
+
   late final void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr) _makePointFfiBuffer = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr), void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)>('uniffi_ffibuffer_uniffi_library_mode_demo_fn_func_make_point');
 
   Point makePoint(double x, double y) {
@@ -1582,6 +1746,278 @@ class LibraryModeDemoFfi {
       final Uint8List retBytes = retBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(retBufPtr.ref.data.asTypedList(retBufPtr.ref.len));
       final _UniFfiBinaryReader retReader = _UniFfiBinaryReader(retBytes);
       final decodedValue = (() { final int __tag = retReader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return retReader.readString(); })();
+      if (!retReader.isDone) {
+        throw StateError('extra bytes remaining while decoding UniFFI ffibuffer return payload');
+      }
+      return decodedValue;
+    } finally {
+      for (final ptr in foreignArgPtrs) {
+        if (ptr != ffi.nullptr) {
+          calloc.free(ptr);
+        }
+      }
+      for (final bufPtr in rustRetBufferPtrs) {
+        if (bufPtr.ref.data == ffi.nullptr && bufPtr.ref.len == 0 && bufPtr.ref.capacity == 0) {
+          continue;
+        }
+        final ffi.Pointer<_UniFfiRustCallStatus> freeStatusPtr = calloc<_UniFfiRustCallStatus>();
+        freeStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
+        freeStatusPtr.ref.errorBuf
+          ..capacity = 0
+          ..len = 0
+          ..data = ffi.nullptr;
+        _uniFfiRustBufferFree(bufPtr.ref, freeStatusPtr);
+        calloc.free(freeStatusPtr);
+        calloc.free(bufPtr);
+      }
+      calloc.free(argBuf);
+      calloc.free(returnBuf);
+    }
+  }
+
+  late final void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr) _maybeTagsFfiBuffer = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr), void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)>('uniffi_ffibuffer_uniffi_library_mode_demo_fn_func_maybe_tags');
+
+  Set<String>? maybeTags(Set<String>? input) {
+    final ffi.Pointer<_UniFfiFfiBufferElement> argBuf = calloc<_UniFfiFfiBufferElement>(3);
+    final ffi.Pointer<_UniFfiFfiBufferElement> returnBuf = calloc<_UniFfiFfiBufferElement>(7);
+    final foreignArgPtrs = <ffi.Pointer<ffi.Uint8>>[];
+    final rustRetBufferPtrs = <ffi.Pointer<_UniFfiRustBuffer>>[];
+    try {
+      final inputWriter = _UniFfiBinaryWriter();
+      if (input == null) {
+        inputWriter.writeI8(0);
+      } else {
+        inputWriter.writeI8(1);
+        inputWriter.writeI32(input!.length);
+        for (final item in input!) {
+          inputWriter.writeString(item);
+        }
+      }
+      final Uint8List inputBytes = inputWriter.toBytes();
+      final ffi.Pointer<ffi.Uint8> inputPtr = inputBytes.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>(inputBytes.length);
+      if (inputBytes.isNotEmpty) { inputPtr.asTypedList(inputBytes.length).setAll(0, inputBytes); }
+      foreignArgPtrs.add(inputPtr);
+      final ffi.Pointer<_UniFfiRustCallStatus> inputFromBytesStatusPtr = calloc<_UniFfiRustCallStatus>();
+      inputFromBytesStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
+      inputFromBytesStatusPtr.ref.errorBuf
+        ..capacity = 0
+        ..len = 0
+        ..data = ffi.nullptr;
+      final ffi.Pointer<_UniFfiForeignBytes> inputForeignPtr = calloc<_UniFfiForeignBytes>();
+      inputForeignPtr.ref
+        ..len = inputBytes.length
+        ..data = inputPtr;
+      final _UniFfiRustBuffer inputRustBuffer = _uniFfiRustBufferFromBytes(inputForeignPtr.ref, inputFromBytesStatusPtr);
+      calloc.free(inputForeignPtr);
+      final int inputFromBytesCode = inputFromBytesStatusPtr.ref.code;
+      final _UniFfiRustBuffer inputFromBytesErrBuf = inputFromBytesStatusPtr.ref.errorBuf;
+      calloc.free(inputFromBytesStatusPtr);
+      if (inputFromBytesCode != _uniFfiRustCallStatusSuccess) {
+        final ffi.Pointer<_UniFfiRustBuffer> inputFromBytesErrBufPtr = calloc<_UniFfiRustBuffer>();
+        inputFromBytesErrBufPtr.ref
+          ..capacity = inputFromBytesErrBuf.capacity
+          ..len = inputFromBytesErrBuf.len
+          ..data = inputFromBytesErrBuf.data;
+        rustRetBufferPtrs.add(inputFromBytesErrBufPtr);
+        throw StateError('UniFFI rustbuffer_from_bytes failed with status $inputFromBytesCode');
+      }
+      (argBuf + 0).ref.u64 = inputRustBuffer.capacity;
+      (argBuf + 1).ref.u64 = inputRustBuffer.len;
+      (argBuf + 2).ref.ptr = inputRustBuffer.data.cast<ffi.Void>();
+      _maybeTagsFfiBuffer(argBuf, returnBuf);
+      final int statusCode = (returnBuf + 3).ref.i8;
+      if (statusCode != _uniFfiRustCallStatusSuccess) {
+        final ffi.Pointer<_UniFfiRustBuffer> errBufPtr = calloc<_UniFfiRustBuffer>();
+        errBufPtr.ref
+          ..capacity = (returnBuf + 4).ref.u64
+          ..len = (returnBuf + 5).ref.u64
+          ..data = (returnBuf + 6).ref.ptr.cast<ffi.Uint8>();
+        rustRetBufferPtrs.add(errBufPtr);
+        throw StateError('UniFFI ffibuffer call failed with status $statusCode');
+      }
+      final ffi.Pointer<_UniFfiRustBuffer> retBufPtr = calloc<_UniFfiRustBuffer>();
+      retBufPtr.ref
+        ..capacity = (returnBuf + 0).ref.u64
+        ..len = (returnBuf + 1).ref.u64
+        ..data = (returnBuf + 2).ref.ptr.cast<ffi.Uint8>();
+      rustRetBufferPtrs.add(retBufPtr);
+      final Uint8List retBytes = retBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(retBufPtr.ref.data.asTypedList(retBufPtr.ref.len));
+      final _UniFfiBinaryReader retReader = _UniFfiBinaryReader(retBytes);
+      final decodedValue = (() { final int __tag = retReader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return (() { final int __len = retReader.readI32(); final out = <String>{}; for (var i = 0; i < __len; i++) { out.add(retReader.readString()); } return out; })(); })();
+      if (!retReader.isDone) {
+        throw StateError('extra bytes remaining while decoding UniFFI ffibuffer return payload');
+      }
+      return decodedValue;
+    } finally {
+      for (final ptr in foreignArgPtrs) {
+        if (ptr != ffi.nullptr) {
+          calloc.free(ptr);
+        }
+      }
+      for (final bufPtr in rustRetBufferPtrs) {
+        if (bufPtr.ref.data == ffi.nullptr && bufPtr.ref.len == 0 && bufPtr.ref.capacity == 0) {
+          continue;
+        }
+        final ffi.Pointer<_UniFfiRustCallStatus> freeStatusPtr = calloc<_UniFfiRustCallStatus>();
+        freeStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
+        freeStatusPtr.ref.errorBuf
+          ..capacity = 0
+          ..len = 0
+          ..data = ffi.nullptr;
+        _uniFfiRustBufferFree(bufPtr.ref, freeStatusPtr);
+        calloc.free(freeStatusPtr);
+        calloc.free(bufPtr);
+      }
+      calloc.free(argBuf);
+      calloc.free(returnBuf);
+    }
+  }
+
+  late final void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr) _totalFfiBuffer = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr), void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)>('uniffi_ffibuffer_uniffi_library_mode_demo_fn_func_total');
+
+  int total(Set<int> values) {
+    final ffi.Pointer<_UniFfiFfiBufferElement> argBuf = calloc<_UniFfiFfiBufferElement>(3);
+    final ffi.Pointer<_UniFfiFfiBufferElement> returnBuf = calloc<_UniFfiFfiBufferElement>(5);
+    final foreignArgPtrs = <ffi.Pointer<ffi.Uint8>>[];
+    final rustRetBufferPtrs = <ffi.Pointer<_UniFfiRustBuffer>>[];
+    try {
+      final valuesWriter = _UniFfiBinaryWriter();
+      valuesWriter.writeI32(values.length);
+      for (final item in values) {
+        valuesWriter.writeU32(item);
+      }
+      final Uint8List valuesBytes = valuesWriter.toBytes();
+      final ffi.Pointer<ffi.Uint8> valuesPtr = valuesBytes.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>(valuesBytes.length);
+      if (valuesBytes.isNotEmpty) { valuesPtr.asTypedList(valuesBytes.length).setAll(0, valuesBytes); }
+      foreignArgPtrs.add(valuesPtr);
+      final ffi.Pointer<_UniFfiRustCallStatus> valuesFromBytesStatusPtr = calloc<_UniFfiRustCallStatus>();
+      valuesFromBytesStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
+      valuesFromBytesStatusPtr.ref.errorBuf
+        ..capacity = 0
+        ..len = 0
+        ..data = ffi.nullptr;
+      final ffi.Pointer<_UniFfiForeignBytes> valuesForeignPtr = calloc<_UniFfiForeignBytes>();
+      valuesForeignPtr.ref
+        ..len = valuesBytes.length
+        ..data = valuesPtr;
+      final _UniFfiRustBuffer valuesRustBuffer = _uniFfiRustBufferFromBytes(valuesForeignPtr.ref, valuesFromBytesStatusPtr);
+      calloc.free(valuesForeignPtr);
+      final int valuesFromBytesCode = valuesFromBytesStatusPtr.ref.code;
+      final _UniFfiRustBuffer valuesFromBytesErrBuf = valuesFromBytesStatusPtr.ref.errorBuf;
+      calloc.free(valuesFromBytesStatusPtr);
+      if (valuesFromBytesCode != _uniFfiRustCallStatusSuccess) {
+        final ffi.Pointer<_UniFfiRustBuffer> valuesFromBytesErrBufPtr = calloc<_UniFfiRustBuffer>();
+        valuesFromBytesErrBufPtr.ref
+          ..capacity = valuesFromBytesErrBuf.capacity
+          ..len = valuesFromBytesErrBuf.len
+          ..data = valuesFromBytesErrBuf.data;
+        rustRetBufferPtrs.add(valuesFromBytesErrBufPtr);
+        throw StateError('UniFFI rustbuffer_from_bytes failed with status $valuesFromBytesCode');
+      }
+      (argBuf + 0).ref.u64 = valuesRustBuffer.capacity;
+      (argBuf + 1).ref.u64 = valuesRustBuffer.len;
+      (argBuf + 2).ref.ptr = valuesRustBuffer.data.cast<ffi.Void>();
+      _totalFfiBuffer(argBuf, returnBuf);
+      final int statusCode = (returnBuf + 1).ref.i8;
+      if (statusCode != _uniFfiRustCallStatusSuccess) {
+        final ffi.Pointer<_UniFfiRustBuffer> errBufPtr = calloc<_UniFfiRustBuffer>();
+        errBufPtr.ref
+          ..capacity = (returnBuf + 2).ref.u64
+          ..len = (returnBuf + 3).ref.u64
+          ..data = (returnBuf + 4).ref.ptr.cast<ffi.Uint8>();
+        rustRetBufferPtrs.add(errBufPtr);
+        throw StateError('UniFFI ffibuffer call failed with status $statusCode');
+      }
+      return (returnBuf + 0).ref.u32;
+    } finally {
+      for (final ptr in foreignArgPtrs) {
+        if (ptr != ffi.nullptr) {
+          calloc.free(ptr);
+        }
+      }
+      for (final bufPtr in rustRetBufferPtrs) {
+        if (bufPtr.ref.data == ffi.nullptr && bufPtr.ref.len == 0 && bufPtr.ref.capacity == 0) {
+          continue;
+        }
+        final ffi.Pointer<_UniFfiRustCallStatus> freeStatusPtr = calloc<_UniFfiRustCallStatus>();
+        freeStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
+        freeStatusPtr.ref.errorBuf
+          ..capacity = 0
+          ..len = 0
+          ..data = ffi.nullptr;
+        _uniFfiRustBufferFree(bufPtr.ref, freeStatusPtr);
+        calloc.free(freeStatusPtr);
+        calloc.free(bufPtr);
+      }
+      calloc.free(argBuf);
+      calloc.free(returnBuf);
+    }
+  }
+
+  late final void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr) _uniqueTagsFfiBuffer = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr), void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)>('uniffi_ffibuffer_uniffi_library_mode_demo_fn_func_unique_tags');
+
+  Set<String> uniqueTags(Set<String> input) {
+    final ffi.Pointer<_UniFfiFfiBufferElement> argBuf = calloc<_UniFfiFfiBufferElement>(3);
+    final ffi.Pointer<_UniFfiFfiBufferElement> returnBuf = calloc<_UniFfiFfiBufferElement>(7);
+    final foreignArgPtrs = <ffi.Pointer<ffi.Uint8>>[];
+    final rustRetBufferPtrs = <ffi.Pointer<_UniFfiRustBuffer>>[];
+    try {
+      final inputWriter = _UniFfiBinaryWriter();
+      inputWriter.writeI32(input.length);
+      for (final item in input) {
+        inputWriter.writeString(item);
+      }
+      final Uint8List inputBytes = inputWriter.toBytes();
+      final ffi.Pointer<ffi.Uint8> inputPtr = inputBytes.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>(inputBytes.length);
+      if (inputBytes.isNotEmpty) { inputPtr.asTypedList(inputBytes.length).setAll(0, inputBytes); }
+      foreignArgPtrs.add(inputPtr);
+      final ffi.Pointer<_UniFfiRustCallStatus> inputFromBytesStatusPtr = calloc<_UniFfiRustCallStatus>();
+      inputFromBytesStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
+      inputFromBytesStatusPtr.ref.errorBuf
+        ..capacity = 0
+        ..len = 0
+        ..data = ffi.nullptr;
+      final ffi.Pointer<_UniFfiForeignBytes> inputForeignPtr = calloc<_UniFfiForeignBytes>();
+      inputForeignPtr.ref
+        ..len = inputBytes.length
+        ..data = inputPtr;
+      final _UniFfiRustBuffer inputRustBuffer = _uniFfiRustBufferFromBytes(inputForeignPtr.ref, inputFromBytesStatusPtr);
+      calloc.free(inputForeignPtr);
+      final int inputFromBytesCode = inputFromBytesStatusPtr.ref.code;
+      final _UniFfiRustBuffer inputFromBytesErrBuf = inputFromBytesStatusPtr.ref.errorBuf;
+      calloc.free(inputFromBytesStatusPtr);
+      if (inputFromBytesCode != _uniFfiRustCallStatusSuccess) {
+        final ffi.Pointer<_UniFfiRustBuffer> inputFromBytesErrBufPtr = calloc<_UniFfiRustBuffer>();
+        inputFromBytesErrBufPtr.ref
+          ..capacity = inputFromBytesErrBuf.capacity
+          ..len = inputFromBytesErrBuf.len
+          ..data = inputFromBytesErrBuf.data;
+        rustRetBufferPtrs.add(inputFromBytesErrBufPtr);
+        throw StateError('UniFFI rustbuffer_from_bytes failed with status $inputFromBytesCode');
+      }
+      (argBuf + 0).ref.u64 = inputRustBuffer.capacity;
+      (argBuf + 1).ref.u64 = inputRustBuffer.len;
+      (argBuf + 2).ref.ptr = inputRustBuffer.data.cast<ffi.Void>();
+      _uniqueTagsFfiBuffer(argBuf, returnBuf);
+      final int statusCode = (returnBuf + 3).ref.i8;
+      if (statusCode != _uniFfiRustCallStatusSuccess) {
+        final ffi.Pointer<_UniFfiRustBuffer> errBufPtr = calloc<_UniFfiRustBuffer>();
+        errBufPtr.ref
+          ..capacity = (returnBuf + 4).ref.u64
+          ..len = (returnBuf + 5).ref.u64
+          ..data = (returnBuf + 6).ref.ptr.cast<ffi.Uint8>();
+        rustRetBufferPtrs.add(errBufPtr);
+        throw StateError('UniFFI ffibuffer call failed with status $statusCode');
+      }
+      final ffi.Pointer<_UniFfiRustBuffer> retBufPtr = calloc<_UniFfiRustBuffer>();
+      retBufPtr.ref
+        ..capacity = (returnBuf + 0).ref.u64
+        ..len = (returnBuf + 1).ref.u64
+        ..data = (returnBuf + 2).ref.ptr.cast<ffi.Uint8>();
+      rustRetBufferPtrs.add(retBufPtr);
+      final Uint8List retBytes = retBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(retBufPtr.ref.data.asTypedList(retBufPtr.ref.len));
+      final _UniFfiBinaryReader retReader = _UniFfiBinaryReader(retBytes);
+      final decodedValue = (() { final int __len = retReader.readI32(); final out = <String>{}; for (var i = 0; i < __len; i++) { out.add(retReader.readString()); } return out; })();
       if (!retReader.isDone) {
         throw StateError('extra bytes remaining while decoding UniFFI ffibuffer return payload');
       }
@@ -2165,11 +2601,32 @@ Future<String> greetAsync(String name) {
   return _bindings().greetAsync(name);
 }
 
+List<Set<String>> grouped() {
+  return _bindings().grouped();
+}
+
+Set<int> ids() {
+  return _bindings().ids();
+}
+
 Point makePoint(double x, double y) {
   return _bindings().makePoint(x, y);
 }
 
 String? maybeGreet(String? name) {
   return _bindings().maybeGreet(name);
+}
+
+Set<String>? maybeTags(Set<String>? input) {
+  return _bindings().maybeTags(input);
+}
+
+int total(Set<int> values) {
+  return _bindings().total(values);
+}
+
+/// Sets round-trip through the FFI boundary (uniffi 0.32 HashSet support).
+Set<String> uniqueTags(Set<String> input) {
+  return _bindings().uniqueTags(input);
 }
 

@@ -59,6 +59,34 @@ void main() {
       expect(echoMap({'x': 1, 'y': 2}), {'x': 1, 'y': 2});
     });
 
+    test('uniqueTags round-trips set', () {
+      expect(uniqueTags({'a', 'b', 'c'}), {'a', 'b', 'c'});
+    });
+
+    test('uniqueTags round-trips empty set', () {
+      expect(uniqueTags(<String>{}), <String>{});
+    });
+
+    test('ids returns set of u32', () {
+      expect(ids(), {1, 2, 3});
+    });
+
+    test('total sums set values', () {
+      expect(total({10, 20, 30}), 60);
+    });
+
+    test('grouped returns list of sets', () {
+      final result = grouped();
+      expect(result, hasLength(2));
+      expect(result[0], {'a', 'b'});
+      expect(result[1], isEmpty);
+    });
+
+    test('maybeTags round-trips optional set', () {
+      expect(maybeTags({'x'}), {'x'});
+      expect(maybeTags(null), isNull);
+    });
+
     test('maybeGreet with value', () {
       expect(maybeGreet('Alice'), 'Hello, Alice!');
     });

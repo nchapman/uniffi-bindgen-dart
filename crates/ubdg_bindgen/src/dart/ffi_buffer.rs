@@ -129,9 +129,12 @@ pub(super) fn ffibuffer_ffi_type_from_uniffi_type(type_: &Type) -> Option<FfiTyp
         | Type::Duration
         | Type::Optional { .. }
         | Type::Sequence { .. }
+        | Type::Set { .. }
         | Type::Map { .. }
         | Type::Record { .. }
         | Type::Enum { .. } => Some(FfiType::RustBuffer(None)),
+        // `Type::Box` is scaffolding-only; its buffer repr is the inner type's.
+        Type::Box { inner_type } => ffibuffer_ffi_type_from_uniffi_type(inner_type),
         _ => None,
     }
 }
@@ -256,6 +259,7 @@ pub(super) fn render_ffibuffer_rustbuffer_arg_serialization(
         runtime_unwrapped_type(&arg.type_),
         Type::Map { .. }
             | Type::Sequence { .. }
+            | Type::Set { .. }
             | Type::Optional { .. }
             | Type::Timestamp
             | Type::Duration
@@ -271,6 +275,7 @@ pub(super) fn render_ffibuffer_rustbuffer_arg_serialization(
         Type::Bytes => lowered_arg.clone(),
         Type::Map { .. }
         | Type::Sequence { .. }
+        | Type::Set { .. }
         | Type::Optional { .. }
         | Type::Timestamp
         | Type::Duration => {

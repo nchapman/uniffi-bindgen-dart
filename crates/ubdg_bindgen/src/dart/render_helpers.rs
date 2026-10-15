@@ -153,6 +153,15 @@ pub(super) fn render_literal_default_expr(
         }
         Literal::EmptySequence => Some("const []".to_string()),
         Literal::EmptyMap => Some("const {}".to_string()),
+        Literal::EmptySet => {
+            // A bare `{}` is a Map literal in Dart; a set literal needs an
+            // explicit element type: `const <T>{}`.
+            let elem = match type_ {
+                Type::Set { inner_type } => map_uniffi_type_to_dart(inner_type, custom_types),
+                _ => "dynamic".to_string(),
+            };
+            Some(format!("const <{elem}>{{}}"))
+        }
         Literal::None => Some("null".to_string()),
         Literal::Some { inner } => render_default_value_expr(inner, type_, enums, custom_types),
     }

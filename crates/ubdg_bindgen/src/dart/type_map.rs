@@ -245,6 +245,11 @@ pub(super) fn map_uniffi_type_to_dart(
             "List<{}>",
             map_uniffi_type_to_dart(inner_type, custom_types)
         ),
+        Type::Set { inner_type } => {
+            format!("Set<{}>", map_uniffi_type_to_dart(inner_type, custom_types))
+        }
+        // `Type::Box` only matters for scaffolding generation; bindings use the inner type.
+        Type::Box { inner_type } => map_uniffi_type_to_dart(inner_type, custom_types),
         Type::Map {
             key_type,
             value_type,
@@ -277,6 +282,7 @@ pub(super) fn uniffi_type_uses_json(type_: &Type) -> bool {
             is_runtime_optional_primitive_type(type_) || uniffi_type_uses_json(inner_type)
         }
         Type::Sequence { inner_type } => uniffi_type_uses_json(inner_type),
+        Type::Set { inner_type } | Type::Box { inner_type } => uniffi_type_uses_json(inner_type),
         Type::Custom { builtin, .. } => uniffi_type_uses_json(builtin),
         _ => false,
     }
@@ -288,6 +294,7 @@ pub(super) fn uniffi_type_uses_bytes(type_: &Type) -> bool {
         Type::Optional { inner_type } | Type::Sequence { inner_type } => {
             uniffi_type_uses_bytes(inner_type)
         }
+        Type::Set { inner_type } | Type::Box { inner_type } => uniffi_type_uses_bytes(inner_type),
         Type::Map {
             key_type,
             value_type,
@@ -327,6 +334,7 @@ pub(super) fn collect_custom_types(
 pub(super) fn runtime_unwrapped_type(type_: &Type) -> &Type {
     match type_ {
         Type::Custom { builtin, .. } => runtime_unwrapped_type(builtin),
+        Type::Box { inner_type } => runtime_unwrapped_type(inner_type),
         _ => type_,
     }
 }
@@ -477,9 +485,19 @@ pub(super) fn map_runtime_native_ffi_type(
             Some("_RustBufferVec")
         }
         Type::Sequence { .. } => Some("ffi.Pointer<Utf8>"),
+        // Sets JSON-encode like sequences (Set is Iterable); set<bytes> has no
+        // native runtime helper and stays unsupported in UDL mode (library mode
+        // covers it via the ffi-buffer path).
+        Type::Set { inner_type } if !is_runtime_bytes_type(inner_type) => Some("ffi.Pointer<Utf8>"),
         Type::Map { key_type, .. } if is_runtime_string_type(key_type) => Some("ffi.Pointer<Utf8>"),
         Type::Map { .. } => Some("_RustBuffer"),
         Type::Optional { inner_type } if is_runtime_string_type(inner_type) => {
+            Some("ffi.Pointer<Utf8>")
+        }
+        // Optional sets JSON-encode like optional sequences (null -> nullptr).
+        Type::Optional { inner_type }
+            if matches!(runtime_unwrapped_type(inner_type), Type::Set { .. }) =>
+        {
             Some("ffi.Pointer<Utf8>")
         }
         Type::Optional { inner_type } if is_runtime_object_type(inner_type) => Some("ffi.Uint64"),
@@ -540,9 +558,19 @@ pub(super) fn map_runtime_dart_ffi_type(
             Some("_RustBufferVec")
         }
         Type::Sequence { .. } => Some("ffi.Pointer<Utf8>"),
+        // Sets JSON-encode like sequences (Set is Iterable); set<bytes> has no
+        // native runtime helper and stays unsupported in UDL mode (library mode
+        // covers it via the ffi-buffer path).
+        Type::Set { inner_type } if !is_runtime_bytes_type(inner_type) => Some("ffi.Pointer<Utf8>"),
         Type::Map { key_type, .. } if is_runtime_string_type(key_type) => Some("ffi.Pointer<Utf8>"),
         Type::Map { .. } => Some("_RustBuffer"),
         Type::Optional { inner_type } if is_runtime_string_type(inner_type) => {
+            Some("ffi.Pointer<Utf8>")
+        }
+        // Optional sets JSON-encode like optional sequences (null -> nullptr).
+        Type::Optional { inner_type }
+            if matches!(runtime_unwrapped_type(inner_type), Type::Set { .. }) =>
+        {
             Some("ffi.Pointer<Utf8>")
         }
         Type::Optional { inner_type } if is_runtime_object_type(inner_type) => Some("int"),

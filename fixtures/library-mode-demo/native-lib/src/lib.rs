@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::Arc;
 
@@ -128,6 +128,32 @@ async fn divide_async(a: u32, b: u32) -> Result<u32, ArithError> {
 #[uniffi::export]
 fn echo_label(label: Label) -> Label {
     label
+}
+
+/// Sets round-trip through the FFI boundary (uniffi 0.32 HashSet support).
+#[uniffi::export]
+fn unique_tags(input: HashSet<String>) -> HashSet<String> {
+    input.into_iter().collect()
+}
+
+#[uniffi::export]
+fn ids() -> HashSet<u32> {
+    [1, 2, 3].into_iter().collect()
+}
+
+#[uniffi::export]
+fn grouped() -> Vec<HashSet<String>> {
+    vec![["a", "b"].iter().map(|s| s.to_string()).collect(), HashSet::new()]
+}
+
+#[uniffi::export]
+fn maybe_tags(input: Option<HashSet<String>>) -> Option<HashSet<String>> {
+    input
+}
+
+#[uniffi::export]
+fn total(values: HashSet<u32>) -> u32 {
+    values.iter().sum()
 }
 
 uniffi::setup_scaffolding!("library_mode_demo");
